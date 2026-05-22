@@ -84,7 +84,15 @@
 	});
 
 	const hasBlog = $derived(!!(page.data as any).hasBlog);
-	const visibleLinks = $derived(navLinks.filter(l => l.href !== 'blog' || hasBlog));
+	const enabledNavItems = $derived((page.data as any).enabledNavItems as string[] | null);
+
+	const visibleLinks = $derived(
+		enabledNavItems && enabledNavItems.length > 0
+			? enabledNavItems
+				.map((href: string) => navLinks.find(l => l.href === href))
+				.filter((l): l is { href: string; label: string } => !!l && (l.href !== 'blog' || hasBlog))
+			: navLinks.filter(l => l.href !== 'blog' || hasBlog)
+	);
 
 	const currentSeason = $derived(
 		seasonChain.find(e => e.leagueId === leagueId)?.season ?? league?.season ?? null

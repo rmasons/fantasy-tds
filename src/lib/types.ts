@@ -5,6 +5,8 @@ export interface UserProfile {
 	sleeperUsername: string | null;
 	/** leagueId of the last league the user viewed */
 	lastLeagueId: string | null;
+	/** Set manually in Firestore to grant admin panel access */
+	isAdmin?: boolean;
 }
 
 export interface SleeperUser {
