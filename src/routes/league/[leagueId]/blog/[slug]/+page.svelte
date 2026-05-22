@@ -60,7 +60,11 @@
 			case 'unordered-list': return `<ul class="list-disc pl-6 mb-4 space-y-1">${children}</ul>`;
 			case 'ordered-list': return `<ol class="list-decimal pl-6 mb-4 space-y-1">${children}</ol>`;
 			case 'list-item': return `<li class="text-gray-300">${children}</li>`;
-			case 'hyperlink': return `<a href="${node.data?.uri ?? '#'}" class="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">${children}</a>`;
+			case 'hyperlink': {
+				const uri = node.data?.uri ?? '';
+				const safeHref = /^https?:\/\//i.test(uri) ? uri : '#';
+				return `<a href="${safeHref}" class="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">${children}</a>`;
+			}
 			case 'hr': return `<hr class="my-6 border-gray-700" />`;
 			case 'blockquote': return `<blockquote class="border-l-4 border-gray-600 pl-4 italic text-gray-400 my-4">${children}</blockquote>`;
 			case 'embedded-asset-block':
@@ -69,18 +73,15 @@
 				const asset = id ? assetMap.get(id) : null;
 				const f = asset?.fields ?? node.data?.target?.fields;
 				const rawUrl: string = f?.file?.url ?? '';
-				// Contentful returns protocol-relative (//...) or full https:// URLs — handle both
 				const url = rawUrl
 					? (rawUrl.startsWith('http') ? rawUrl : `https:${rawUrl}`)
 					: null;
-				// Escape quotes so a title like `"foo"` doesn't break the alt attribute
-				const alt = (f?.title ?? f?.description ?? '').replace(/"/g, '&quot;');
 				if (!url) return '';
-				// No loading="lazy" — Chrome doesn't reliably trigger lazy loads on innerHTML-injected images
-				const img = `<img src="${url}" alt="${alt}" class="max-w-full rounded-lg" />`;
+				const alt = (f?.title ?? f?.description ?? '').replace(/"/g, '&quot;');
+				const img = `<img src="${url}" alt="${alt}" style="max-width:100%;border-radius:0.5rem;display:block" />`;
 				return node.nodeType === 'embedded-asset-inline'
 					? img
-					: `<figure class="my-6 flex justify-center">${img}</figure>`;
+					: `<figure style="margin:1.5rem 0;text-align:center">${img}</figure>`;
 			}
 			case 'table': return `<div class="overflow-x-auto my-4"><table class="w-full text-sm border-collapse">${children}</table></div>`;
 			case 'table-row': return `<tr class="border-b border-gray-800">${children}</tr>`;

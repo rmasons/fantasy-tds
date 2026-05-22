@@ -45,6 +45,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 	if (!locals.user) throw error(401, 'You must be signed in to comment.');
 
+	// Rate limit: one comment per 30 seconds per user
+	const userRef = adminDb.collection('users').doc(locals.user.uid);
+	const userSnap = await userRef.get();
+	const lastAt: number = userSnap.data()?.lastCommentAt ?? 0;
+	if (Date.now() - lastAt < COMMENT_RATE_LIMIT_MS) {
+		throw error(429, 'Please wait before posting another comment.');
+	}
+
 	const body = await request.json().catch(() => null);
 	if (!body?.postId || !body?.comment?.trim()) {
 		throw error(400, 'postId and comment are required.');
@@ -53,7 +61,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const author = locals.user.sleeperUsername ?? locals.user.email ?? 'Anonymous';
 	const comment = String(body.comment).trim().slice(0, 1000);
 
-	// Create draft entry via Contentful Management API
+	// Create draft entry via Contentful Management API (published via manual moderation)
 	const createRes = await fetch(
 		`https://api.contentful.com/spaces/${spaceId}/environments/master/entries`,
 		{
@@ -74,28 +82,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	);
 
 	if (!createRes.ok) {
-		const detail = await createRes.text().catch(() => '');
-		throw error(502, `Failed to save comment: ${detail}`);
+		console.error('[comments] Contentful create failed:', await createRes.text().catch(() => ''));
+		throw error(502, 'Failed to save comment.');
 	}
 
-	const entry = await createRes.json();
+	await userRef.update({ lastCommentAt: Date.now() });
 
-	// Publish immediately
-	const publishRes = await fetch(
-		`https://api.contentful.com/spaces/${spaceId}/environments/master/entries/${entry.sys.id}/published`,
-		{
-			method: 'PUT',
-			headers: {
-				Authorization: `Bearer ${mgmtToken}`,
-				'X-Contentful-Version': String(entry.sys.version),
-			},
-		}
-	);
-
-	if (!publishRes.ok) {
-		// Comment was created but not published — still return success so it goes live after manual review
-		return json({ ok: true, published: false });
-	}
-
-	return json({ ok: true, published: true });
+	return json({ ok: true, published: false });
 };
