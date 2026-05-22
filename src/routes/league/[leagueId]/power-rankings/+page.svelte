@@ -1,0 +1,608 @@
+<script lang="ts">
+	import type { LayoutData } from '../$types';
+	import { fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
+
+	let { data } = $props<{ data: LayoutData }>();
+
+	interface PowerRank {
+		rosterId: number;
+		teamName: string;
+		ownerName: string;
+		avatar: string | null;
+		wins: number;       // H2H wins through selectedWeek
+		losses: number;
+		ties: number;
+		totalPF: number;    // cumulative through selectedWeek
+		score: number;      // PF × (2 + h2hWin% + medianWin%)
+		rank: number;
+		delta: number | null;
+		playoffOdds: number | null;
+	}
+
+	interface RosterBase {
+		rosterId: number;
+		teamName: string;
+		ownerName: string;
+		avatar: string | null;
+		wins: number;     // official Sleeper record (includes median wins if enabled)
+		losses: number;
+		ties: number;
+		totalPF: number;  // official season total PF
+	}
+
+	let rosterBaseData = $state<RosterBase[]>([]);
+	let weekScoreMap = $state<Map<number, Map<number, number>>>(new Map());
+	let weekMatchupPairs = $state<Map<number, [number, number][]>>(new Map());
+	let weekMedians = $state<Map<number, number>>(new Map());
+	let futureSchedule = $state<[number, number][][]>([]);
+	let selectedWeek = $state(0);
+	let currentWeek = $state(0);
+	let weeksRemaining = $state(0);
+	let playoffSpots = $state(0);
+	let loading = $state(true);
+	let error = $state('');
+
+	const SIM_COUNT = 10_000;
+
+	// ── Power score computation ────────────────────────────────────────────────
+	//
+	// Score = PF × (2 + H2H Win% + Median Win%)
+	//   PF:           cumulative points through `throughWeek`
+	//   H2H Win%:     actual matchup wins / games played
+	//   Median Win%:  weeks above median score / weeks played
+	//
+	// Returns a map of rosterId → { score, rank, wins, losses, ties, pf }
+
+	function computePowerRankMap(
+		rosterIds: number[],
+		throughWeek: number,
+		scoreMap: Map<number, Map<number, number>>,
+		pairMap: Map<number, [number, number][]>,
+		medianMap: Map<number, number>
+	): Map<number, { score: number; rank: number; wins: number; losses: number; ties: number; pf: number }> {
+		const w = new Map(rosterIds.map((id) => [id, 0]));
+		const l = new Map(rosterIds.map((id) => [id, 0]));
+		const t = new Map(rosterIds.map((id) => [id, 0]));
+		const pf = new Map(rosterIds.map((id) => [id, 0]));
+		const mw = new Map(rosterIds.map((id) => [id, 0]));
+
+		for (let week = 1; week <= throughWeek; week++) {
+			const scores = scoreMap.get(week) ?? new Map<number, number>();
+			const pairs = pairMap.get(week) ?? [];
+			const median = medianMap.get(week) ?? 0;
+
+			for (const [a, b] of pairs) {
+				const sa = scores.get(a) ?? 0;
+				const sb = scores.get(b) ?? 0;
+				if (sa > sb) { w.set(a, w.get(a)! + 1); l.set(b, l.get(b)! + 1); }
+				else if (sb > sa) { w.set(b, w.get(b)! + 1); l.set(a, l.get(a)! + 1); }
+				else { t.set(a, t.get(a)! + 1); t.set(b, t.get(b)! + 1); }
+			}
+
+			for (const [id, pts] of scores) {
+				pf.set(id, (pf.get(id) ?? 0) + pts);
+				if (pts > median) mw.set(id, mw.get(id)! + 1);
+			}
+		}
+
+		const entries = rosterIds.map((id) => {
+			const wins = w.get(id) ?? 0;
+			const losses = l.get(id) ?? 0;
+			const ties = t.get(id) ?? 0;
+			const points = pf.get(id) ?? 0;
+			const medWins = mw.get(id) ?? 0;
+			const games = wins + losses + ties;
+			const h2hWinPct = games > 0 ? (wins + 0.5 * ties) / games : 0;
+			const medWinPct = throughWeek > 0 ? medWins / throughWeek : 0;
+			const score = points * (2 + h2hWinPct + medWinPct);
+			return { id, score, rank: 0, wins, losses, ties, pf: points };
+		});
+
+		entries.sort((a, b) => b.score - a.score);
+		const result = new Map<number, { score: number; rank: number; wins: number; losses: number; ties: number; pf: number }>();
+		entries.forEach((e, i) => result.set(e.id, { ...e, rank: i + 1 }));
+		return result;
+	}
+
+	// ── Monte Carlo simulation ─────────────────────────────────────────────────
+	//
+	// `weeklyAvgPts` is used (not the power score) so Gaussian noise (std ≈ 20)
+	// stays physically meaningful relative to per-week scoring.
+
+	function randn(): number {
+		return Math.sqrt(-2 * Math.log(Math.random())) * Math.cos(2 * Math.PI * Math.random());
+	}
+
+	function simulateOdds(
+		teams: { rosterId: number; wins: number; losses: number; totalPF: number; weeklyAvgPts: number }[],
+		schedule: [number, number][][],
+		spots: number
+	): Map<number, number> {
+		const leagueAvg = teams.reduce((s, t) => s + t.weeklyAvgPts, 0) / (teams.length || 1) || 100;
+		const expScore = new Map(teams.map((t) => [t.rosterId, t.weeklyAvgPts > 0 ? t.weeklyAvgPts : leagueAvg]));
+		const qualified = new Map(teams.map((t) => [t.rosterId, 0]));
+
+		for (let sim = 0; sim < SIM_COUNT; sim++) {
+			const simWins = new Map(teams.map((t) => [t.rosterId, t.wins]));
+			const simPF = new Map(teams.map((t) => [t.rosterId, t.totalPF]));
+
+			for (const weekMatchups of schedule) {
+				for (const [a, b] of weekMatchups) {
+					const ptsA = Math.max(0, expScore.get(a)! + randn() * 20);
+					const ptsB = Math.max(0, expScore.get(b)! + randn() * 20);
+					if (ptsA >= ptsB) simWins.set(a, simWins.get(a)! + 1);
+					else simWins.set(b, simWins.get(b)! + 1);
+					simPF.set(a, simPF.get(a)! + ptsA);
+					simPF.set(b, simPF.get(b)! + ptsB);
+				}
+			}
+
+			const ranked = [...teams].sort((x, y) => {
+				const wDiff = simWins.get(y.rosterId)! - simWins.get(x.rosterId)!;
+				return wDiff !== 0 ? wDiff : simPF.get(y.rosterId)! - simPF.get(x.rosterId)!;
+			});
+
+			for (let i = 0; i < Math.min(spots, ranked.length); i++) {
+				qualified.set(ranked[i].rosterId, qualified.get(ranked[i].rosterId)! + 1);
+			}
+		}
+
+		return new Map([...qualified.entries()].map(([id, n]) => [id, (n / SIM_COUNT) * 100]));
+	}
+
+	// ── Main data load ─────────────────────────────────────────────────────────
+
+	$effect(() => {
+		const leagueId = data.leagueId;
+		rosterBaseData = [];
+		weekScoreMap = new Map();
+		weekMatchupPairs = new Map();
+		weekMedians = new Map();
+		futureSchedule = [];
+		selectedWeek = 0;
+		currentWeek = 0;
+		weeksRemaining = 0;
+		playoffSpots = 0;
+		loading = true;
+		error = '';
+
+		(async () => {
+			try {
+				const [{ league, rosters, users }, nfl] = await Promise.all([
+					fetchLeagueCore(leagueId),
+					fetchNflState(),
+				]);
+
+				if (data.leagueId !== leagueId) return;
+
+				const playoffStart: number = league.settings.playoff_week_start ?? 15;
+				const spots = league.settings.playoff_teams ?? 6;
+				playoffSpots = spots;
+
+				let completedWeeks = 0;
+				if (nfl.season_type === 'regular') {
+					completedWeeks = Math.max(0, nfl.display_week - 1);
+				} else if (nfl.season_type === 'post' || league.status === 'complete') {
+					completedWeeks = playoffStart - 1;
+				}
+				completedWeeks = Math.min(completedWeeks, playoffStart - 1);
+				currentWeek = completedWeeks;
+				selectedWeek = completedWeeks;
+
+				const remaining = Math.max(0, playoffStart - 1 - completedWeeks);
+				weeksRemaining = remaining;
+
+				const rosterInfo = buildRosterInfoMap(rosters, users);
+				rosterBaseData = rosters.map((r) => {
+					const info = rosterInfo.get(r.roster_id)!;
+					return {
+						rosterId: r.roster_id,
+						teamName: info.teamName,
+						ownerName: info.ownerName,
+						avatar: info.avatar,
+						wins: r.settings.wins ?? 0,
+						losses: r.settings.losses ?? 0,
+						ties: r.settings.ties ?? 0,
+						totalPF: combineFpts(r.settings.fpts, r.settings.fpts_decimal),
+					};
+				});
+
+				if (completedWeeks === 0) return;
+
+				// Fetch all completed weeks + future schedule in parallel
+				const allWeeks = Array.from({ length: completedWeeks }, (_, i) => i + 1);
+				const futureWeeks = Array.from({ length: remaining }, (_, i) => completedWeeks + 1 + i);
+
+				const [allHistDataArr, futureDataArr] = await Promise.all([
+					Promise.all(allWeeks.map((w) => fetchMatchups(leagueId, w))),
+					Promise.all(futureWeeks.map((w) => fetchMatchups(leagueId, w))),
+				]);
+
+				if (data.leagueId !== leagueId) return;
+
+				// Build score map, matchup pairs, and medians for every completed week
+				const newWeekScoreMap = new Map<number, Map<number, number>>();
+				const newWeekMatchupPairs = new Map<number, [number, number][]>();
+				const newWeekMedians = new Map<number, number>();
+
+				for (let i = 0; i < allWeeks.length; i++) {
+					const week = allWeeks[i];
+					const wm = new Map<number, number>();
+					const groups = new Map<number, number[]>();
+
+					for (const m of allHistDataArr[i]) {
+						const pts = m.points ?? 0;
+						wm.set(m.roster_id, pts);
+						if (m.matchup_id != null) {
+							if (!groups.has(m.matchup_id)) groups.set(m.matchup_id, []);
+							groups.get(m.matchup_id)!.push(m.roster_id);
+						}
+					}
+
+					// Compute true median from sorted scores
+					const sorted = [...wm.values()].filter((p) => p > 0).sort((a, b) => a - b);
+					if (sorted.length > 0) {
+						const mid = Math.floor(sorted.length / 2);
+						const median = sorted.length % 2 === 0
+							? (sorted[mid - 1] + sorted[mid]) / 2
+							: sorted[mid];
+						newWeekMedians.set(week, median);
+					}
+
+					newWeekScoreMap.set(week, wm);
+					newWeekMatchupPairs.set(
+						week,
+						[...groups.values()].filter((p) => p.length === 2).map((p) => [p[0], p[1]])
+					);
+				}
+
+				weekScoreMap = newWeekScoreMap;
+				weekMatchupPairs = newWeekMatchupPairs;
+				weekMedians = newWeekMedians;
+
+				// Build future schedule
+				futureSchedule = futureDataArr.map((weekData) => {
+					const groups = new Map<number, number[]>();
+					for (const m of weekData) {
+						if (!groups.has(m.matchup_id)) groups.set(m.matchup_id, []);
+						groups.get(m.matchup_id)!.push(m.roster_id);
+					}
+					return [...groups.values()]
+						.filter((p) => p.length === 2)
+						.map((p) => [p[0], p[1]] as [number, number]);
+				});
+
+			} catch (e: any) {
+				if (data.leagueId !== leagueId) return;
+				error = e.message;
+			} finally {
+				if (data.leagueId !== leagueId) return;
+				loading = false;
+			}
+		})();
+	});
+
+	// ── Reactive rankings ─────────────────────────────────────────────────────
+
+	const rankings = $derived.by((): PowerRank[] => {
+		if (rosterBaseData.length === 0) return [];
+
+		const rosterIds = rosterBaseData.map((r) => r.rosterId);
+
+		// Pre-season: no matchup data yet
+		if (weekScoreMap.size === 0) {
+			const rows: PowerRank[] = rosterBaseData.map((r) => ({
+				...r,
+				score: r.totalPF,
+				rank: 0,
+				delta: null,
+				playoffOdds: null,
+			}));
+			rows.sort((a, b) => b.wins - a.wins || b.totalPF - a.totalPF);
+			rows.forEach((r, i) => (r.rank = i + 1));
+			return rows;
+		}
+
+		const currMap = computePowerRankMap(rosterIds, selectedWeek, weekScoreMap, weekMatchupPairs, weekMedians);
+		const prevMap = selectedWeek > 0
+			? computePowerRankMap(rosterIds, selectedWeek - 1, weekScoreMap, weekMatchupPairs, weekMedians)
+			: null;
+
+		const rows: PowerRank[] = rosterBaseData.map((r) => {
+			const curr = currMap.get(r.rosterId) ?? { score: 0, rank: 0, wins: r.wins, losses: r.losses, ties: r.ties, pf: r.totalPF };
+			const prev = prevMap?.get(r.rosterId) ?? null;
+			return {
+				...r,
+				wins: curr.wins,
+				losses: curr.losses,
+				ties: curr.ties,
+				totalPF: curr.pf,
+				score: curr.score,
+				rank: curr.rank,
+				delta: prev !== null ? prev.rank - curr.rank : null,
+				playoffOdds: null,
+			};
+		});
+		rows.sort((a, b) => a.rank - b.rank);
+
+		// Playoff odds for any selected week
+		if (selectedWeek > 0) {
+			const historicalFutureWeeks = Array.from(
+				{ length: currentWeek - selectedWeek },
+				(_, i) => selectedWeek + 1 + i
+			).map((w) => weekMatchupPairs.get(w) ?? ([] as [number, number][]));
+
+			const scheduleFromHere: [number, number][][] = [...historicalFutureWeeks, ...futureSchedule];
+			const totalRemainingFromHere = currentWeek + weeksRemaining - selectedWeek;
+
+			let oddsMap: Map<number, number> | null = null;
+
+			if (totalRemainingFromHere > 0 && scheduleFromHere.some((w) => w.length > 0)) {
+				// Use avg weekly PF as the expected score for simulation (not the cumulative power score)
+				const simInput = rows.map((r) => ({
+					rosterId: r.rosterId,
+					wins: r.wins,
+					losses: r.losses,
+					totalPF: r.totalPF,
+					weeklyAvgPts: selectedWeek > 0 ? r.totalPF / selectedWeek : 0,
+				}));
+				oddsMap = simulateOdds(simInput, scheduleFromHere, playoffSpots);
+			} else if (totalRemainingFromHere === 0) {
+				// Season complete — use official Sleeper records (includes median wins) for qualification
+				const officialRanked = rosterBaseData
+					.slice()
+					.sort((a, b) => b.wins - a.wins || b.totalPF - a.totalPF);
+				oddsMap = new Map(officialRanked.map((r, i) => [r.rosterId, i < playoffSpots ? 100 : 0]));
+			}
+
+			if (oddsMap) {
+				for (const row of rows) row.playoffOdds = oddsMap.get(row.rosterId) ?? null;
+			}
+		}
+
+		return rows;
+	});
+
+	// ── Display helpers ────────────────────────────────────────────────────────
+
+	function deltaLabel(d: number | null): string {
+		if (d === null || d === 0) return '—';
+		return d > 0 ? `▲${d}` : `▼${Math.abs(d)}`;
+	}
+
+	function deltaClass(d: number | null): string {
+		if (d === null || d === 0) return 'text-slate-600';
+		return d > 0 ? 'text-emerald-400' : 'text-red-400';
+	}
+
+	function oddsClass(odds: number | null): string {
+		if (odds === null) return 'text-slate-600';
+		if (odds >= 80) return 'text-emerald-400 font-bold';
+		if (odds >= 50) return 'text-emerald-600';
+		if (odds >= 20) return 'text-slate-400';
+		return 'text-red-400';
+	}
+
+	function oddsLabel(odds: number | null, isFinal = false): string {
+		if (odds === null) return '—';
+		if (odds >= 99.5) return isFinal ? '100%' : '99%';
+		if (odds <= 0.5) return '<1%';
+		return `${odds.toFixed(0)}%`;
+	}
+
+	function rankBadge(rank: number): string {
+		if (rank === 1) return 'text-amber-400 font-bold';
+		if (rank === 2) return 'text-slate-300 font-semibold';
+		if (rank === 3) return 'text-amber-700 font-semibold';
+		return 'text-slate-500';
+	}
+
+	const isCurrentView = $derived(selectedWeek === currentWeek && currentWeek > 0);
+	const weeksRemainingFromHere = $derived(currentWeek + weeksRemaining - selectedWeek);
+	const playoffLine = $derived(rankings.length > 0 && playoffSpots > 0 ? playoffSpots : null);
+</script>
+
+<div>
+	<!-- Header -->
+	<div class="flex items-start justify-between mb-6 flex-wrap gap-3">
+		<div>
+			<h1 class="text-2xl font-extrabold text-white">Power Rankings</h1>
+			<p class="text-slate-500 text-sm mt-0.5">
+				{#if currentWeek === 0}
+					Pre-season · ordered by record
+				{:else if !isCurrentView}
+					Historical · as of Week {selectedWeek}
+				{:else if weeksRemaining === 0}
+					Final · regular season complete
+				{:else}
+					Week {currentWeek} · {weeksRemaining} week{weeksRemaining !== 1 ? 's' : ''} remaining
+				{/if}
+			</p>
+		</div>
+
+		<!-- Week navigator -->
+		{#if currentWeek > 0 && !loading}
+			<div class="flex items-center gap-0.5 bg-slate-900 rounded-xl p-1">
+				<button
+					onclick={() => { if (selectedWeek > 1) selectedWeek -= 1; }}
+					disabled={selectedWeek <= 1}
+					class="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
+				>‹</button>
+				<select
+					value={selectedWeek}
+					onchange={(e) => { selectedWeek = parseInt((e.target as HTMLSelectElement).value); }}
+					class="bg-transparent text-sm font-semibold text-white px-2 py-1.5 focus:outline-none cursor-pointer"
+				>
+					{#each Array.from({ length: currentWeek }, (_, i) => i + 1) as w}
+						<option value={w} class="bg-slate-900">
+							Week {w}{w === currentWeek ? ' (current)' : ''}
+						</option>
+					{/each}
+				</select>
+				<button
+					onclick={() => { if (selectedWeek < currentWeek) selectedWeek += 1; }}
+					disabled={selectedWeek >= currentWeek}
+					class="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
+				>›</button>
+			</div>
+		{/if}
+	</div>
+
+	{#if loading}
+		<div class="space-y-2">
+			{#each Array(10) as _}
+				<div class="h-14 bg-slate-800 rounded-xl animate-pulse"></div>
+			{/each}
+		</div>
+
+	{:else if error}
+		<div class="bg-slate-900 rounded-xl border border-slate-800 p-6 text-center">
+			<p class="text-slate-400">Failed to load power rankings.</p>
+			<p class="text-slate-600 text-sm mt-1">{error}</p>
+		</div>
+
+	{:else if rankings.length === 0}
+		<p class="text-slate-400">No data available yet.</p>
+
+	{:else}
+		<!-- Sub-header -->
+		{#if currentWeek > 0}
+			<div class="mb-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+				{#if !isCurrentView}
+					<span class="inline-flex items-center bg-slate-800 text-slate-400 text-xs font-medium px-2.5 py-1 rounded-full ring-1 ring-slate-700">
+						Historical view
+					</span>
+				{/if}
+				<span>Score = (PF × 2) + (PF × Win%) + (PF × Median Win%)</span>
+				<span class="text-slate-700">·</span>
+				{#if weeksRemainingFromHere > 0}
+					<span>Playoff % = {SIM_COUNT.toLocaleString()}-sim Monte Carlo,
+						top {playoffSpots} qualify ({weeksRemainingFromHere} wk{weeksRemainingFromHere !== 1 ? 's' : ''} remaining)</span>
+				{:else}
+					<span>Playoff % = actual final standings</span>
+				{/if}
+			</div>
+		{/if}
+
+		<!-- Desktop table -->
+		<div class="hidden sm:block overflow-x-auto rounded-xl border border-slate-800">
+			<table class="w-full text-sm">
+				<thead>
+					<tr class="bg-slate-900/80 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-800">
+						<th class="px-4 py-3 text-left w-8">#</th>
+						<th class="px-3 py-3 text-center w-10">Δ</th>
+						<th class="px-4 py-3 text-left">Team</th>
+						<th class="px-4 py-3 text-center">Record</th>
+						<th class="px-4 py-3 text-right">Total PF</th>
+						<th class="px-4 py-3 text-right">Score</th>
+						<th class="px-4 py-3 text-right">Playoff %</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each rankings as row, i}
+						{@const atCutline = playoffLine !== null && i === playoffLine - 1}
+						{@const belowCutline = playoffLine !== null && i >= playoffLine}
+						<tr class="border-t border-slate-800/60 hover:bg-slate-800/40 transition-colors
+						           {i % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900/30'}
+						           {row.rank === 1 ? 'bg-amber-500/5' : ''}
+						           {belowCutline ? 'opacity-75' : ''}">
+							<td class="px-4 py-3">
+								<span class="font-mono text-xs {rankBadge(row.rank)}">{row.rank}</span>
+							</td>
+							<td class="px-3 py-3 text-center">
+								<span class="text-xs font-bold {deltaClass(row.delta)}">{deltaLabel(row.delta)}</span>
+							</td>
+							<td class="px-4 py-3">
+								<div class="flex items-center gap-3">
+									{#if row.avatar}
+										<img src={row.avatar} alt="" class="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-slate-700" />
+									{:else}
+										<div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0 text-sm">🏈</div>
+									{/if}
+									<div>
+										<p class="font-semibold text-white leading-tight">{row.teamName}</p>
+										{#if row.ownerName && row.ownerName !== row.teamName}
+											<p class="text-xs text-slate-500">{row.ownerName}</p>
+										{/if}
+									</div>
+								</div>
+							</td>
+							<td class="px-4 py-3 text-center text-slate-400 tabular-nums text-xs">
+								{row.wins}–{row.losses}{row.ties > 0 ? `–${row.ties}` : ''}
+							</td>
+							<td class="px-4 py-3 text-right font-mono text-xs text-slate-400 tabular-nums">
+								{row.totalPF.toFixed(1)}
+							</td>
+							<td class="px-4 py-3 text-right">
+								<span class="font-mono font-bold text-white tabular-nums">
+									{row.score > 0 ? row.score.toFixed(2) : '—'}
+								</span>
+							</td>
+							<td class="px-4 py-3 text-right tabular-nums {oddsClass(row.playoffOdds)}">
+								{oddsLabel(row.playoffOdds, weeksRemainingFromHere === 0)}
+							</td>
+						</tr>
+						<!-- Playoff cutline -->
+						{#if atCutline && selectedWeek > 0 && weeksRemainingFromHere > 0}
+							<tr class="border-t border-blue-500/40">
+								<td colspan="99" class="px-4 py-1 bg-blue-500/5">
+									<span class="text-xs text-blue-400/70 font-medium">— Playoff line —</span>
+								</td>
+							</tr>
+						{/if}
+					{/each}
+				</tbody>
+			</table>
+		</div>
+
+		<!-- Mobile cards -->
+		<div class="sm:hidden space-y-2">
+			{#each rankings as row, i}
+				{@const atCutline = playoffLine !== null && i === playoffLine && selectedWeek > 0 && weeksRemainingFromHere > 0}
+				{#if atCutline}
+					<div class="px-4 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30">
+						<span class="text-xs text-blue-400/80 font-medium">— Playoff line —</span>
+					</div>
+				{/if}
+				<div class="bg-slate-900 rounded-xl border border-slate-800/60 px-4 py-3
+				            {row.rank === 1 ? 'border-amber-500/30 bg-amber-500/5' : ''}
+				            {playoffLine !== null && i >= playoffLine ? 'opacity-75' : ''}">
+					<div class="flex items-center gap-3">
+						<!-- Rank + delta -->
+						<div class="w-10 shrink-0 text-center">
+							<p class="font-mono text-sm {rankBadge(row.rank)}">{row.rank}</p>
+							<p class="text-xs {deltaClass(row.delta)}">{deltaLabel(row.delta)}</p>
+						</div>
+
+						{#if row.avatar}
+							<img src={row.avatar} alt="" class="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-slate-700" />
+						{:else}
+							<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center shrink-0">🏈</div>
+						{/if}
+
+						<div class="flex-1 min-w-0">
+							<p class="font-semibold text-white text-sm truncate">{row.teamName}</p>
+							<p class="text-xs text-slate-500">{row.wins}–{row.losses}{row.ties > 0 ? `–${row.ties}` : ''} · {row.totalPF.toFixed(1)} PF</p>
+						</div>
+
+						<div class="shrink-0 text-right">
+							<p class="font-mono font-bold text-white text-sm">{row.score > 0 ? row.score.toFixed(2) : '—'}</p>
+							<p class="text-xs {oddsClass(row.playoffOdds)}">{oddsLabel(row.playoffOdds, weeksRemainingFromHere === 0)}</p>
+						</div>
+					</div>
+				</div>
+			{/each}
+		</div>
+
+		<!-- Legend -->
+		{#if currentWeek > 0}
+			<div class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+				<span>Score = (PF × 2) + (PF × H2H Win%) + (PF × Median Win%)</span>
+				{#if selectedWeek > 0 && weeksRemainingFromHere > 0}
+					<span>·</span>
+					<span>Playoff % simulates {weeksRemainingFromHere} remaining wk{weeksRemainingFromHere !== 1 ? 's' : ''} using actual schedule</span>
+				{/if}
+			</div>
+		{/if}
+	{/if}
+</div>

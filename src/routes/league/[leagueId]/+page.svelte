@@ -95,16 +95,17 @@
 	});
 
 	const navItems = [
-		{ href: 'standings',    label: 'Standings',    icon: '🏆' },
-		{ href: 'matchups',     label: 'Matchups',     icon: '⚔️' },
-		{ href: 'rosters',      label: 'Rosters',      icon: '📋' },
-		{ href: 'records',      label: 'Records',      icon: '📊' },
-		{ href: 'transactions', label: 'Transactions', icon: '🔄' },
-		{ href: 'drafts',       label: 'Drafts',       icon: '🎯' },
-		{ href: 'awards',       label: 'Awards',       icon: '🥇' },
-		{ href: 'managers',     label: 'Managers',     icon: '👤' },
-		{ href: 'rivalry',      label: 'Rivalry',      icon: '⚡' },
-		{ href: 'blog',         label: 'Blog',         icon: '📝' },
+		{ href: 'standings',      label: 'Standings',       icon: '🏆' },
+		{ href: 'matchups',       label: 'Matchups',        icon: '⚔️' },
+		{ href: 'power-rankings', label: 'Power Rankings',  icon: '📈' },
+		{ href: 'rosters',        label: 'Rosters',         icon: '📋' },
+		{ href: 'records',        label: 'Records',         icon: '📊' },
+		{ href: 'transactions',   label: 'Transactions',    icon: '🔄' },
+		{ href: 'drafts',         label: 'Drafts',          icon: '🎯' },
+		{ href: 'awards',         label: 'Awards',          icon: '🥇' },
+		{ href: 'managers',       label: 'Managers',        icon: '👤' },
+		{ href: 'rivalry',        label: 'Rivalry',         icon: '⚡' },
+		{ href: 'blog',           label: 'Blog',            icon: '📝' },
 	];
 </script>
 

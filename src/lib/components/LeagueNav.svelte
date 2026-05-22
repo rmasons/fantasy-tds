@@ -19,21 +19,21 @@
 	const CACHE_PREFIX = 'ftds_chain_';
 
 	const navLinks = [
-		{ href: 'standings',    label: 'Standings'    },
-		{ href: 'matchups',     label: 'Matchups'     },
-		{ href: 'rosters',      label: 'Rosters'      },
-		{ href: 'records',      label: 'Records'      },
-		{ href: 'transactions', label: 'Transactions' },
-		{ href: 'drafts',       label: 'Drafts'       },
-		{ href: 'awards',       label: 'Awards'       },
-		{ href: 'managers',     label: 'Managers'     },
-		{ href: 'rivalry',      label: 'Rivalry'      },
-		{ href: 'blog',         label: 'Blog'         },
+		{ href: 'standings',       label: 'Standings'       },
+		{ href: 'matchups',        label: 'Matchups'        },
+		{ href: 'power-rankings',  label: 'Power Rankings'  },
+		{ href: 'rosters',         label: 'Rosters'         },
+		{ href: 'records',         label: 'Records'         },
+		{ href: 'transactions',    label: 'Transactions'    },
+		{ href: 'drafts',          label: 'Drafts'          },
+		{ href: 'awards',          label: 'Awards'          },
+		{ href: 'managers',        label: 'Managers'        },
+		{ href: 'rivalry',         label: 'Rivalry'         },
+		{ href: 'blog',            label: 'Blog'            },
 	];
 
 	function currentSubPath(): string {
 		const parts = page.url.pathname.split('/');
-		// ['',' league', leagueId, 'sub', 'path']
 		const sub = parts.slice(3).join('/');
 		return sub;
 	}
@@ -45,7 +45,6 @@
 		goto(`/league/${targetId}${sub ? '/' + sub : ''}`);
 	}
 
-	// Find a cached chain that contains leagueId anywhere in it
 	function findCachedChain(): SeasonEntry[] | null {
 		try {
 			for (let i = 0; i < sessionStorage.length; i++) {
@@ -59,16 +58,13 @@
 	}
 
 	onMount(async () => {
-		// Warm chain from cache so year selector appears instantly
 		const cached = findCachedChain();
 		if (cached) seasonChain = cached;
 
-		// Fetch current league for name/avatar
 		const res = await fetch(`https://api.sleeper.app/v1/league/${leagueId}`);
 		league = await res.json();
 
 		if (!cached) {
-			// Walk the previous_league_id chain progressively
 			const chain: SeasonEntry[] = [{ leagueId, season: league!.season }];
 			seasonChain = [...chain];
 
@@ -77,13 +73,11 @@
 				const r = await fetch(`https://api.sleeper.app/v1/league/${prevId}`);
 				const d: SleeperLeague = await r.json();
 				chain.push({ leagueId: prevId, season: d.season });
-				seasonChain = [...chain]; // update reactively as each season loads
+				seasonChain = [...chain];
 				prevId = d.previous_league_id ?? '';
 			}
 
 			try {
-				// Cache under the current (newest) leagueId as the key
-				// This lets future navigation into historical seasons find this chain
 				sessionStorage.setItem(`${CACHE_PREFIX}${leagueId}`, JSON.stringify(chain));
 			} catch {}
 		}
@@ -104,9 +98,115 @@
 	}
 </script>
 
-<svelte:document onclick={(e) => { if (yearOpen && !(e.target as Element)?.closest?.('.year-selector')) yearOpen = false; }} />
+<svelte:document onclick={(e) => {
+	if (yearOpen && !(e.target as Element)?.closest?.('.year-selector')) yearOpen = false;
+}} />
 
-<nav class="bg-gray-900 border-b border-gray-800 sticky top-0 z-50">
+<!-- ─── Desktop sidebar (lg+) ─────────────────────────────────── -->
+<aside class="hidden lg:flex flex-col fixed inset-y-0 left-0 w-56 bg-slate-900 border-r border-slate-800 z-40">
+
+	<!-- League header -->
+	<div class="p-4 border-b border-slate-800">
+		<a href="/league/{leagueId}" class="flex items-center gap-2.5 min-w-0 group mb-3">
+			{#if league?.avatar}
+				<img
+					src="https://sleepercdn.com/avatars/thumbs/{league.avatar}"
+					alt=""
+					class="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-slate-700 group-hover:ring-blue-500 transition-all"
+				/>
+			{:else}
+				<div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center shrink-0 text-sm">
+					🏈
+				</div>
+			{/if}
+			<span class="font-bold text-white text-sm truncate leading-tight group-hover:text-blue-400 transition-colors">
+				{league?.name ?? '…'}
+			</span>
+		</a>
+
+		<!-- Year selector -->
+		{#if currentSeason}
+			<div class="year-selector relative">
+				<button
+					onclick={() => (yearOpen = !yearOpen)}
+					disabled={!hasHistory}
+					class="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-md text-xs transition-colors
+					       {hasHistory
+					           ? 'text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer'
+					           : 'text-slate-600 cursor-default'}"
+					title={hasHistory ? 'Switch season' : 'Only one season available'}
+				>
+					<span class="text-slate-600 font-medium">Season</span>
+					<span class="font-semibold text-slate-300">{currentSeason}</span>
+					{#if hasHistory}
+						<svg class="w-3 h-3 ml-auto shrink-0 transition-transform {yearOpen ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+						</svg>
+					{/if}
+				</button>
+
+				{#if yearOpen && hasHistory}
+					<div class="absolute left-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50 min-w-full">
+						{#each seasonChain as entry}
+							<button
+								onclick={() => switchSeason(entry.leagueId)}
+								class="w-full text-left px-3 py-2 text-sm transition-colors
+								       {entry.leagueId === leagueId
+								           ? 'bg-blue-600 text-white font-semibold'
+								           : 'text-slate-300 hover:bg-slate-700'}"
+							>
+								{entry.season}
+							</button>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/if}
+	</div>
+
+	<!-- Nav links -->
+	<nav class="flex-1 p-2 space-y-0.5 overflow-y-auto">
+		{#each navLinks as link}
+			<a
+				href="/league/{leagueId}/{link.href}"
+				class="flex items-center px-3 py-2 rounded-lg text-sm transition-all
+				       {isActive(link.href)
+				           ? 'bg-gradient-to-r from-blue-600/30 to-violet-600/10 border-l-2 border-blue-500 text-white font-semibold pl-[10px]'
+				           : 'text-slate-400 hover:text-white hover:bg-slate-800 border-l-2 border-transparent'}"
+			>
+				{link.label}
+			</a>
+		{/each}
+	</nav>
+
+	<!-- Bottom auth -->
+	<div class="p-2 border-t border-slate-800 space-y-0.5">
+		{#if page.data.user}
+			<a
+				href="/"
+				class="flex items-center px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+			>
+				Switch league
+			</a>
+			<button
+				onclick={signOut}
+				class="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-red-400 hover:bg-slate-800/60 transition-colors"
+			>
+				Sign out
+			</button>
+		{:else}
+			<a
+				href="/login"
+				class="flex items-center px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+			>
+				Sign in
+			</a>
+		{/if}
+	</div>
+</aside>
+
+<!-- ─── Mobile top nav (<lg) ──────────────────────────────────── -->
+<nav class="lg:hidden bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
 	<div class="max-w-7xl mx-auto px-4 flex items-center h-14 gap-3">
 
 		<!-- League name / home link -->
@@ -125,15 +225,15 @@
 			</span>
 		</a>
 
-		<!-- Time machine year selector -->
+		<!-- Year selector (mobile) -->
 		{#if currentSeason}
 			<div class="year-selector relative shrink-0">
 				<button
 					onclick={() => (yearOpen = !yearOpen)}
 					class="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors
 					       {hasHistory
-					           ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 cursor-pointer'
-					           : 'bg-gray-800/50 text-gray-500 cursor-default'}"
+					           ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer'
+					           : 'bg-slate-800/50 text-slate-500 cursor-default'}"
 					disabled={!hasHistory}
 					title={hasHistory ? 'Switch season' : 'Only one season available'}
 				>
@@ -146,14 +246,14 @@
 				</button>
 
 				{#if yearOpen && hasHistory}
-					<div class="absolute left-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-50 min-w-[100px]">
+					<div class="absolute left-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden z-50 min-w-[100px]">
 						{#each seasonChain as entry}
 							<button
 								onclick={() => switchSeason(entry.leagueId)}
 								class="w-full text-left px-4 py-2 text-sm transition-colors
 								       {entry.leagueId === leagueId
 								           ? 'bg-blue-600 text-white font-semibold'
-								           : 'text-gray-300 hover:bg-gray-700'}"
+								           : 'text-slate-300 hover:bg-slate-700'}"
 							>
 								{entry.season}
 							</button>
@@ -163,49 +263,34 @@
 			</div>
 		{/if}
 
-		<!-- Desktop nav links -->
-		<div class="hidden md:flex items-center gap-0.5 flex-1 overflow-x-auto scrollbar-none">
-			{#each navLinks as link}
-				<a
-					href="/league/{leagueId}/{link.href}"
-					class="px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors shrink-0
-					       {isActive(link.href)
-					           ? 'bg-blue-600 text-white'
-					           : 'text-gray-400 hover:text-white hover:bg-gray-800'}"
-				>
-					{link.label}
-				</a>
-			{/each}
-		</div>
-
 		<!-- Right side -->
 		<div class="ml-auto flex items-center gap-2 shrink-0">
 			{#if page.data.user}
 				<a
 					href="/"
-					class="text-xs text-gray-500 hover:text-gray-300 transition-colors hidden sm:block whitespace-nowrap"
+					class="text-xs text-slate-500 hover:text-slate-300 transition-colors hidden sm:block whitespace-nowrap"
 				>
 					Switch league
 				</a>
 				<button
 					onclick={signOut}
-					class="text-xs text-gray-500 hover:text-red-400 transition-colors"
+					class="text-xs text-slate-500 hover:text-red-400 transition-colors"
 				>
 					Sign out
 				</button>
 			{:else}
 				<a
 					href="/login"
-					class="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+					class="text-xs text-slate-500 hover:text-slate-300 transition-colors"
 				>
 					Sign in
 				</a>
 			{/if}
 
-			<!-- Mobile hamburger -->
+			<!-- Hamburger -->
 			<button
 				onclick={() => (menuOpen = !menuOpen)}
-				class="md:hidden p-1.5 rounded text-gray-400 hover:text-white"
+				class="md:hidden p-1.5 rounded text-slate-400 hover:text-white"
 				aria-label="Toggle menu"
 			>
 				{#if menuOpen}✕{:else}☰{/if}
@@ -215,11 +300,10 @@
 
 	<!-- Mobile dropdown -->
 	{#if menuOpen}
-		<div class="md:hidden bg-gray-900 border-t border-gray-800 px-4 py-3 flex flex-col gap-1">
-			<!-- Season selector in mobile menu -->
+		<div class="md:hidden bg-slate-900 border-t border-slate-800 px-4 py-3 flex flex-col gap-1">
 			{#if hasHistory}
-				<div class="mb-2 pb-2 border-b border-gray-800">
-					<p class="text-xs text-gray-600 uppercase tracking-wider mb-1.5 px-1">Season</p>
+				<div class="mb-2 pb-2 border-b border-slate-800">
+					<p class="text-xs text-slate-600 uppercase tracking-wider mb-1.5 px-1">Season</p>
 					<div class="flex flex-wrap gap-1">
 						{#each seasonChain as entry}
 							<button
@@ -227,7 +311,7 @@
 								class="px-3 py-1 rounded-lg text-xs font-medium transition-colors
 								       {entry.leagueId === leagueId
 								           ? 'bg-blue-600 text-white'
-								           : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}"
+								           : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}"
 							>
 								{entry.season}
 							</button>
@@ -242,18 +326,19 @@
 					onclick={() => (menuOpen = false)}
 					class="px-3 py-2 rounded-md text-sm transition-colors
 					       {isActive(link.href)
-					           ? 'bg-blue-600 text-white'
-					           : 'text-gray-300 hover:bg-gray-800'}"
+					           ? 'bg-blue-600 text-white font-semibold'
+					           : 'text-slate-300 hover:bg-slate-800'}"
 				>
 					{link.label}
 				</a>
 			{/each}
-			<div class="border-t border-gray-800 mt-2 pt-2 flex gap-4">
+
+			<div class="border-t border-slate-800 mt-2 pt-2 flex gap-4">
 				{#if page.data.user}
-					<a href="/" class="text-xs text-gray-500 hover:text-gray-300">Switch league</a>
-					<button onclick={signOut} class="text-xs text-gray-500 hover:text-red-400">Sign out</button>
+					<a href="/" class="text-xs text-slate-500 hover:text-slate-300">Switch league</a>
+					<button onclick={signOut} class="text-xs text-slate-500 hover:text-red-400">Sign out</button>
 				{:else}
-					<a href="/login" class="text-xs text-gray-500 hover:text-gray-300">Sign in</a>
+					<a href="/login" class="text-xs text-slate-500 hover:text-slate-300">Sign in</a>
 				{/if}
 			</div>
 		</div>
