@@ -70,8 +70,8 @@
 					const lb: any[] = Array.isArray(losers) ? losers : [];
 
 					if (wb.length > 0) {
-						const playoffRounds = wb[wb.length - 1].r;
-						const toiletRounds = lb.length ? lb[lb.length - 1].r : 0;
+						const playoffRounds = Math.max(...wb.map((m: any) => m.r));
+						const toiletRounds = lb.length ? Math.max(...lb.map((m: any) => m.r)) : 0;
 
 						const finalsMatch = wb.find(m => m.r === playoffRounds && m.t1_from?.w != null);
 						const runnersUpMatch = wb.find(m => m.r === playoffRounds && m.t1_from?.l != null);

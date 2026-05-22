@@ -186,8 +186,6 @@
 		const leagueId = data.leagueId;
 
 		try {
-			if (data.leagueId !== leagueId) return;
-
 			const managerMap = new Map<string, AllTimeStat>();
 			const allGameResults: GameResult[] = [];
 			const allWeekHighs: WeekHigh[] = [];
