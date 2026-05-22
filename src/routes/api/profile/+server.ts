@@ -22,8 +22,7 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 		if (key in body) {
 			const val = typeof body[key] === 'string' ? body[key].trim() : '';
 			if (val.length > maxLen) throw error(400, `${key} exceeds ${maxLen} characters`);
-			// Strip @ from twitterHandle before storing
-			(update as any)[key] = key === 'twitterHandle' ? val.replace(/^@/, '') : val || undefined;
+			(update as any)[key] = key === 'twitterHandle' ? val.replace(/^@/, '') || undefined : val || undefined;
 		}
 	}
 

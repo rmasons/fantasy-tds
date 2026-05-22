@@ -1,4 +1,5 @@
 import { adminDb } from '$lib/firebase/admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import type { ManagerProfile, ManagerLeagueProfile } from '$lib/types';
 
 export async function getManagerProfile(sleeperUserId: string): Promise<ManagerProfile | null> {
@@ -11,10 +12,11 @@ export async function upsertManagerProfile(
 	sleeperUserId: string,
 	data: Partial<Omit<ManagerProfile, 'sleeperUserId' | 'updatedAt'>>
 ): Promise<void> {
-	await adminDb
-		.collection('managerProfiles')
-		.doc(sleeperUserId)
-		.set({ ...data, sleeperUserId, updatedAt: Date.now() }, { merge: true });
+	const toWrite: Record<string, any> = { sleeperUserId, updatedAt: Date.now() };
+	for (const [k, v] of Object.entries(data)) {
+		toWrite[k] = v === undefined ? FieldValue.delete() : v;
+	}
+	await adminDb.collection('managerProfiles').doc(sleeperUserId).set(toWrite, { merge: true });
 }
 
 export async function getManagerLeagueProfile(
@@ -36,12 +38,11 @@ export async function upsertManagerLeagueProfile(
 	leagueId: string,
 	data: Partial<Omit<ManagerLeagueProfile, 'leagueId' | 'updatedAt'>>
 ): Promise<void> {
-	await adminDb
-		.collection('managerProfiles')
-		.doc(sleeperUserId)
-		.collection('leagues')
-		.doc(leagueId)
-		.set({ ...data, leagueId, updatedAt: Date.now() }, { merge: true });
+	const toWrite: Record<string, any> = { leagueId, updatedAt: Date.now() };
+	for (const [k, v] of Object.entries(data)) {
+		toWrite[k] = v === undefined ? FieldValue.delete() : v;
+	}
+	await adminDb.collection('managerProfiles').doc(sleeperUserId).collection('leagues').doc(leagueId).set(toWrite, { merge: true });
 }
 
 export async function getManagerProfilesBatch(
