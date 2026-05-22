@@ -8,7 +8,7 @@
 	interface RosterTeam {
 		rosterId: number;
 		teamName: string;
-		ownerName: string;
+		ownerName: string | null;
 		avatar: string | null;
 		starters: { id: string; name: string; pos: string; team: string }[];
 		bench: { id: string; name: string; pos: string; team: string }[];
@@ -116,7 +116,7 @@
 						{/if}
 						<div class="flex-1 min-w-0">
 							<p class="font-medium text-white text-sm truncate">{team.teamName}</p>
-							{#if team.ownerName !== team.teamName}
+							{#if team.ownerName && team.ownerName !== team.teamName}
 								<p class="text-xs text-slate-500">{team.ownerName}</p>
 							{/if}
 						</div>

@@ -61,7 +61,7 @@
 						return {
 							rosterId: rid,
 							teamName: info?.teamName ?? `Team ${rid}`,
-							ownerName: info?.ownerName ?? `Team ${rid}`,
+							ownerName: info?.ownerName ?? info?.teamName ?? `Team ${rid}`,
 							avatar: info?.avatar ?? null,
 						};
 					}

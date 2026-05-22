@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { LayoutData } from '../$types';
-	import { fetchLeagueCore, fetchNflState, fetchMatchups as fetchWeekMatchups, buildRosterInfoMap, combineFpts, avatarUrl } from '$lib/sleeper';
+	import { fetchLeagueCore, fetchNflState, fetchMatchups as fetchWeekMatchups, buildRosterInfoMap, combineFpts, avatarUrl, type RosterInfo } from '$lib/sleeper';
 
 	let { data } = $props<{ data: LayoutData }>();
 
@@ -54,7 +54,7 @@
 	let atClosest = $state<GameResult[]>([]);
 	let atHighs = $state<WeekHigh[]>([]);
 
-	let teamName = (id: number, m: Map<number, string>) => m.get(id) ?? `Roster ${id}`;
+	let teamName = (id: number, m: Map<number, RosterInfo>) => m.get(id)?.teamName ?? `Roster ${id}`;
 
 	$effect(() => {
 		const leagueId = data.leagueId;
@@ -88,9 +88,6 @@
 				const playoffStart: number = league.settings.playoff_week_start ?? 15;
 
 				const rosterInfo = buildRosterInfoMap(rosters, users);
-				const rosterMap = new Map<number, string>(
-					[...rosterInfo.entries()].map(([id, info]) => [id, info.teamName])
-				);
 
 				seasonLeaders = rosters
 					.map((r) => {
@@ -145,8 +142,8 @@
 						const result: GameResult = {
 							season,
 							week,
-							winner: teamName(winner, rosterMap),
-							loser: teamName(loser, rosterMap),
+							winner: teamName(winner, rosterInfo),
+							loser: teamName(loser, rosterInfo),
 							winnerPts: winPts,
 							loserPts: losPts,
 							diff: +(winPts - losPts).toFixed(2)
@@ -157,7 +154,7 @@
 
 					const weekScores = weekData[wi]
 						.filter((m: any) => (m.points ?? 0) > 0)
-						.map((m: any) => ({ team: teamName(m.roster_id, rosterMap), pts: m.points ?? 0 }));
+						.map((m: any) => ({ team: teamName(m.roster_id, rosterInfo), pts: m.points ?? 0 }));
 					if (weekScores.length) {
 						weekScores.sort((a: any, b: any) => b.pts - a.pts);
 						allHighs.push({ season, week, team: weekScores[0].team, pts: weekScores[0].pts });
@@ -202,9 +199,6 @@
 				const playoffStart: number = leagueData.settings?.playoff_week_start ?? 15;
 
 				const rosterInfo = buildRosterInfoMap(rosters, users);
-				const rosterNameMap = new Map<number, string>(
-					[...rosterInfo.entries()].map(([id, info]) => [id, info.teamName])
-				);
 
 				for (const r of rosters) {
 					const info = rosterInfo.get(r.roster_id)!;
@@ -222,7 +216,7 @@
 					} else {
 						managerMap.set(r.owner_id, {
 							userId: r.owner_id,
-							displayName: info.teamName,
+							displayName: info.ownerName ?? info.teamName,
 							avatar: info.avatar,
 							wins: r.settings?.wins ?? 0,
 							losses: r.settings?.losses ?? 0,
@@ -266,8 +260,8 @@
 							allGameResults.push({
 								season: yr,
 								week,
-								winner: rosterNameMap.get(winRoster) ?? `Roster ${winRoster}`,
-								loser: rosterNameMap.get(losRoster) ?? `Roster ${losRoster}`,
+								winner: rosterInfo.get(winRoster)?.teamName ?? `Roster ${winRoster}`,
+								loser: rosterInfo.get(losRoster)?.teamName ?? `Roster ${losRoster}`,
 								winnerPts: winPts,
 								loserPts: losPts,
 								diff: +(winPts - losPts).toFixed(2),
@@ -277,7 +271,7 @@
 						const weekScores = weekData[wi]
 							.filter((m: any) => (m.points ?? 0) > 0)
 							.map((m: any) => ({
-								team: rosterNameMap.get(m.roster_id) ?? `Roster ${m.roster_id}`,
+								team: rosterInfo.get(m.roster_id)?.teamName ?? `Roster ${m.roster_id}`,
 								pts: m.points ?? 0,
 							}));
 						if (weekScores.length) {

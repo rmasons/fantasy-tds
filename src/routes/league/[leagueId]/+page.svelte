@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { SleeperLeague, SleeperNflState } from '$lib/types';
-	import { fetchLeague, fetchNflState, fetchUsers, fetchRosters, fetchWinnersBracket, avatarUrl } from '$lib/sleeper';
+	import { fetchLeague, fetchNflState, fetchUsers, fetchRosters, fetchWinnersBracket, buildRosterInfoMap } from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -11,7 +11,7 @@
 
 	interface Champion {
 		teamName: string;
-		ownerName: string;
+		ownerName: string | null;
 		avatar: string | null;
 		season: string;
 	}
@@ -44,20 +44,18 @@
 			if (data.leagueId !== forLeagueId) return;
 			if (!Array.isArray(winners) || winners.length === 0) return;
 
-			const userMap = new Map<string, any>((users as any[]).map((u: any) => [u.user_id, u]));
-			const rosterMap = new Map<number, any>((rosters as any[]).map((r: any) => [r.roster_id, r]));
+			const rosterInfo = buildRosterInfoMap(rosters, users);
 
 			const maxRound = Math.max(...(winners as any[]).map((m: any) => m.r));
 			const finalsMatch = (winners as any[]).find((m: any) => m.r === maxRound && m.t1_from?.w != null);
 			if (!finalsMatch?.w) return;
 
-			const roster = rosterMap.get(finalsMatch.w);
-			const user = roster ? userMap.get(roster.owner_id) : null;
+			const info = rosterInfo.get(finalsMatch.w);
 
 			const result: Champion = {
-				teamName: user?.metadata?.team_name ?? user?.display_name ?? `Team ${finalsMatch.w}`,
-				ownerName: user?.display_name ?? '',
-				avatar: avatarUrl(user?.avatar),
+				teamName: info?.teamName ?? `Team ${finalsMatch.w}`,
+				ownerName: info?.ownerName ?? null,
+				avatar: info?.avatar ?? null,
 				season: prevLeague.season,
 			};
 

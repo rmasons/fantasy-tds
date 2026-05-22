@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { fetchLeague, fetchRosters, fetchUsers, avatarUrl, combineFpts } from '$lib/sleeper';
+	import { fetchLeague, fetchRosters, fetchUsers, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
 	import type { ManagerProfile, ManagerLeagueProfile } from '$lib/types';
 
 	let { data } = $props<{ data: PageData }>();
@@ -17,7 +17,7 @@
 	}
 
 	interface ManagerInfo {
-		userId: string;
+		ownerId: string;
 		displayName: string;
 		teamName: string;
 		avatar: string | null;
@@ -62,22 +62,23 @@
 
 							loadingStatus = `Loaded ${leagueData.season}…`;
 
-							const userMeta = (users as any[]).find((u: any) => u.user_id === userId);
-							const roster = (rosters as any[]).find((r: any) => r.owner_id === userId);
+							const rosterInfo = buildRosterInfoMap(rosters, users);
+							const roster = rosters.find(r => r.owner_id === userId);
 
 							if (roster) {
-								if (!manager && userMeta) {
+								const info = rosterInfo.get(roster.roster_id)!;
+								if (!manager) {
 									manager = {
-										userId,
-										displayName: userMeta.display_name ?? userId,
-										teamName: userMeta.metadata?.team_name ?? userMeta.display_name ?? userId,
-										avatar: avatarUrl(userMeta.avatar),
+										ownerId: userId,
+										displayName: info.ownerName ?? info.teamName,
+										teamName: info.teamName,
+										avatar: info.avatar,
 									};
 								}
 
 								result.push({
 									season: leagueData.season,
-									teamName: userMeta?.metadata?.team_name ?? userMeta?.display_name ?? `Roster ${roster.roster_id}`,
+									teamName: info.teamName,
 									wins: roster.settings?.wins ?? 0,
 									losses: roster.settings?.losses ?? 0,
 									ties: roster.settings?.ties ?? 0,

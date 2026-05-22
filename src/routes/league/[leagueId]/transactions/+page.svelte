@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { LayoutData } from '../$types';
 	import type { SlimPlayer } from '$lib/types';
-	import { fetchLeagueCore, fetchNflState, fetchTransactions as fetchWeekTransactions, buildRosterInfoMap } from '$lib/sleeper';
+	import { fetchLeagueCore, fetchNflState, fetchTransactions as fetchWeekTransactions, buildRosterInfoMap, type RosterInfo } from '$lib/sleeper';
 
 	let { data } = $props<{ data: LayoutData }>();
 
@@ -28,7 +28,7 @@
 	let loading = $state(true);
 	let error = $state('');
 
-	let rosterInfoMap = new Map<number, { teamName: string }>();
+	let rosterInfoMap = new Map<number, RosterInfo>();
 	let players: Record<string, SlimPlayer> = {};
 
 	$effect(() => {

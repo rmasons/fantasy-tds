@@ -47,7 +47,7 @@
 						const info = rosterInfo.get(r.roster_id)!;
 						return {
 							userId: r.owner_id,
-							displayName: info.ownerName || info.teamName,
+							displayName: info.ownerName ?? info.teamName,
 							teamName: info.teamName,
 							avatar: info.avatar,
 							rosterId: r.roster_id,

@@ -7,7 +7,7 @@
 	interface PowerRank {
 		rosterId: number;
 		teamName: string;
-		ownerName: string;
+		ownerName: string | null;
 		avatar: string | null;
 		wins: number;       // H2H wins through selectedWeek
 		losses: number;
@@ -22,7 +22,7 @@
 	interface RosterBase {
 		rosterId: number;
 		teamName: string;
-		ownerName: string;
+		ownerName: string | null;
 		avatar: string | null;
 		wins: number;     // official Sleeper record (includes median wins if enabled)
 		losses: number;
@@ -347,6 +347,34 @@
 					weeklyAvgPts: selectedWeek > 0 ? r.totalPF / selectedWeek : 0,
 				}));
 				oddsMap = simulateOdds(simInput, scheduleFromHere, playoffSpots);
+
+				// Override simulation with mathematical clinch / elimination
+				const remGames = new Map<number, number>(rows.map((r) => [r.rosterId, 0]));
+				for (const week of scheduleFromHere) {
+					for (const [a, b] of week) {
+						remGames.set(a, (remGames.get(a) ?? 0) + 1);
+						remGames.set(b, (remGames.get(b) ?? 0) + 1);
+					}
+				}
+				for (const row of rows) {
+					const maxWins = row.wins + (remGames.get(row.rosterId) ?? 0);
+					const others = rows.filter((r) => r.rosterId !== row.rosterId);
+
+					// Clinched: fewer than playoffSpots others can even tie row's win floor
+					const canMatch = others.filter(
+						(o) => o.wins + (remGames.get(o.rosterId) ?? 0) >= row.wins
+					).length;
+					if (canMatch < playoffSpots) {
+						oddsMap.set(row.rosterId, 100);
+						continue;
+					}
+
+					// Eliminated: playoffSpots+ others already exceed row's best possible wins
+					const definitelyAhead = others.filter((o) => o.wins > maxWins).length;
+					if (definitelyAhead >= playoffSpots) {
+						oddsMap.set(row.rosterId, 0);
+					}
+				}
 			} else if (totalRemainingFromHere === 0) {
 				// Season complete — use official Sleeper records (includes median wins) for qualification
 				const officialRanked = rosterBaseData
@@ -377,6 +405,8 @@
 
 	function oddsClass(odds: number | null): string {
 		if (odds === null) return 'text-slate-600';
+		if (odds === 100) return 'text-emerald-300 font-bold';
+		if (odds === 0) return 'text-red-500 font-bold';
 		if (odds >= 80) return 'text-emerald-400 font-bold';
 		if (odds >= 50) return 'text-emerald-600';
 		if (odds >= 20) return 'text-slate-400';
@@ -385,6 +415,8 @@
 
 	function oddsLabel(odds: number | null, isFinal = false): string {
 		if (odds === null) return '—';
+		if (odds === 100) return '100%';
+		if (odds === 0) return '0%';
 		if (odds >= 99.5) return isFinal ? '100%' : '99%';
 		if (odds <= 0.5) return '<1%';
 		return `${odds.toFixed(0)}%`;
@@ -600,7 +632,7 @@
 				<span>Score = (PF × 2) + (PF × H2H Win%) + (PF × Median Win%)</span>
 				{#if selectedWeek > 0 && weeksRemainingFromHere > 0}
 					<span>·</span>
-					<span>Playoff % simulates {weeksRemainingFromHere} remaining wk{weeksRemainingFromHere !== 1 ? 's' : ''} using actual schedule</span>
+					<span>Playoff % simulates {weeksRemainingFromHere} remaining wk{weeksRemainingFromHere !== 1 ? 's' : ''} using actual schedule · 100%/0% = clinched/eliminated</span>
 				{/if}
 			</div>
 		{/if}

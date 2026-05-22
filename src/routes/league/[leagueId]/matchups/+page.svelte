@@ -11,7 +11,7 @@
 	interface MatchupTeam {
 		rosterId: number;
 		teamName: string;
-		ownerName: string;
+		ownerName: string | null;
 		avatar: string | null;
 		points: number;
 		starters: string[];
@@ -119,7 +119,7 @@
 			const grouped: Record<number, MatchupTeam[]> = {};
 			for (const m of raw) {
 				if (!grouped[m.matchup_id]) grouped[m.matchup_id] = [];
-				const info = userMap.get(m.roster_id) ?? { teamName: `Team ${m.roster_id}`, ownerName: '', avatar: null };
+				const info = userMap.get(m.roster_id) ?? { teamName: `Team ${m.roster_id}`, ownerName: null, avatar: null };
 				grouped[m.matchup_id].push({ rosterId: m.roster_id, ...info, points: m.points ?? 0, starters: m.starters ?? [] });
 			}
 
@@ -167,7 +167,7 @@
 			}
 
 			function teamSide(rosterId: number | null, winnerId: number | null, round: number): BracketSide {
-				const info = rosterId ? (userMap.get(rosterId) ?? { teamName: `Team ${rosterId}`, ownerName: '', avatar: null }) : null;
+				const info = rosterId ? (userMap.get(rosterId) ?? { teamName: `Team ${rosterId}`, ownerName: null, avatar: null }) : null;
 				return {
 					rosterId,
 					teamName: info?.teamName ?? null,

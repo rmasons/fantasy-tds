@@ -83,7 +83,7 @@ export interface StandingRow {
 	rank: number;
 	rosterId: number;
 	teamName: string;
-	ownerName: string;
+	ownerName: string | null;
 	avatar: string | null;
 	wins: number;
 	losses: number;

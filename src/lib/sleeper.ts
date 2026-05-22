@@ -6,9 +6,9 @@ const BASE = 'https://api.sleeper.app/v1';
 
 export interface RosterInfo {
 	teamName: string;
-	ownerName: string;
+	ownerName: string | null;
 	avatar: string | null;
-	userId: string;
+	ownerId: string;
 }
 
 export interface RawMatchup {
@@ -45,9 +45,9 @@ export function buildRosterInfoMap(
 		const u = userMap.get(r.owner_id);
 		map.set(r.roster_id, {
 			teamName: u?.metadata?.team_name ?? u?.display_name ?? `Team ${r.roster_id}`,
-			ownerName: u?.display_name ?? '',
+			ownerName: u?.display_name ?? null,
 			avatar: avatarUrl(u?.metadata?.avatar ?? u?.avatar),
-			userId: r.owner_id,
+			ownerId: r.owner_id,
 		});
 	}
 	return map;
