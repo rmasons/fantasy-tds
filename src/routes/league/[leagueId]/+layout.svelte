@@ -5,9 +5,12 @@
 	let { data, children } = $props<{ data: LayoutData; children: any }>();
 </script>
 
-<div class="min-h-screen bg-gray-950 text-white">
+<div class="min-h-screen bg-slate-950 text-white">
 	<LeagueNav leagueId={data.leagueId} />
-	<main class="max-w-7xl mx-auto px-4 py-6">
-		{@render children()}
-	</main>
+	<!-- lg: offset for fixed sidebar; mobile: offset for sticky top nav -->
+	<div class="lg:pl-56 pt-14 lg:pt-0">
+		<main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
+			{@render children()}
+		</main>
+	</div>
 </div>

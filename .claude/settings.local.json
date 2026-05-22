@@ -11,12 +11,17 @@
       "Bash(mkdir -p /Users/masonrussell/Desktop/development/fantasy-tds/src/routes/league/\\\\[leagueId\\\\]/rivalry)",
       "Bash(mkdir -p /Users/masonrussell/Desktop/development/fantasy-tds/src/routes/league/\\\\[leagueId\\\\]/blog/\\\\[slug\\\\])",
       "Bash(npx tsc *)",
-      "Bash(git -C /Users/masonrussell/Desktop/development/fantasy-tds log --oneline -10)",
-      "Bash(git -C /Users/masonrussell/Desktop/development/fantasy-tds log --oneline -5)",
-      "Bash(echo \"EXIT:$?\")",
-      "Bash(git init *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit -m ' *)",
+      "Bash(git -C /Users/masonrussell/Desktop/development/fantasy-tds show b80fac2 --stat)",
+      "Bash(git -C /Users/masonrussell/Desktop/development/fantasy-tds show b80fac2 -p)",
+      "Bash(git -C /Users/masonrussell/Desktop/development/fantasy-tds status)",
+      "Bash(git -C /Users/masonrussell/Desktop/development/fantasy-tds diff)",
+      "Bash(git -C /Users/masonrussell/Desktop/development/fantasy-tds remote -v)",
+      "Bash(git -C /Users/masonrussell/Desktop/development/fantasy-tds add src/routes/league/\\\\[leagueId\\\\]/blog/\\\\[slug\\\\]/+page.svelte)",
+      "Bash(git -C /Users/masonrussell/Desktop/development/fantasy-tds commit -m ' *)",
+      "Bash(git *)",
+      "Bash([ -f \"/Users/masonrussell/Desktop/development/fantasy-tds/src/routes/league/[leagueId]/$dir/+page.svelte\" ])"
     ]
   }
 }
