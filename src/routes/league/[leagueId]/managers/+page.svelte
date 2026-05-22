@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { fetchRosters, fetchUsers, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
+	import type { ManagerProfile } from '$lib/types';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -18,12 +19,14 @@
 	}
 
 	let managers = $state<ManagerCard[]>([]);
+	let profiles = $state<Record<string, ManagerProfile>>({});
 	let loading = $state(true);
 	let error = $state('');
 
 	$effect(() => {
 		const leagueId = data.leagueId;
 		managers = [];
+		profiles = {};
 		loading = true;
 		error = '';
 
@@ -38,7 +41,7 @@
 
 				const rosterInfo = buildRosterInfoMap(rosters, users);
 
-				managers = rosters
+				const built = rosters
 					.filter(r => r.owner_id)
 					.map(r => {
 						const info = rosterInfo.get(r.roster_id)!;
@@ -56,6 +59,18 @@
 						};
 					})
 					.sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
+
+				managers = built;
+
+				// Fetch profiles in background — don't block card render
+				const ids = built.map(m => m.userId).join(',');
+				fetch(`/api/profiles?ids=${ids}`)
+					.then(r => r.json())
+					.then(p => {
+						if (data.leagueId !== leagueId) return;
+						profiles = p;
+					})
+					.catch(() => {});
 			} catch (e: any) {
 				if (data.leagueId !== leagueId) return;
 				error = e.message;
@@ -83,16 +98,17 @@
 	{:else}
 		<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
 			{#each managers as mgr}
+				{@const profile = profiles[mgr.userId]}
 				<a
 					href="/league/{data.leagueId}/managers/{mgr.userId}"
-					class="bg-slate-900 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors p-4 flex gap-4 items-center"
+					class="bg-slate-900 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors p-4 flex gap-4 items-start"
 				>
 					{#if mgr.avatar}
-						<img src={mgr.avatar} alt="" class="w-12 h-12 rounded-full object-cover shrink-0" />
+						<img src={mgr.avatar} alt="" class="w-12 h-12 rounded-full object-cover shrink-0 mt-0.5" />
 					{:else}
-						<div class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-xl shrink-0">🏈</div>
+						<div class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-xl shrink-0 mt-0.5">🏈</div>
 					{/if}
-					<div class="min-w-0">
+					<div class="min-w-0 flex-1">
 						<p class="font-semibold text-white truncate">{mgr.teamName}</p>
 						<p class="text-xs text-slate-500 truncate">{mgr.displayName}</p>
 						<div class="flex items-center gap-3 mt-1">
@@ -101,6 +117,19 @@
 							</span>
 							<span class="text-xs text-slate-600">{mgr.fpts.toFixed(2)} pts</span>
 						</div>
+						{#if profile?.bio}
+							<p class="text-xs text-slate-500 mt-1.5 line-clamp-2 leading-relaxed">{profile.bio}</p>
+						{/if}
+						{#if profile?.location || profile?.favoriteNFLTeam}
+							<div class="flex flex-wrap gap-1.5 mt-1.5">
+								{#if profile.location}
+									<span class="text-[11px] text-slate-600 bg-slate-800 rounded-full px-2 py-0.5">{profile.location}</span>
+								{/if}
+								{#if profile.favoriteNFLTeam}
+									<span class="text-[11px] text-slate-600 bg-slate-800 rounded-full px-2 py-0.5">{profile.favoriteNFLTeam}</span>
+								{/if}
+							</div>
+						{/if}
 					</div>
 				</a>
 			{/each}

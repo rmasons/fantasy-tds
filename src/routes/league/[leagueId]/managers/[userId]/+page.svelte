@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { fetchLeague, fetchRosters, fetchUsers, avatarUrl, combineFpts } from '$lib/sleeper';
+	import type { ManagerProfile, ManagerLeagueProfile } from '$lib/types';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -28,61 +29,78 @@
 	let loadingStatus = $state('Loading…');
 	let error = $state('');
 
+	let profile = $state<ManagerProfile | null>(null);
+	let leagueProfile = $state<ManagerLeagueProfile | null>(null);
+
 	$effect(() => {
 		const leagueId = data.leagueId;
 		const userId = data.userId;
 		manager = null;
 		seasons = [];
+		profile = null;
+		leagueProfile = null;
 		loading = true;
 		loadingStatus = 'Loading…';
 		error = '';
 
 		(async () => {
 			try {
-				let curId: string | null = leagueId;
-				const result: SeasonStat[] = [];
+				// Load Sleeper data and profile in parallel
+				const [, profileRes] = await Promise.all([
+					(async () => {
+						let curId: string | null = leagueId;
+						const result: SeasonStat[] = [];
 
-				while (curId && curId !== '0') {
-					const [leagueData, users, rosters] = await Promise.all([
-						fetchLeague(curId),
-						fetchUsers(curId),
-						fetchRosters(curId),
-					]);
+						while (curId && curId !== '0') {
+							const [leagueData, users, rosters] = await Promise.all([
+								fetchLeague(curId),
+								fetchUsers(curId),
+								fetchRosters(curId),
+							]);
 
-					if (data.leagueId !== leagueId || data.userId !== userId) return;
+							if (data.leagueId !== leagueId || data.userId !== userId) return;
 
-					loadingStatus = `Loaded ${leagueData.season}…`;
+							loadingStatus = `Loaded ${leagueData.season}…`;
 
-					const userMeta = (users as any[]).find((u: any) => u.user_id === userId);
-					const roster = (rosters as any[]).find((r: any) => r.owner_id === userId);
+							const userMeta = (users as any[]).find((u: any) => u.user_id === userId);
+							const roster = (rosters as any[]).find((r: any) => r.owner_id === userId);
 
-					if (roster) {
-						if (!manager && userMeta) {
-							manager = {
-								userId,
-								displayName: userMeta.display_name ?? userId,
-								teamName: userMeta.metadata?.team_name ?? userMeta.display_name ?? userId,
-								avatar: avatarUrl(userMeta.avatar),
-							};
+							if (roster) {
+								if (!manager && userMeta) {
+									manager = {
+										userId,
+										displayName: userMeta.display_name ?? userId,
+										teamName: userMeta.metadata?.team_name ?? userMeta.display_name ?? userId,
+										avatar: avatarUrl(userMeta.avatar),
+									};
+								}
+
+								result.push({
+									season: leagueData.season,
+									teamName: userMeta?.metadata?.team_name ?? userMeta?.display_name ?? `Roster ${roster.roster_id}`,
+									wins: roster.settings?.wins ?? 0,
+									losses: roster.settings?.losses ?? 0,
+									ties: roster.settings?.ties ?? 0,
+									fpts: combineFpts(roster.settings?.fpts, roster.settings?.fpts_decimal),
+									fptsAgainst: combineFpts(roster.settings?.fpts_against, roster.settings?.fpts_against_decimal),
+									rosterId: roster.roster_id,
+								});
+							}
+
+							curId = leagueData.previous_league_id ?? null;
 						}
 
-						result.push({
-							season: leagueData.season,
-							teamName: userMeta?.metadata?.team_name ?? userMeta?.display_name ?? `Roster ${roster.roster_id}`,
-							wins: roster.settings?.wins ?? 0,
-							losses: roster.settings?.losses ?? 0,
-							ties: roster.settings?.ties ?? 0,
-							fpts: combineFpts(roster.settings?.fpts, roster.settings?.fpts_decimal),
-							fptsAgainst: combineFpts(roster.settings?.fpts_against, roster.settings?.fpts_against_decimal),
-							rosterId: roster.roster_id,
-						});
-					}
-
-					curId = leagueData.previous_league_id ?? null;
-				}
+						if (data.leagueId !== leagueId || data.userId !== userId) return;
+						seasons = result;
+					})(),
+					fetch(`/api/profile/${userId}?leagueId=${leagueId}`)
+						.then(r => r.json())
+						.catch(() => ({ global: null, league: null })),
+				]);
 
 				if (data.leagueId !== leagueId || data.userId !== userId) return;
-				seasons = result;
+				profile = profileRes?.global ?? null;
+				leagueProfile = profileRes?.league ?? null;
 			} catch (e: any) {
 				if (data.leagueId !== leagueId || data.userId !== userId) return;
 				error = e.message;
@@ -99,6 +117,18 @@
 	const careerFpts = $derived(seasons.reduce((s, x) => s + x.fpts, 0));
 	const careerGames = $derived(careerWins + careerLosses + careerTies);
 	const winPct = $derived(careerGames > 0 ? ((careerWins + careerTies * 0.5) / careerGames * 100).toFixed(1) : '—');
+
+	// Show edit button only if the logged-in user owns this profile
+	const isOwnProfile = $derived(
+		!!(data as any).user?.sleeperUserId && (data as any).user.sleeperUserId === data.userId
+	);
+	const editHref = $derived(`/settings/profile?leagueId=${data.leagueId}`);
+
+	const hasAnyProfile = $derived(
+		!!(profile?.bio || profile?.location || profile?.favoriteNFLTeam ||
+		   profile?.favoritePlayer || profile?.funFact || profile?.twitterHandle ||
+		   leagueProfile?.joinedYear)
+	);
 </script>
 
 <div>
@@ -117,17 +147,29 @@
 		<p class="text-red-400 mt-4">Failed to load manager: {error}</p>
 	{:else if manager}
 		<!-- Manager header -->
-		<div class="flex items-center gap-4 mt-4 mb-8 p-5 bg-slate-900 rounded-xl border border-slate-800">
+		<div class="flex items-start gap-4 mt-4 mb-5 p-5 bg-slate-900 rounded-xl border border-slate-800">
 			{#if manager.avatar}
 				<img src={manager.avatar} alt="" class="w-20 h-20 rounded-full object-cover border-2 border-slate-700 shrink-0" />
 			{:else}
 				<div class="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center text-4xl shrink-0">🏈</div>
 			{/if}
-			<div>
-				<h1 class="text-2xl font-bold text-white">{manager.teamName}</h1>
-				<p class="text-slate-400 text-sm">{manager.displayName}</p>
+			<div class="flex-1 min-w-0">
+				<div class="flex items-start justify-between gap-3">
+					<div class="min-w-0">
+						<h1 class="text-2xl font-bold text-white">{manager.teamName}</h1>
+						<p class="text-slate-400 text-sm">{manager.displayName}</p>
+					</div>
+					{#if isOwnProfile}
+						<a
+							href={editHref}
+							class="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-colors"
+						>
+							Edit Profile
+						</a>
+					{/if}
+				</div>
 				{#if careerGames > 0}
-					<div class="flex gap-4 mt-2 text-sm">
+					<div class="flex flex-wrap gap-4 mt-2 text-sm">
 						<span class="text-slate-300">{careerWins}–{careerLosses}{careerTies ? `–${careerTies}` : ''} career</span>
 						<span class="text-slate-500">{winPct}% win rate</span>
 						<span class="text-slate-500">{careerFpts.toFixed(2)} total pts</span>
@@ -135,6 +177,73 @@
 				{/if}
 			</div>
 		</div>
+
+		<!-- Profile "About" card -->
+		{#if hasAnyProfile}
+			<div class="mb-5 p-5 bg-slate-900 rounded-xl border border-slate-800 space-y-3">
+				<h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">About</h2>
+
+				{#if profile?.bio}
+					<p class="text-slate-300 text-sm leading-relaxed">{profile.bio}</p>
+				{/if}
+
+				<div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+					{#if profile?.location}
+						<div>
+							<p class="text-xs text-slate-600 uppercase tracking-wider mb-0.5">Location</p>
+							<p class="text-slate-300">{profile.location}</p>
+						</div>
+					{/if}
+					{#if leagueProfile?.joinedYear}
+						<div>
+							<p class="text-xs text-slate-600 uppercase tracking-wider mb-0.5">In League Since</p>
+							<p class="text-slate-300">{leagueProfile.joinedYear}</p>
+						</div>
+					{/if}
+					{#if profile?.favoriteNFLTeam}
+						<div>
+							<p class="text-xs text-slate-600 uppercase tracking-wider mb-0.5">Favorite Team</p>
+							<p class="text-slate-300">{profile.favoriteNFLTeam}</p>
+						</div>
+					{/if}
+					{#if profile?.favoritePlayer}
+						<div>
+							<p class="text-xs text-slate-600 uppercase tracking-wider mb-0.5">Favorite Player</p>
+							<p class="text-slate-300">{profile.favoritePlayer}</p>
+						</div>
+					{/if}
+					{#if profile?.twitterHandle}
+						<div>
+							<p class="text-xs text-slate-600 uppercase tracking-wider mb-0.5">X / Twitter</p>
+							<a
+								href="https://x.com/{profile.twitterHandle}"
+								target="_blank"
+								rel="noopener noreferrer"
+								class="text-blue-400 hover:text-blue-300 transition-colors"
+							>@{profile.twitterHandle}</a>
+						</div>
+					{/if}
+				</div>
+
+				{#if profile?.funFact}
+					<div class="mt-1 pt-3 border-t border-slate-800">
+						<p class="text-xs text-slate-600 uppercase tracking-wider mb-1">Fun Fact</p>
+						<p class="text-slate-300 text-sm italic">"{profile.funFact}"</p>
+					</div>
+				{/if}
+			</div>
+		{:else if isOwnProfile && !loading}
+			<!-- Nudge empty-state for own profile -->
+			<div class="mb-5 p-4 bg-slate-900 rounded-xl border border-dashed border-slate-700 flex items-center justify-between gap-4">
+				<p class="text-slate-500 text-sm">Your profile is empty. Add a bio and some info to stand out.</p>
+				<a
+					href={editHref}
+					class="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+				>
+					Set up profile
+				</a>
+			</div>
+		{/if}
 
 		<!-- Season history -->
 		{#if seasons.length > 0}

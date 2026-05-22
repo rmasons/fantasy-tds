@@ -185,6 +185,14 @@
 	<!-- Bottom auth -->
 	<div class="p-2 border-t border-slate-800 space-y-0.5">
 		{#if page.data.user}
+			{#if page.data.user.sleeperUserId}
+				<a
+					href="/settings/profile?leagueId={leagueId}"
+					class="flex items-center px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+				>
+					Edit my profile
+				</a>
+			{/if}
 			<a
 				href="/"
 				class="flex items-center px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
@@ -336,8 +344,11 @@
 				</a>
 			{/each}
 
-			<div class="border-t border-slate-800 mt-2 pt-2 flex gap-4">
+			<div class="border-t border-slate-800 mt-2 pt-2 flex flex-wrap gap-4">
 				{#if page.data.user}
+					{#if page.data.user.sleeperUserId}
+						<a href="/settings/profile?leagueId={leagueId}" onclick={() => (menuOpen = false)} class="text-xs text-slate-500 hover:text-slate-300">Edit profile</a>
+					{/if}
 					<a href="/" class="text-xs text-slate-500 hover:text-slate-300">Switch league</a>
 					<button onclick={signOut} class="text-xs text-slate-500 hover:text-red-400">Sign out</button>
 				{:else}

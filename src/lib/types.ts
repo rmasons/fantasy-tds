@@ -90,3 +90,20 @@ export interface StandingRow {
 	fptsAgainst: number;
 	streak: string;
 }
+
+export interface ManagerProfile {
+	sleeperUserId: string;
+	bio?: string;             // max 280 chars
+	location?: string;        // max 60 chars
+	favoriteNFLTeam?: string; // max 60 chars
+	favoritePlayer?: string;  // max 60 chars
+	funFact?: string;         // max 200 chars
+	twitterHandle?: string;   // max 50 chars, no @ prefix stored
+	updatedAt?: number;
+}
+
+export interface ManagerLeagueProfile {
+	leagueId: string;
+	joinedYear?: number;
+	updatedAt?: number;
+}
