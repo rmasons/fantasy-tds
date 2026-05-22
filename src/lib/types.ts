@@ -26,6 +26,8 @@ export interface SleeperLeague {
 	settings: {
 		type: number; // 0=redraft, 2=dynasty
 		playoff_week_start?: number;
+		playoff_round_type?: number; // 0=1-week, 2=2-week rounds
+		playoff_teams?: number;
 	};
 	avatar: string | null;
 }

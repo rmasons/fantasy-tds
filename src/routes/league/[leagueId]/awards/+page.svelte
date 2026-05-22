@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { onMount } from 'svelte';
+	import { fetchLeague, fetchLeagueCore, fetchWinnersBracket, fetchLosersBracket, buildRosterInfoMap, avatarUrl } from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -25,161 +25,213 @@
 	let error = $state('');
 	let selectedIdx = $state(0);
 
-	function avatarUrl(hash: string | null) {
-		return hash ? `https://sleepercdn.com/avatars/thumbs/${hash}` : null;
-	}
+	$effect(() => {
+		const leagueId = data.leagueId;
+		podiums = [];
+		selectedIdx = 0;
+		loading = true;
+		loadingStatus = 'Fetching league history…';
+		error = '';
 
-	onMount(async () => {
-		try {
-			const leagueRes = await fetch(`https://api.sleeper.app/v1/league/${data.leagueId}`);
-			const current = await leagueRes.json();
+		(async () => {
+			try {
+				const current = await fetchLeague(leagueId);
 
-			let curId: string = current.status === 'complete'
-				? current.league_id
-				: current.previous_league_id;
+				if (data.leagueId !== leagueId) return;
 
-			while (curId && curId !== '0') {
-				const [leagueData, users, rosters, winners, losers] = await Promise.all([
-					fetch(`https://api.sleeper.app/v1/league/${curId}`).then(r => r.json()),
-					fetch(`https://api.sleeper.app/v1/league/${curId}/users`).then(r => r.json()),
-					fetch(`https://api.sleeper.app/v1/league/${curId}/rosters`).then(r => r.json()),
-					fetch(`https://api.sleeper.app/v1/league/${curId}/winners_bracket`).then(r => r.json()),
-					fetch(`https://api.sleeper.app/v1/league/${curId}/losers_bracket`).then(r => r.json()),
-				]);
+				let curId: string | null = current.status === 'complete'
+					? current.league_id
+					: current.previous_league_id;
 
-				loadingStatus = `Loaded ${leagueData.season}…`;
+				while (curId && curId !== '0') {
+					const [{ league: leagueData, rosters, users }, winners, losers] = await Promise.all([
+						fetchLeagueCore(curId),
+						fetchWinnersBracket(curId),
+						fetchLosersBracket(curId),
+					]);
 
-				const userMap = new Map<string, any>((users as any[]).map(u => [u.user_id, u]));
-				const rosterUser = new Map<number, any>();
-				for (const r of rosters as any[]) {
-					const u = userMap.get(r.owner_id);
-					if (u) rosterUser.set(r.roster_id, u);
-				}
+					if (data.leagueId !== leagueId) return;
 
-				function toEntry(rid: number): ManagerEntry {
-					const u = rosterUser.get(rid);
-					return {
-						rosterId: rid,
-						teamName: u?.metadata?.team_name ?? u?.display_name ?? `Team ${rid}`,
-						ownerName: u?.display_name ?? `Team ${rid}`,
-						avatar: avatarUrl(u?.avatar ?? null),
-					};
-				}
+					loadingStatus = `Loaded ${leagueData.season}…`;
 
-				const wb: any[] = Array.isArray(winners) ? winners : [];
-				const lb: any[] = Array.isArray(losers) ? losers : [];
+					const rosterInfo = buildRosterInfoMap(rosters, users);
 
-				if (wb.length > 0) {
-					const playoffRounds = wb[wb.length - 1].r;
-					const toiletRounds = lb.length ? lb[lb.length - 1].r : 0;
-
-					const finalsMatch = wb.find(m => m.r === playoffRounds && m.t1_from?.w != null);
-					const runnersUpMatch = wb.find(m => m.r === playoffRounds && m.t1_from?.l != null);
-					const toiletMatch = lb.length
-						? lb.find(m => m.r === toiletRounds && (!m.t1_from || m.t1_from?.w != null))
-						: null;
-
-					if (finalsMatch?.w) {
-						podiums = [...podiums, {
-							season: leagueData.season,
-							champion: toEntry(finalsMatch.w),
-							second: finalsMatch.l ? toEntry(finalsMatch.l) : null,
-							third: runnersUpMatch?.w ? toEntry(runnersUpMatch.w) : null,
-							toilet: toiletMatch?.w ? toEntry(toiletMatch.w) : null,
-						}];
+					function toEntry(rid: number): ManagerEntry {
+						const info = rosterInfo.get(rid);
+						return {
+							rosterId: rid,
+							teamName: info?.teamName ?? `Team ${rid}`,
+							ownerName: info?.ownerName ?? `Team ${rid}`,
+							avatar: info?.avatar ?? null,
+						};
 					}
-				}
 
-				curId = leagueData.previous_league_id;
+					const wb: any[] = Array.isArray(winners) ? winners : [];
+					const lb: any[] = Array.isArray(losers) ? losers : [];
+
+					if (wb.length > 0) {
+						const playoffRounds = wb[wb.length - 1].r;
+						const toiletRounds = lb.length ? lb[lb.length - 1].r : 0;
+
+						const finalsMatch = wb.find(m => m.r === playoffRounds && m.t1_from?.w != null);
+						const runnersUpMatch = wb.find(m => m.r === playoffRounds && m.t1_from?.l != null);
+						const toiletMatch = lb.length
+							? lb.find(m => m.r === toiletRounds && (!m.t1_from || m.t1_from?.w != null))
+							: null;
+
+						if (finalsMatch?.w) {
+							podiums = [...podiums, {
+								season: leagueData.season,
+								champion: toEntry(finalsMatch.w),
+								second: finalsMatch.l ? toEntry(finalsMatch.l) : null,
+								third: runnersUpMatch?.w ? toEntry(runnersUpMatch.w) : null,
+								toilet: toiletMatch?.w ? toEntry(toiletMatch.w) : null,
+							}];
+						}
+					}
+
+					curId = leagueData.previous_league_id ?? null;
+				}
+			} catch (e: any) {
+				if (data.leagueId !== leagueId) return;
+				error = e.message;
+			} finally {
+				if (data.leagueId !== leagueId) return;
+				loading = false;
 			}
-		} catch (e: any) {
-			error = e.message;
-		} finally {
-			loading = false;
-		}
+		})();
 	});
 
 	const podium = $derived(podiums[selectedIdx]);
 </script>
 
 <div>
-	<h1 class="text-2xl font-bold mb-6">Awards</h1>
+	<div class="mb-6">
+		<h1 class="text-2xl font-extrabold text-white">Awards</h1>
+	</div>
 
 	{#if loading && podiums.length === 0}
 		<div class="space-y-3">
 			{#each Array(3) as _}
-				<div class="h-12 bg-gray-800 rounded-xl animate-pulse"></div>
+				<div class="h-12 bg-slate-800 rounded-xl animate-pulse"></div>
 			{/each}
-			<p class="text-gray-500 text-sm">{loadingStatus}</p>
+			<p class="text-slate-500 text-sm">{loadingStatus}</p>
 		</div>
 	{:else if error}
 		<p class="text-red-400">Failed to load awards: {error}</p>
 	{:else if podiums.length === 0}
-		<p class="text-gray-400">No completed seasons found.</p>
+		<p class="text-slate-400">No completed seasons found.</p>
 	{:else}
-		<!-- Year tabs -->
-		<div class="flex gap-1 bg-gray-900 rounded-xl p-1 mb-8 w-fit flex-wrap">
+		<!-- Season tabs -->
+		<div class="flex gap-1 bg-slate-900 rounded-xl p-1 mb-8 w-fit flex-wrap">
 			{#each podiums as p, i}
 				<button
 					onclick={() => (selectedIdx = i)}
 					class="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
-					       {selectedIdx === i ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}"
+					       {selectedIdx === i ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}"
 				>
 					{p.season}
 				</button>
 			{/each}
 			{#if loading}
-				<span class="px-4 py-1.5 text-xs text-gray-600 italic self-center">{loadingStatus}</span>
+				<span class="px-4 py-1.5 text-xs text-slate-600 italic self-center">{loadingStatus}</span>
 			{/if}
 		</div>
 
 		{#if podium}
-			<!-- Champion's Cup -->
-			<div class="mb-10">
-				<p class="text-center text-gray-500 text-xs uppercase tracking-widest mb-6">
-					{podium.season} Champion's Cup
-				</p>
+			<!-- ── CHAMPION HERO ──────────────────────────────── -->
+			<div class="relative rounded-2xl overflow-hidden mb-8 border border-amber-500/25">
+				<!-- Background layers -->
+				<div class="absolute inset-0 bg-slate-900"></div>
+				<div class="absolute inset-0 bg-gradient-to-b from-amber-500/12 via-transparent to-transparent"></div>
+				<div class="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-amber-400/70 to-transparent"></div>
 
-				<!-- Podium -->
-				<div class="flex items-end justify-center gap-4 mb-8">
+				<div class="relative py-10 px-6 flex flex-col items-center text-center gap-5">
+					<!-- Label -->
+					<p class="text-xs font-bold uppercase tracking-[0.2em] text-amber-400/90">
+						{podium.season} Fantasy Champion
+					</p>
+
+					<!-- Avatar with gold glow -->
+					<div class="relative">
+						<div class="absolute inset-0 rounded-full blur-2xl bg-amber-400/25 scale-[2]"></div>
+						{#if podium.champion.avatar}
+							<img
+								src={podium.champion.avatar}
+								alt=""
+								class="relative w-28 h-28 rounded-full object-cover border-4 border-amber-400 shadow-2xl shadow-amber-900/50"
+							/>
+						{:else}
+							<div class="relative w-28 h-28 rounded-full bg-slate-700 border-4 border-amber-400 flex items-center justify-center text-5xl">
+								🏈
+							</div>
+						{/if}
+					</div>
+
+					<!-- Team name -->
+					<div>
+						<h2 class="text-3xl font-black italic text-white leading-tight">{podium.champion.teamName}</h2>
+						{#if podium.champion.ownerName !== podium.champion.teamName}
+							<p class="text-slate-400 text-sm mt-1">{podium.champion.ownerName}</p>
+						{/if}
+					</div>
+				</div>
+			</div>
+
+			<!-- ── CHAMPION'S CUP PODIUM ─────────────────────── -->
+			<div class="mb-10">
+				<!-- Gold ribbon label -->
+				<div class="flex items-center justify-center mb-6">
+					<div class="relative">
+						<div class="bg-gradient-to-r from-amber-600 to-amber-500 text-amber-950 text-sm font-black uppercase tracking-widest px-8 py-2 rounded-sm shadow-lg">
+							Champion's Cup
+						</div>
+						<!-- Ribbon tails -->
+						<div class="absolute top-0 -left-3 w-3 h-full bg-amber-700" style="clip-path: polygon(100% 0, 100% 100%, 0 50%)"></div>
+						<div class="absolute top-0 -right-3 w-3 h-full bg-amber-700" style="clip-path: polygon(0 0, 0 100%, 100% 50%)"></div>
+					</div>
+				</div>
+
+				<!-- Podium with teams -->
+				<div class="flex items-end justify-center gap-4">
 					<!-- 2nd place -->
 					{#if podium.second}
 						<div class="flex flex-col items-center gap-2">
 							<div class="relative">
 								{#if podium.second.avatar}
-									<img src={podium.second.avatar} alt="" class="w-16 h-16 rounded-full object-cover border-2 border-gray-400" />
+									<img src={podium.second.avatar} alt="" class="w-16 h-16 rounded-full object-cover border-2 border-slate-400 shadow-md" />
 								{:else}
-									<div class="w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center text-2xl border-2 border-gray-400">🏈</div>
+									<div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-2xl border-2 border-slate-400">🏈</div>
 								{/if}
-								<span class="absolute -bottom-1 -right-1 text-base">🥈</span>
+								<span class="absolute -bottom-1 -right-1 text-base leading-none">🥈</span>
 							</div>
 							<div class="text-center">
-								<p class="text-sm font-semibold text-gray-300 max-w-[100px] truncate">{podium.second.teamName}</p>
-								<p class="text-xs text-gray-500 max-w-[100px] truncate">{podium.second.ownerName}</p>
+								<p class="text-sm font-semibold text-slate-300 max-w-[100px] truncate">{podium.second.teamName}</p>
+								<p class="text-xs text-slate-500 max-w-[100px] truncate">{podium.second.ownerName}</p>
 							</div>
-							<div class="w-24 h-16 bg-gray-600 rounded-t-lg flex items-center justify-center">
-								<span class="text-2xl font-bold text-gray-300">2</span>
+							<div class="w-24 h-16 bg-gradient-to-b from-slate-500 to-slate-600 rounded-t-md flex items-center justify-center shadow-inner">
+								<span class="text-2xl font-black text-slate-200">2</span>
 							</div>
 						</div>
 					{/if}
 
-					<!-- Champion -->
+					<!-- Champion (tallest pedestal) -->
 					<div class="flex flex-col items-center gap-2">
-						<div class="text-3xl mb-1">🏆</div>
+						<div class="text-3xl mb-1 drop-shadow-lg">🏆</div>
 						<div class="relative">
+							<div class="absolute inset-0 rounded-full blur-xl bg-amber-400/20 scale-150"></div>
 							{#if podium.champion.avatar}
-								<img src={podium.champion.avatar} alt="" class="w-24 h-24 rounded-full object-cover border-4 border-yellow-500 shadow-lg shadow-yellow-500/20" />
+								<img src={podium.champion.avatar} alt="" class="relative w-24 h-24 rounded-full object-cover border-4 border-amber-400 shadow-2xl shadow-amber-900/40" />
 							{:else}
-								<div class="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-4xl border-4 border-yellow-500">🏈</div>
+								<div class="relative w-24 h-24 rounded-full bg-slate-700 flex items-center justify-center text-4xl border-4 border-amber-400">🏈</div>
 							{/if}
-							<span class="absolute -bottom-1 -right-1 text-xl">🥇</span>
 						</div>
 						<div class="text-center">
 							<p class="text-base font-bold text-white max-w-[130px] truncate">{podium.champion.teamName}</p>
-							<p class="text-sm text-gray-400 max-w-[130px] truncate">{podium.champion.ownerName}</p>
+							<p class="text-sm text-slate-400 max-w-[130px] truncate">{podium.champion.ownerName}</p>
 						</div>
-						<div class="w-28 h-24 bg-yellow-600/30 border border-yellow-600/50 rounded-t-lg flex items-center justify-center">
-							<span class="text-3xl font-bold text-yellow-500">1</span>
+						<div class="w-28 h-24 bg-gradient-to-b from-amber-600/40 to-amber-800/30 border border-amber-500/40 rounded-t-md flex items-center justify-center shadow-inner">
+							<span class="text-3xl font-black text-amber-400">1</span>
 						</div>
 					</div>
 
@@ -188,51 +240,57 @@
 						<div class="flex flex-col items-center gap-2">
 							<div class="relative">
 								{#if podium.third.avatar}
-									<img src={podium.third.avatar} alt="" class="w-14 h-14 rounded-full object-cover border-2 border-orange-700" />
+									<img src={podium.third.avatar} alt="" class="w-14 h-14 rounded-full object-cover border-2 border-amber-700 shadow-md" />
 								{:else}
-									<div class="w-14 h-14 rounded-full bg-gray-700 flex items-center justify-center text-xl border-2 border-orange-700">🏈</div>
+									<div class="w-14 h-14 rounded-full bg-slate-700 flex items-center justify-center text-xl border-2 border-amber-700">🏈</div>
 								{/if}
-								<span class="absolute -bottom-1 -right-1 text-base">🥉</span>
+								<span class="absolute -bottom-1 -right-1 text-base leading-none">🥉</span>
 							</div>
 							<div class="text-center">
-								<p class="text-sm font-semibold text-gray-300 max-w-[90px] truncate">{podium.third.teamName}</p>
-								<p class="text-xs text-gray-500 max-w-[90px] truncate">{podium.third.ownerName}</p>
+								<p class="text-sm font-semibold text-slate-300 max-w-[90px] truncate">{podium.third.teamName}</p>
+								<p class="text-xs text-slate-500 max-w-[90px] truncate">{podium.third.ownerName}</p>
 							</div>
-							<div class="w-20 h-12 bg-orange-900/40 rounded-t-lg flex items-center justify-center">
-								<span class="text-xl font-bold text-orange-700">3</span>
+							<div class="w-20 h-12 bg-gradient-to-b from-amber-900/50 to-amber-950/40 rounded-t-md flex items-center justify-center">
+								<span class="text-xl font-black text-amber-700">3</span>
 							</div>
 						</div>
 					{/if}
 				</div>
-
-				<!-- Toilet Bowl -->
-				{#if podium.toilet}
-					<div class="mt-8 pt-6 border-t border-gray-800">
-						<p class="text-center text-gray-500 text-xs uppercase tracking-widest mb-4">
-							🚽 Toilet Bowl Champion
-						</p>
-						<div class="flex flex-col items-center gap-2">
-							<div class="relative">
-								{#if podium.toilet.avatar}
-									<img src={podium.toilet.avatar} alt="" class="w-14 h-14 rounded-full object-cover border-2 border-gray-600 grayscale opacity-75" />
-								{:else}
-									<div class="w-14 h-14 rounded-full bg-gray-800 flex items-center justify-center text-xl border-2 border-gray-600">🏈</div>
-								{/if}
-							</div>
-							<p class="text-sm text-gray-400">{podium.toilet.teamName}</p>
-							<p class="text-xs text-gray-600">{podium.toilet.ownerName}</p>
-						</div>
-					</div>
-				{/if}
 			</div>
 
-			<!-- All-time champions table -->
-			<div class="mt-4">
-				<h2 class="text-lg font-semibold mb-3 text-gray-300">All-Time Champions</h2>
-				<div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+			<!-- ── TOILET BOWL ──────────────────────────────── -->
+			{#if podium.toilet}
+				<div class="mt-4 pt-6 border-t border-slate-800">
+					<div class="flex items-center justify-center mb-4">
+						<div class="relative">
+							<div class="bg-slate-800 border border-slate-600 text-slate-300 text-sm font-bold uppercase tracking-widest px-8 py-2 rounded-sm shadow">
+								🚽 Toilet Bowl
+							</div>
+							<div class="absolute top-0 -left-3 w-3 h-full bg-slate-700" style="clip-path: polygon(100% 0, 100% 100%, 0 50%)"></div>
+							<div class="absolute top-0 -right-3 w-3 h-full bg-slate-700" style="clip-path: polygon(0 0, 0 100%, 100% 50%)"></div>
+						</div>
+					</div>
+					<div class="flex flex-col items-center gap-2">
+						<div class="relative">
+							{#if podium.toilet.avatar}
+								<img src={podium.toilet.avatar} alt="" class="w-14 h-14 rounded-full object-cover border-2 border-slate-600 grayscale opacity-70" />
+							{:else}
+								<div class="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center text-xl border-2 border-slate-600 grayscale opacity-70">🏈</div>
+							{/if}
+						</div>
+						<p class="text-sm text-slate-400 font-medium">{podium.toilet.teamName}</p>
+						<p class="text-xs text-slate-600">{podium.toilet.ownerName}</p>
+					</div>
+				</div>
+			{/if}
+
+			<!-- ── ALL-TIME CHAMPIONS ─────────────────────────── -->
+			<div class="mt-10">
+				<h2 class="text-base font-bold uppercase tracking-wider text-slate-500 mb-3">All-Time Champions</h2>
+				<div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
 					<table class="w-full text-sm">
 						<thead>
-							<tr class="border-b border-gray-800 text-gray-500 text-xs uppercase">
+							<tr class="border-b border-slate-800 text-slate-500 text-xs uppercase tracking-wider">
 								<th class="px-4 py-3 text-left">Season</th>
 								<th class="px-4 py-3 text-left">Champion</th>
 								<th class="px-4 py-3 text-left hidden sm:table-cell">Runner-up</th>
@@ -243,22 +301,22 @@
 							{#each podiums as p, i}
 								<tr
 									onclick={() => (selectedIdx = i)}
-									class="border-b border-gray-800/50 cursor-pointer transition-colors
-									       {selectedIdx === i ? 'bg-blue-900/20' : 'hover:bg-gray-800/50'}"
+									class="border-b border-slate-800/50 cursor-pointer transition-colors
+									       {selectedIdx === i ? 'bg-amber-500/10' : 'hover:bg-slate-800/50'}"
 								>
-									<td class="px-4 py-3 font-mono text-gray-400">{p.season}</td>
+									<td class="px-4 py-3 font-mono text-slate-400">{p.season}</td>
 									<td class="px-4 py-3">
 										<div class="flex items-center gap-2">
 											{#if p.champion.avatar}
 												<img src={p.champion.avatar} alt="" class="w-6 h-6 rounded-full" />
 											{/if}
-											<span class="text-white font-medium truncate max-w-[120px]">{p.champion.teamName}</span>
+											<span class="text-white font-semibold truncate max-w-[120px]">{p.champion.teamName}</span>
 										</div>
 									</td>
-									<td class="px-4 py-3 text-gray-400 hidden sm:table-cell truncate max-w-[120px]">
+									<td class="px-4 py-3 text-slate-400 hidden sm:table-cell truncate max-w-[120px]">
 										{p.second?.teamName ?? '—'}
 									</td>
-									<td class="px-4 py-3 text-gray-500 hidden md:table-cell truncate max-w-[120px]">
+									<td class="px-4 py-3 text-slate-500 hidden md:table-cell truncate max-w-[120px]">
 										{p.third?.teamName ?? '—'}
 									</td>
 								</tr>

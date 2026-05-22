@@ -1,7 +1,10 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import type { SleeperRoster, SleeperLeagueUser, SleeperNflState } from '$lib/types';
-	import { onMount } from 'svelte';
+	import type { RosterInfo } from '$lib/sleeper';
+	import {
+		fetchLeagueCore, fetchNflState, fetchMatchups as fetchWeekMatchups,
+		fetchWinnersBracket, fetchLosersBracket, buildRosterInfoMap
+	} from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -28,10 +31,9 @@
 		matchId: number;
 		t1: BracketSide;
 		t2: BracketSide;
-		label: string; // "Championship", "3rd Place", "Semifinals", "Round N", "Toilet Bowl"
+		label: string;
 	}
 
-	// weekly state
 	let allMatchups = $state<Record<number, Matchup[]>>({});
 	let selectedWeek = $state(1);
 	let maxWeek = $state(1);
@@ -41,7 +43,6 @@
 	let error = $state('');
 	let season = $state('');
 
-	// bracket state
 	let view = $state<'weekly' | 'bracket'>('weekly');
 	let winnersRounds = $state<BracketMatch[][]>([]);
 	let losersRounds = $state<BracketMatch[][]>([]);
@@ -50,60 +51,70 @@
 	let playoffStart = $state(15);
 	let playoffType = $state(0);
 
-	let userMap = new Map<number, { teamName: string; ownerName: string; avatar: string | null }>();
+	let userMap = new Map<number, RosterInfo>();
 
-	onMount(async () => {
-		try {
-			const [rostersRes, usersRes, leagueRes, nflRes] = await Promise.all([
-				fetch(`https://api.sleeper.app/v1/league/${data.leagueId}/rosters`),
-				fetch(`https://api.sleeper.app/v1/league/${data.leagueId}/users`),
-				fetch(`https://api.sleeper.app/v1/league/${data.leagueId}`),
-				fetch('https://api.sleeper.app/v1/state/nfl')
-			]);
-			const [rosters, users, league, nfl]: [SleeperRoster[], SleeperLeagueUser[], any, SleeperNflState] =
-				await Promise.all([rostersRes.json(), usersRes.json(), leagueRes.json(), nflRes.json()]);
+	$effect(() => {
+		const leagueId = data.leagueId;
+		allMatchups = {};
+		selectedWeek = 1;
+		maxWeek = 1;
+		loading = true;
+		error = '';
+		season = '';
+		view = 'weekly';
+		bracketLoaded = false;
+		winnersRounds = [];
+		losersRounds = [];
+		userMap = new Map();
 
-			season = league.season;
-			playoffStart = league.settings?.playoff_week_start ?? 15;
-			playoffType = league.settings?.playoff_round_type ?? 0;
-			regularSeasonLength = playoffStart - 1;
+		(async () => {
+			try {
+				const [{ league, rosters, users }, nfl] = await Promise.all([
+					fetchLeagueCore(leagueId),
+					fetchNflState(),
+				]);
 
-			const rawUserMap = new Map<string, SleeperLeagueUser>(users.map((u) => [u.user_id, u]));
-			for (const r of rosters) {
-				const u = rawUserMap.get(r.owner_id);
-				const avatarHash = u?.metadata?.avatar ?? u?.avatar;
-				userMap.set(r.roster_id, {
-					teamName: u?.metadata?.team_name ?? u?.display_name ?? 'Unknown',
-					ownerName: u?.display_name ?? '',
-					avatar: avatarHash ? `https://sleepercdn.com/avatars/thumbs/${avatarHash}` : null
-				});
+				if (data.leagueId !== leagueId) return;
+
+				season = league.season;
+				playoffStart = league.settings?.playoff_week_start ?? 15;
+				playoffType = league.settings?.playoff_round_type ?? 0;
+				regularSeasonLength = playoffStart - 1;
+
+				userMap = buildRosterInfoMap(rosters, users);
+
+				const playoffTeams = league.settings?.playoff_teams ?? 4;
+				const numRounds = Math.ceil(Math.log2(Math.max(playoffTeams, 2)));
+				const weeksPerRound = playoffType === 2 ? 2 : 1;
+				const lastPlayoffWeek = playoffStart + numRounds * weeksPerRound - 1;
+
+				let week = 1;
+				if (league.status === 'complete') {
+					week = lastPlayoffWeek; maxWeek = lastPlayoffWeek;
+				} else if (nfl.season_type === 'regular') {
+					week = Math.min(nfl.display_week, regularSeasonLength);
+					maxWeek = week;
+				} else if (nfl.season_type === 'post') {
+					week = regularSeasonLength; maxWeek = lastPlayoffWeek;
+				}
+				selectedWeek = week;
+
+				await loadWeek(week);
+			} catch (e: any) {
+				if (data.leagueId !== leagueId) return;
+				error = e.message;
+			} finally {
+				if (data.leagueId !== leagueId) return;
+				loading = false;
 			}
-
-			let week = 1;
-			if (league.status === 'complete') {
-				week = 18; maxWeek = 18;
-			} else if (nfl.season_type === 'regular') {
-				week = Math.min(nfl.display_week, regularSeasonLength);
-				maxWeek = week;
-			} else if (nfl.season_type === 'post') {
-				week = regularSeasonLength; maxWeek = 18;
-			}
-			selectedWeek = week;
-
-			await loadWeek(week);
-		} catch (e: any) {
-			error = e.message;
-		} finally {
-			loading = false;
-		}
+		})();
 	});
 
 	async function loadWeek(week: number) {
 		if (allMatchups[week]) { selectedWeek = week; return; }
 		weekLoading = true;
 		try {
-			const res = await fetch(`https://api.sleeper.app/v1/league/${data.leagueId}/matchups/${week}`);
-			const raw: { roster_id: number; matchup_id: number; points: number; starters: string[] }[] = await res.json();
+			const raw = await fetchWeekMatchups(data.leagueId, week);
 
 			const grouped: Record<number, MatchupTeam[]> = {};
 			for (const m of raw) {
@@ -130,18 +141,12 @@
 		try {
 			const playoffWeeks = Array.from({ length: 18 - playoffStart + 1 }, (_, i) => playoffStart + i);
 
-			const [winnersRes, losersRes, ...weekRess] = await Promise.all([
-				fetch(`https://api.sleeper.app/v1/league/${data.leagueId}/winners_bracket`),
-				fetch(`https://api.sleeper.app/v1/league/${data.leagueId}/losers_bracket`),
-				...playoffWeeks.map(w => fetch(`https://api.sleeper.app/v1/league/${data.leagueId}/matchups/${w}`))
-			]);
-
 			const [winnersData, losersData, ...weekDataArr]: [any[], any[], ...any[][]] = await Promise.all([
-				winnersRes.json(), losersRes.json(),
-				...weekRess.map(r => r.json())
+				fetchWinnersBracket(data.leagueId),
+				fetchLosersBracket(data.leagueId),
+				...playoffWeeks.map(w => fetchWeekMatchups(data.leagueId, w))
 			]);
 
-			// week -> roster_id -> points
 			const weekPoints = new Map<number, Map<number, number>>();
 			for (let i = 0; i < weekDataArr.length; i++) {
 				const rp = new Map<number, number>();
@@ -151,8 +156,6 @@
 
 			function getPoints(rosterId: number | null, round: number): number | null {
 				if (!rosterId) return null;
-				// simple: round r of winners/losers bracket corresponds to playoffStart + r - 1
-				// for 2-week rounds (playoffType 2), sum two consecutive weeks
 				const week = playoffStart + round - 1;
 				const pts = weekPoints.get(week)?.get(rosterId) ?? null;
 				if (pts === null) return null;
@@ -212,47 +215,60 @@
 	}
 
 	const weekMatchups = $derived(allMatchups[selectedWeek] ?? []);
+
+	function weekLabel(week: number): string {
+		return week <= regularSeasonLength
+			? `Week ${week}`
+			: `Playoffs · Wk ${week - regularSeasonLength}`;
+	}
 </script>
 
 <div>
-	<!-- Header + view toggle -->
+	<!-- Header -->
 	<div class="flex items-start justify-between mb-6 flex-wrap gap-3">
 		<div>
-			<h1 class="text-2xl font-bold">Matchups</h1>
-			<p class="text-gray-500 text-sm">{season} Season</p>
+			<h1 class="text-2xl font-extrabold text-white">Matchups</h1>
+			<p class="text-slate-500 text-sm mt-0.5">{season} Season</p>
 		</div>
 		<div class="flex items-center gap-2">
 			<!-- View tabs -->
-			<div class="flex gap-1 bg-gray-900 rounded-xl p-1">
+			<div class="flex gap-1 bg-slate-900 rounded-xl p-1">
 				<button
 					onclick={() => (view = 'weekly')}
 					class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-					       {view === 'weekly' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}"
+					       {view === 'weekly' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}"
 				>Weekly</button>
 				<button
 					onclick={() => loadBracket()}
 					class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-					       {view === 'bracket' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}"
+					       {view === 'bracket' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}"
 				>
 					{bracketLoading ? 'Loading…' : 'Bracket'}
 				</button>
 			</div>
 
-			<!-- Week selector (weekly view only) -->
+			<!-- Week navigator -->
 			{#if view === 'weekly'}
-				<div class="flex items-center gap-1 bg-gray-900 rounded-xl p-1">
+				<div class="flex items-center gap-0.5 bg-slate-900 rounded-xl p-1">
 					<button
 						onclick={() => selectedWeek > 1 && loadWeek(selectedWeek - 1)}
 						disabled={selectedWeek <= 1 || weekLoading}
-						class="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white disabled:opacity-30 transition-colors"
+						class="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
 					>‹</button>
-					<span class="px-3 py-1.5 text-sm font-medium text-white min-w-[80px] text-center">
-						{selectedWeek <= regularSeasonLength ? `Week ${selectedWeek}` : `Playoffs Wk ${selectedWeek - regularSeasonLength}`}
-					</span>
+					<select
+						value={selectedWeek}
+						onchange={(e) => loadWeek(parseInt((e.target as HTMLSelectElement).value))}
+						disabled={weekLoading}
+						class="bg-transparent text-sm font-semibold text-white px-2 py-1.5 focus:outline-none cursor-pointer disabled:opacity-50"
+					>
+						{#each Array.from({ length: maxWeek }, (_, i) => i + 1) as w}
+							<option value={w} class="bg-slate-900">{weekLabel(w)}</option>
+						{/each}
+					</select>
 					<button
 						onclick={() => selectedWeek < maxWeek && loadWeek(selectedWeek + 1)}
 						disabled={selectedWeek >= maxWeek || weekLoading}
-						class="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white disabled:opacity-30 transition-colors"
+						class="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
 					>›</button>
 				</div>
 			{/if}
@@ -260,52 +276,75 @@
 	</div>
 
 	{#if loading}
-		<div class="grid sm:grid-cols-2 gap-4">
+		<div class="grid sm:grid-cols-2 gap-3">
 			{#each Array(6) as _}
-				<div class="h-28 bg-gray-800 rounded-xl animate-pulse"></div>
+				<div class="h-16 bg-slate-800 rounded-xl animate-pulse"></div>
 			{/each}
 		</div>
+
 	{:else if error}
 		<p class="text-red-400">Failed to load matchups: {error}</p>
 
 	<!-- ── WEEKLY VIEW ─────────────────────────────────── -->
 	{:else if view === 'weekly'}
 		{#if weekLoading}
-			<div class="grid sm:grid-cols-2 gap-4">
+			<div class="grid sm:grid-cols-2 gap-3">
 				{#each Array(6) as _}
-					<div class="h-28 bg-gray-800 rounded-xl animate-pulse"></div>
+					<div class="h-16 bg-slate-800 rounded-xl animate-pulse"></div>
 				{/each}
 			</div>
 		{:else if weekMatchups.length === 0}
-			<p class="text-gray-400">No matchups found for this week.</p>
+			<p class="text-slate-400">No matchups found for this week.</p>
 		{:else}
-			<div class="grid sm:grid-cols-2 gap-4">
+			<!-- Pill-style matchup cards -->
+			<div class="grid sm:grid-cols-2 gap-3">
 				{#each weekMatchups as matchup (matchup.id)}
 					{@const homeWon = matchup.home.points > matchup.away.points}
 					{@const awayWon = matchup.away.points > matchup.home.points}
-					<div class="bg-gray-900 rounded-xl overflow-hidden border border-gray-800">
-						{#each [{ team: matchup.home, won: homeWon }, { team: matchup.away, won: awayWon }] as side, i}
-							<div class="flex items-center gap-3 px-4 py-3 {i === 0 ? 'border-b border-gray-800' : ''}
-							            {side.won ? 'bg-gray-800/60' : ''}">
-								{#if side.team.avatar}
-									<img src={side.team.avatar} alt="" class="w-10 h-10 rounded-full object-cover shrink-0" />
-								{:else}
-									<div class="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center shrink-0">🏈</div>
-								{/if}
-								<div class="flex-1 min-w-0">
-									<p class="font-medium text-sm truncate {side.won ? 'text-white' : 'text-gray-300'}">{side.team.teamName}</p>
-									{#if side.team.ownerName && side.team.ownerName !== side.team.teamName}
-										<p class="text-xs text-gray-500 truncate">{side.team.ownerName}</p>
-									{/if}
-								</div>
-								<div class="text-right shrink-0 flex items-center gap-2">
-									{#if side.won}<span class="text-green-500 text-xs font-bold">W</span>{/if}
-									<span class="font-mono font-semibold text-lg {side.won ? 'text-white' : 'text-gray-400'}">
-										{side.team.points.toFixed(2)}
-									</span>
-								</div>
+
+					<div class="flex rounded-xl overflow-hidden border border-slate-700/30 shadow-lg">
+						<!-- Home team (left half) -->
+						<div class="flex-1 flex items-center gap-2 px-3 py-3 min-w-0
+						            {homeWon ? 'bg-red-900/80' : 'bg-slate-800/90'}">
+							{#if matchup.home.avatar}
+								<img src={matchup.home.avatar} alt="" class="w-9 h-9 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
+							{:else}
+								<div class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center shrink-0 text-sm">🏈</div>
+							{/if}
+							<p class="flex-1 min-w-0 text-sm italic font-semibold truncate leading-tight
+							          {homeWon ? 'text-white' : 'text-slate-400'}">
+								{matchup.home.teamName}
+							</p>
+							<div class="shrink-0 pl-1 text-right">
+								<p class="font-mono font-bold text-sm leading-none
+								          {homeWon ? 'text-white' : 'text-slate-400'}">
+									{matchup.home.points.toFixed(2)}
+								</p>
 							</div>
-						{/each}
+						</div>
+
+						<!-- Divider -->
+						<div class="w-px shrink-0 bg-slate-600/40"></div>
+
+						<!-- Away team (right half, mirrored) -->
+						<div class="flex-1 flex items-center gap-2 px-3 py-3 min-w-0
+						            {awayWon ? 'bg-red-900/80' : 'bg-slate-800/90'}">
+							<div class="shrink-0 pr-1 text-left">
+								<p class="font-mono font-bold text-sm leading-none
+								          {awayWon ? 'text-white' : 'text-slate-400'}">
+									{matchup.away.points.toFixed(2)}
+								</p>
+							</div>
+							<p class="flex-1 min-w-0 text-sm italic font-semibold text-right truncate leading-tight
+							          {awayWon ? 'text-white' : 'text-slate-400'}">
+								{matchup.away.teamName}
+							</p>
+							{#if matchup.away.avatar}
+								<img src={matchup.away.avatar} alt="" class="w-9 h-9 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
+							{:else}
+								<div class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center shrink-0 text-sm">🏈</div>
+							{/if}
+						</div>
 					</div>
 				{/each}
 			</div>
@@ -316,51 +355,63 @@
 		{#if bracketLoading}
 			<div class="space-y-3">
 				{#each Array(4) as _}
-					<div class="h-16 bg-gray-800 rounded-xl animate-pulse"></div>
+					<div class="h-16 bg-slate-800 rounded-xl animate-pulse"></div>
 				{/each}
 			</div>
 		{:else if winnersRounds.length === 0 && losersRounds.length === 0}
-			<p class="text-gray-400">No bracket data available for this season.</p>
+			<p class="text-slate-400">No bracket data available for this season.</p>
 		{:else}
-			<!-- Bracket: horizontal scroll, rounds as columns -->
-			{#snippet bracketSection(rounds: BracketMatch[][], title: string, finalIcon: string)}
+			{#snippet bracketSection(rounds: BracketMatch[][], title: string, finalIcon: string, accent: string)}
 				{#if rounds.length > 0}
-					<div class="mb-8">
-						<h2 class="text-base font-semibold text-gray-300 mb-4">{title}</h2>
-						<div class="overflow-x-auto pb-2">
+					<div class="mb-10">
+						<h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">{title}</h2>
+						<div class="overflow-x-auto pb-3">
 							<div class="flex gap-4 items-start min-w-max">
 								{#each rounds as roundMatches, ri}
-									<div class="flex flex-col gap-3" style="min-width: 180px; max-width: 220px;">
-										<!-- Round label (use first match's label) -->
-										<p class="text-xs text-gray-500 uppercase tracking-wider text-center">
+									{@const isChampionRound = ri === rounds.length - 1}
+									<div class="flex flex-col gap-3" style="min-width: 190px; max-width: 230px;">
+										<p class="text-xs text-slate-500 uppercase tracking-wider text-center font-medium">
 											{roundMatches[0]?.label ?? `Round ${ri + 1}`}
 										</p>
 										{#each roundMatches as match}
-											{@const isLast = ri === rounds.length - 1}
-											<div class="bg-gray-900 rounded-xl border {isLast ? 'border-yellow-600/40' : 'border-gray-800'} overflow-hidden">
+											<div class="rounded-xl overflow-hidden border
+											            {isChampionRound
+											                ? 'border-amber-500/40 shadow-lg shadow-amber-900/20'
+											                : 'border-slate-700/60'}">
 												{#each [match.t1, match.t2] as side, si}
 													{#if side.bye}
-														<div class="flex items-center gap-2 px-3 py-2 {si === 0 ? 'border-b border-gray-800' : ''} text-gray-600 text-xs italic">
+														<div class="flex items-center gap-2 px-3 py-2.5
+														            {si === 0 ? 'border-b border-slate-800' : ''}
+														            bg-slate-900 text-slate-600 text-xs italic">
 															BYE
 														</div>
 													{:else}
-														<div class="flex items-center gap-2 px-3 py-2 {si === 0 ? 'border-b border-gray-800' : ''}
-														            {side.won ? 'bg-gray-800/70' : ''}">
+														<div class="flex items-center gap-2 px-3 py-2.5
+														            {si === 0 ? 'border-b border-slate-800/80' : ''}
+														            {side.won
+														                ? isChampionRound
+														                    ? 'bg-amber-950/60'
+														                    : 'bg-slate-800'
+														                : 'bg-slate-900/80'}">
 															{#if side.avatar}
-																<img src={side.avatar} alt="" class="w-7 h-7 rounded-full object-cover shrink-0" />
+																<img src={side.avatar} alt="" class="w-7 h-7 rounded-full object-cover shrink-0
+																            {side.won ? 'ring-2 ring-white/30' : 'opacity-60'}" />
 															{:else}
-																<div class="w-7 h-7 rounded-full bg-gray-700 flex items-center justify-center text-sm shrink-0">🏈</div>
+																<div class="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-sm shrink-0
+																            {side.won ? '' : 'opacity-50'}">🏈</div>
 															{/if}
-															<span class="text-xs font-medium truncate flex-1 {side.won ? 'text-white' : 'text-gray-400'}">
+															<span class="text-xs font-semibold truncate flex-1 leading-tight
+															             {side.won
+															                 ? isChampionRound ? 'text-amber-200' : 'text-white'
+															                 : 'text-slate-500'}">
 																{side.teamName ?? '—'}
 															</span>
-															{#if side.won && isLast}
+															{#if side.won && isChampionRound}
 																<span class="text-sm shrink-0">{finalIcon}</span>
-															{:else if side.won}
-																<span class="text-green-500 text-xs font-bold shrink-0">W</span>
 															{/if}
 															{#if side.points !== null}
-																<span class="font-mono text-xs {side.won ? 'text-white' : 'text-gray-500'} shrink-0">
+																<span class="font-mono text-xs shrink-0
+																             {side.won ? 'text-white' : 'text-slate-600'}">
 																	{side.points.toFixed(1)}
 																</span>
 															{/if}
@@ -377,8 +428,8 @@
 				{/if}
 			{/snippet}
 
-			{@render bracketSection(winnersRounds, 'Championship Bracket', '🏆')}
-			{@render bracketSection(losersRounds, 'Toilet Bowl Bracket', '🚽')}
+			{@render bracketSection(winnersRounds, 'Championship Bracket', '🏆', 'amber')}
+			{@render bracketSection(losersRounds, 'Toilet Bowl Bracket', '🚽', 'slate')}
 		{/if}
 	{/if}
 </div>
