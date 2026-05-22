@@ -78,7 +78,7 @@
 					: null;
 				if (!url) return '';
 				const alt = (f?.title ?? f?.description ?? '').replace(/"/g, '&quot;');
-				const img = `<img src="${url}" alt="${alt}" style="max-width:100%;border-radius:0.5rem;display:block" />`;
+				const img = `<img src="${url.replace(/"/g, '%22')}" alt="${alt}" style="max-width:100%;border-radius:0.5rem;display:block" />`;
 				return node.nodeType === 'embedded-asset-inline'
 					? img
 					: `<figure style="margin:1.5rem 0;text-align:center">${img}</figure>`;
