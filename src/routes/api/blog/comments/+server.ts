@@ -1,6 +1,9 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
+import { adminDb } from '$lib/firebase/admin';
+
+const COMMENT_RATE_LIMIT_MS = 30_000;
 
 function getConfig() {
 	const spaceId = env.CONTENTFUL_SPACE_ID ?? '';

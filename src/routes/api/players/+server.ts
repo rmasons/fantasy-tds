@@ -74,7 +74,8 @@ async function getPlayers(): Promise<Record<string, SlimPlayer>> {
 	return slim;
 }
 
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ locals }) => {
+	if (!locals.user) return json({ error: 'Unauthorized' }, { status: 401 });
 	const players = await getPlayers();
 	return json(players);
 };

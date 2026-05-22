@@ -73,11 +73,11 @@
 				const url = rawUrl
 					? (rawUrl.startsWith('http') ? rawUrl : `https:${rawUrl}`)
 					: null;
-				const alt = f?.title ?? f?.description ?? '';
-				const mime: string = f?.file?.contentType ?? '';
-				const isGif = mime === 'image/gif' || rawUrl.toLowerCase().includes('.gif');
+				// Escape quotes so a title like `"foo"` doesn't break the alt attribute
+				const alt = (f?.title ?? f?.description ?? '').replace(/"/g, '&quot;');
 				if (!url) return '';
-				const img = `<img src="${url}" alt="${alt}" ${isGif ? '' : 'loading="lazy"'} class="max-w-full rounded-lg" />`;
+				// No loading="lazy" — Chrome doesn't reliably trigger lazy loads on innerHTML-injected images
+				const img = `<img src="${url}" alt="${alt}" class="max-w-full rounded-lg" />`;
 				return node.nodeType === 'embedded-asset-inline'
 					? img
 					: `<figure class="my-6 flex justify-center">${img}</figure>`;

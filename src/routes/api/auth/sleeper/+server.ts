@@ -9,11 +9,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	const { username } = await request.json();
-	if (!username?.trim()) {
+	const trimmed = username?.trim() ?? '';
+	if (!trimmed) {
 		return json({ error: 'Username required' }, { status: 400 });
 	}
+	if (!/^[a-zA-Z0-9_]{1,30}$/.test(trimmed)) {
+		return json({ error: 'Invalid username format' }, { status: 400 });
+	}
 
-	const res = await fetch(`https://api.sleeper.app/v1/user/${username.trim()}`);
+	const res = await fetch(`https://api.sleeper.app/v1/user/${trimmed}`);
 	if (!res.ok) {
 		return json({ error: 'Sleeper user not found' }, { status: 404 });
 	}

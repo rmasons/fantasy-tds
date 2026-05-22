@@ -32,13 +32,17 @@ function adminApp(): App {
 
 export const adminAuth = new Proxy({} as ReturnType<typeof getAuth>, {
 	get(_, prop) {
-		return (getAuth(adminApp()) as any)[prop];
+		const instance = getAuth(adminApp());
+		const value = (instance as any)[prop];
+		return typeof value === 'function' ? value.bind(instance) : value;
 	}
 });
 
 export const adminDb = new Proxy({} as ReturnType<typeof getFirestore>, {
 	get(_, prop) {
-		return (getFirestore(adminApp()) as any)[prop];
+		const instance = getFirestore(adminApp());
+		const value = (instance as any)[prop];
+		return typeof value === 'function' ? value.bind(instance) : value;
 	}
 });
 
