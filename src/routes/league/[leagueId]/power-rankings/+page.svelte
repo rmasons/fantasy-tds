@@ -304,7 +304,7 @@
 		}
 
 		const currMap = computePowerRankMap(rosterIds, selectedWeek, weekScoreMap, weekMatchupPairs, weekMedians);
-		const prevMap = selectedWeek > 0
+		const prevMap = selectedWeek > 1
 			? computePowerRankMap(rosterIds, selectedWeek - 1, weekScoreMap, weekMatchupPairs, weekMedians)
 			: null;
 
