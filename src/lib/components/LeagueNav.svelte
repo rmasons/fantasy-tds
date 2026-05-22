@@ -83,6 +83,9 @@
 		}
 	});
 
+	const hasBlog = $derived(!!(page.data as any).hasBlog);
+	const visibleLinks = $derived(navLinks.filter(l => l.href !== 'blog' || hasBlog));
+
 	const currentSeason = $derived(
 		seasonChain.find(e => e.leagueId === leagueId)?.season ?? league?.season ?? null
 	);
@@ -166,7 +169,7 @@
 
 	<!-- Nav links -->
 	<nav class="flex-1 p-2 space-y-0.5 overflow-y-auto">
-		{#each navLinks as link}
+		{#each visibleLinks as link}
 			<a
 				href="/league/{leagueId}/{link.href}"
 				class="flex items-center px-3 py-2 rounded-lg text-sm transition-all
@@ -320,7 +323,7 @@
 				</div>
 			{/if}
 
-			{#each navLinks as link}
+			{#each visibleLinks as link}
 				<a
 					href="/league/{leagueId}/{link.href}"
 					onclick={() => (menuOpen = false)}

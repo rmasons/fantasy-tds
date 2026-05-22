@@ -94,7 +94,7 @@
 		});
 	});
 
-	const navItems = [
+	const allNavItems = [
 		{ href: 'standings',      label: 'Standings',       icon: '🏆' },
 		{ href: 'matchups',       label: 'Matchups',        icon: '⚔️' },
 		{ href: 'power-rankings', label: 'Power Rankings',  icon: '📈' },
@@ -107,6 +107,7 @@
 		{ href: 'rivalry',        label: 'Rivalry',         icon: '⚡' },
 		{ href: 'blog',           label: 'Blog',            icon: '📝' },
 	];
+	const navItems = $derived(allNavItems.filter(n => n.href !== 'blog' || data.hasBlog));
 </script>
 
 {#if loading}
