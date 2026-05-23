@@ -114,9 +114,11 @@ const PLAYERS_CACHE_TTL_MS = 5 * 60 * 1000;
 async function getPlayersCache(): Promise<Record<string, { name: string; pos: string; team: string }>> {
 	if (playersCacheData && Date.now() < playersCacheExpiry) return playersCacheData;
 	const doc = await adminDb.collection('cache').doc('players_nfl').get();
-	playersCacheData = doc.exists ? JSON.parse(doc.data()!.data) : {};
+	const fresh: Record<string, { name: string; pos: string; team: string }> =
+		doc.exists ? JSON.parse(doc.data()!.data) : {};
+	playersCacheData = fresh;
 	playersCacheExpiry = Date.now() + PLAYERS_CACHE_TTL_MS;
-	return playersCacheData;
+	return fresh;
 }
 
 const POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];

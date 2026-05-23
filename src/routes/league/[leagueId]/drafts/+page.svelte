@@ -10,7 +10,6 @@
 		pickNo: number;
 		slot: number;
 		rosterId: number;
-		originalRosterId: number;
 		team: string;
 		playerId: string;
 		playerName: string;
@@ -19,96 +18,113 @@
 		amount?: number; // auction
 	}
 
-	interface Draft {
+	interface DraftMeta {
 		id: string;
 		season: string;
 		type: 'snake' | 'auction' | 'linear';
 		status: string;
 		rounds: number;
 		teams: number;
-		picks: DraftPick[];
 		slotToRoster: Record<number, number>;
 		rosterNames: Map<number, string>;
 	}
 
-	let drafts = $state<Draft[]>([]);
-	let selectedDraft = $state(0);
+	let draftsMeta = $state<DraftMeta[]>([]);
+	let selectedIdx = $state(0);
 	let loading = $state(true);
+	let loadingPicks = $state(false);
 	let error = $state('');
+	let picksError = $state('');
+	let currentPicks = $state<DraftPick[]>([]);
 
-	let rosterNameMap = $state(new Map<number, string>());
+	// Plain variable — not reactive. Set before draftsMeta is populated so it's
+	// always ready when the picks effect runs.
+	let playersMap: Record<string, SlimPlayer> = {};
 
+	// ── Effect 1: load draft list + player lookup on league change ────────────
 	$effect(() => {
 		const leagueId = data.leagueId;
-		drafts = [];
-		selectedDraft = 0;
+		draftsMeta = [];
+		selectedIdx = 0;
+		currentPicks = [];
 		loading = true;
 		error = '';
-		rosterNameMap = new Map<number, string>();
+		playersMap = {};
 
 		(async () => {
 			try {
-				const [{ rosters, users }, draftList, players] = await Promise.all([
+				const [{ rosters, users }, draftList, rawPlayers] = await Promise.all([
 					fetchLeagueCore(leagueId),
 					fetchLeagueDrafts(leagueId),
-					fetch('/api/players').then((r) => r.json()) as Promise<Record<string, SlimPlayer>>,
+					fetch('/api/players').then(r => r.ok ? r.json() : {}),
 				]);
 
 				if (data.leagueId !== leagueId) return;
 
+				playersMap = rawPlayers;
+
 				const rosterInfo = buildRosterInfoMap(rosters, users);
-				for (const [id, info] of rosterInfo) {
-					rosterNameMap.set(id, info.teamName);
-				}
+				const names = new Map<number, string>();
+				for (const [id, info] of rosterInfo) names.set(id, info.teamName);
 
-				const completedDrafts = draftList.filter((d) => d.status === 'complete');
-				completedDrafts.sort((a, b) => parseInt(b.season) - parseInt(a.season));
-
-				const resolved = await Promise.all(
-					completedDrafts.map(async (d) => {
-						const rawPicks = await fetchDraftPicks(d.draft_id);
-
-						const slotToRoster: Record<number, number> = d.slot_to_roster_id ?? {};
-
-						const picks: DraftPick[] = rawPicks.map((p) => {
-							const player = players[p.player_id];
-							return {
-								round: p.round,
-								pickNo: p.pick_no,
-								slot: p.draft_slot,
-								rosterId: p.roster_id,
-								originalRosterId: p.roster_id,
-								team: rosterNameMap.get(p.roster_id) ?? `Team ${p.roster_id}`,
-								playerId: p.player_id,
-								playerName: player?.name ?? p.metadata?.name ?? p.player_id,
-								pos: player?.pos ?? p.metadata?.position ?? '?',
-								nflTeam: player?.team ?? p.metadata?.team ?? 'FA',
-								amount: p.metadata?.amount ? parseInt(p.metadata.amount) : undefined
-							};
-						});
-
-						return {
-							id: d.draft_id,
-							season: d.season,
-							type: d.type,
-							status: d.status,
-							rounds: d.settings.rounds,
-							teams: Object.keys(slotToRoster).length,
-							picks,
-							slotToRoster,
-							rosterNames: rosterNameMap
-						} satisfies Draft;
-					})
-				);
-
-				if (data.leagueId !== leagueId) return;
-				drafts = resolved;
+				draftsMeta = draftList
+					.filter((d: any) => d.status === 'complete')
+					.sort((a: any, b: any) => parseInt(b.season, 10) - parseInt(a.season, 10))
+					.map((d: any) => ({
+						id: d.draft_id,
+						season: d.season,
+						type: d.type,
+						status: d.status,
+						rounds: d.settings?.rounds ?? 0,
+						teams: Object.keys(d.slot_to_roster_id ?? {}).length,
+						slotToRoster: d.slot_to_roster_id ?? {},
+						rosterNames: names,
+					}));
 			} catch (e: any) {
 				if (data.leagueId !== leagueId) return;
 				error = e.message;
 			} finally {
 				if (data.leagueId !== leagueId) return;
 				loading = false;
+			}
+		})();
+	});
+
+	// ── Effect 2: load picks for the selected draft ───────────────────────────
+	$effect(() => {
+		const meta = draftsMeta[selectedIdx];
+		if (!meta) { currentPicks = []; return; }
+
+		const draftId = meta.id;
+		loadingPicks = true;
+		picksError = '';
+
+		(async () => {
+			try {
+				const rawPicks = await fetchDraftPicks(draftId);
+				if (draftsMeta[selectedIdx]?.id !== draftId) return;
+
+				currentPicks = rawPicks.map((p: any) => {
+					const player = playersMap[p.player_id];
+					return {
+						round: p.round,
+						pickNo: p.pick_no,
+						slot: p.draft_slot,
+						rosterId: p.roster_id,
+						team: meta.rosterNames.get(Number(p.roster_id)) ?? `Team ${p.roster_id}`,
+						playerId: p.player_id,
+						playerName: player?.name ?? p.metadata?.name ?? p.player_id,
+						pos: player?.pos ?? p.metadata?.position ?? '?',
+						nflTeam: player?.team ?? p.metadata?.team ?? 'FA',
+						amount: p.metadata?.amount ? parseInt(p.metadata.amount, 10) : undefined,
+					};
+				});
+			} catch (e: any) {
+				if (draftsMeta[selectedIdx]?.id !== draftId) return;
+				picksError = e.message;
+			} finally {
+				if (draftsMeta[selectedIdx]?.id !== draftId) return;
+				loadingPicks = false;
 			}
 		})();
 	});
@@ -123,16 +139,16 @@
 	};
 	function pc(pos: string) { return posColor[pos] ?? 'border-l-slate-600'; }
 
-	const draft = $derived(drafts[selectedDraft]);
+	const draft = $derived(draftsMeta[selectedIdx]);
 
-	function picksGrid(d: Draft): (DraftPick | null)[][] {
-		const grid: (DraftPick | null)[][] = Array.from({ length: d.rounds }, () =>
-			new Array(d.teams).fill(null)
+	function picksGrid(meta: DraftMeta, picks: DraftPick[]): (DraftPick | null)[][] {
+		const grid: (DraftPick | null)[][] = Array.from({ length: meta.rounds }, () =>
+			new Array(meta.teams).fill(null)
 		);
-		for (const pick of d.picks) {
+		for (const pick of picks) {
 			const row = pick.round - 1;
 			const col = pick.slot - 1;
-			if (row >= 0 && row < d.rounds && col >= 0 && col < d.teams) {
+			if (row >= 0 && row < meta.rounds && col >= 0 && col < meta.teams) {
 				grid[row][col] = pick;
 			}
 		}
@@ -151,17 +167,17 @@
 		</div>
 	{:else if error}
 		<p class="text-red-400">Failed to load drafts: {error}</p>
-	{:else if drafts.length === 0}
+	{:else if draftsMeta.length === 0}
 		<p class="text-slate-400">No completed drafts found.</p>
 	{:else}
 		<!-- Draft selector tabs -->
-		{#if drafts.length > 1}
+		{#if draftsMeta.length > 1}
 			<div class="flex gap-1 bg-slate-900 rounded-xl p-1 mb-6 w-fit">
-				{#each drafts as d, i}
+				{#each draftsMeta as d, i}
 					<button
-						onclick={() => (selectedDraft = i)}
+						onclick={() => (selectedIdx = i)}
 						class="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
-						       {selectedDraft === i ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}"
+						       {selectedIdx === i ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}"
 					>
 						{d.season}
 					</button>
@@ -172,13 +188,24 @@
 		{#if draft}
 			<div class="mb-3 flex items-center gap-3">
 				<span class="text-slate-400 text-sm">{draft.season} · {draft.type} · {draft.rounds} rounds · {draft.teams} teams</span>
+				{#if loadingPicks}
+					<span class="text-slate-600 text-xs">Loading picks…</span>
+				{/if}
 			</div>
 
-			{#if draft.type === 'auction'}
-				<!-- Auction: show each team's picks sorted by amount -->
+			{#if picksError}
+				<p class="text-red-400 text-sm mb-4">Failed to load picks: {picksError}</p>
+			{:else if loadingPicks}
+				<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+					{#each Array(6) as _}
+						<div class="h-24 bg-slate-800 rounded-xl animate-pulse"></div>
+					{/each}
+				</div>
+			{:else if draft.type === 'auction'}
+				<!-- Auction: each team's picks sorted by amount -->
 				<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
 					{#each [...draft.rosterNames.entries()].sort((a, b) => a[1].localeCompare(b[1])) as [rid, tname]}
-						{@const teamPicks = draft.picks.filter((p) => p.rosterId === rid).sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0))}
+						{@const teamPicks = currentPicks.filter((p) => p.rosterId === rid).sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0))}
 						<div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
 							<div class="px-3 py-2 border-b border-slate-800 bg-slate-800/40">
 								<p class="font-medium text-sm text-white">{tname}</p>
@@ -197,17 +224,18 @@
 				</div>
 			{:else}
 				<!-- Snake / linear: round × pick grid -->
-				{@const grid = picksGrid(draft)}
+				{@const grid = picksGrid(draft, currentPicks)}
 				{@const slots = Object.entries(draft.slotToRoster)
-					.sort((a, b) => parseInt(a[0]) - parseInt(b[0]))}
+					.sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
+					.map(([slot, rid]) => [Number(slot), Number(rid)] as [number, number])}
 				<div class="overflow-x-auto rounded-xl border border-slate-800">
 					<table class="text-xs border-collapse w-max">
 						<thead>
 							<tr class="bg-slate-900">
 								<th class="px-2 py-2 text-slate-500 text-left font-normal w-12 border-b border-slate-800">Rd</th>
-								{#each slots as [slot, rid]}
+								{#each slots as [, rid]}
 									<th class="px-2 py-2 text-slate-400 font-medium border-b border-slate-800 min-w-[120px] max-w-[150px]">
-										<span class="truncate block">{rosterNameMap.get(rid as number) ?? `T${rid}`}</span>
+										<span class="truncate block">{draft.rosterNames.get(rid) ?? `T${rid}`}</span>
 									</th>
 								{/each}
 							</tr>
