@@ -27,7 +27,11 @@
 			<div>
 				<p class="text-sm font-medium text-white">Default League</p>
 				<p class="text-xs text-slate-500 mt-0.5">
-					{data.appConfig.defaultLeagueId ?? <span class="italic">not set</span>}
+					{#if data.appConfig.defaultLeagueId}
+						{data.appConfig.defaultLeagueId}
+					{:else}
+						<span class="italic">not set</span>
+					{/if}
 				</p>
 			</div>
 			<a
