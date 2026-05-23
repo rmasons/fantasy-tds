@@ -26,7 +26,7 @@ export const GET: RequestHandler = async ({ url, getClientAddress }) => {
 		access_token: token,
 	};
 
-	const isJson = (r: Response) => !!r.headers.get('content-type')?.includes('application/json');
+	const isJson = (r: Response) => !!r.headers.get('content-type')?.includes('json');
 
 	if (!slug) {
 		const params = new URLSearchParams({ ...baseParams, order: '-sys.createdAt' });
