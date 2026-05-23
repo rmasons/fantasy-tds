@@ -16,6 +16,9 @@ function today(): string {
 
 async function fetchAndSlimFromSleeper(): Promise<Record<string, SlimPlayer>> {
 	const res = await fetch('https://api.sleeper.app/v1/players/nfl');
+	if (!res.ok || !res.headers.get('content-type')?.includes('application/json')) {
+		throw new Error(`Sleeper API error: ${res.status}`);
+	}
 	const raw: Record<string, any> = await res.json();
 
 	return Object.fromEntries(

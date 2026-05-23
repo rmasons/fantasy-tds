@@ -2,15 +2,20 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { adminDb } from '$lib/firebase/admin';
 import { getLeagueConfig } from '$lib/server/config';
+import { checkRateLimit } from '$lib/server/rateLimit';
 
 const COMMENT_RATE_LIMIT_MS = 30_000;
 
 // GET /api/blog/comments?leagueId=<id>&postId=<contentful-entry-id>
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ url, getClientAddress }) => {
+	if (!checkRateLimit(`comments:${getClientAddress()}`)) {
+		return new Response('Too many requests.', { status: 429, headers: { 'Retry-After': '60' } });
+	}
 	const leagueId = url.searchParams.get('leagueId') ?? '';
 	const postId = url.searchParams.get('postId');
 
 	if (!leagueId) throw error(400, 'Missing leagueId');
+	if (!/^[\w-]+$/.test(leagueId)) throw error(400, 'Invalid leagueId.');
 	if (!postId) throw error(400, 'Missing postId');
 
 	const config = await getLeagueConfig(leagueId);
@@ -27,14 +32,19 @@ export const GET: RequestHandler = async ({ url }) => {
 	});
 
 	const res = await fetch(`https://cdn.contentful.com/spaces/${spaceId}/entries?${params}`);
-	if (!res.ok) throw error(502, 'Failed to fetch comments.');
+	if (!res.ok || !res.headers.get('content-type')?.includes('application/json')) {
+		throw error(502, 'Failed to fetch comments.');
+	}
 
 	const data = await res.json();
 	return json(data);
 };
 
 // POST /api/blog/comments  body: { leagueId, postId, comment }
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, getClientAddress }) => {
+	if (!checkRateLimit(`comments-post:${getClientAddress()}`, 10)) {
+		return new Response('Too many requests.', { status: 429, headers: { 'Retry-After': '60' } });
+	}
 	if (!locals.user) throw error(401, 'You must be signed in to comment.');
 
 	const body = await request.json().catch(() => null);
@@ -81,7 +91,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	);
 
 	if (!createRes.ok) {
-		console.error('[comments] Contentful create failed:', await createRes.text().catch(() => ''));
+		console.error('[comments] Contentful create failed:', createRes.status, createRes.statusText);
 		throw error(502, 'Failed to save comment.');
 	}
 

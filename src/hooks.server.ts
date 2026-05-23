@@ -8,7 +8,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (sessionCookie) {
 		const decoded = await verifySessionCookie(sessionCookie);
 		if (decoded) {
-			event.locals.user = await getUserProfile(decoded.uid);
+			const user = await getUserProfile(decoded.uid);
+			if (user) {
+				event.locals.user = user;
+			} else {
+				event.locals.user = null;
+				event.cookies.delete(SESSION_COOKIE, { path: '/' });
+			}
 		} else {
 			event.locals.user = null;
 			event.cookies.delete(SESSION_COOKIE, { path: '/' });

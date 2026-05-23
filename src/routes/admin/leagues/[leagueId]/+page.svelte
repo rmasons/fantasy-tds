@@ -84,27 +84,34 @@
 			</div>
 
 			<div>
-				<label for="contentfulAccessToken" class="block text-xs font-medium text-slate-400 mb-1">Content Delivery Token</label>
+				<label for="contentfulAccessToken" class="block text-xs font-medium text-slate-400 mb-1">
+					Content Delivery Token
+					{#if data.leagueConfig.hasAccessToken}
+						<span class="text-emerald-600 font-normal ml-1">set</span>
+					{/if}
+				</label>
 				<input
 					id="contentfulAccessToken"
 					name="contentfulAccessToken"
-					type="text"
-					value={data.leagueConfig.contentfulAccessToken ?? ''}
-					placeholder="Content Delivery API access token"
+					type="password"
+					placeholder={data.leagueConfig.hasAccessToken ? 'leave blank to keep existing' : 'Content Delivery API access token'}
 					class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
 				/>
 			</div>
 
 			<div>
 				<label for="contentfulManagementToken" class="block text-xs font-medium text-slate-400 mb-1">
-					Management Token <span class="text-slate-600 font-normal">(optional — for comments)</span>
+					Management Token
+					<span class="text-slate-600 font-normal">(optional — for comments)</span>
+					{#if data.leagueConfig.hasManagementToken}
+						<span class="text-emerald-600 font-normal ml-1">set</span>
+					{/if}
 				</label>
 				<input
 					id="contentfulManagementToken"
 					name="contentfulManagementToken"
-					type="text"
-					value={data.leagueConfig.contentfulManagementToken ?? ''}
-					placeholder="Content Management API token"
+					type="password"
+					placeholder={data.leagueConfig.hasManagementToken ? 'leave blank to keep existing' : 'Content Management API token'}
 					class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
 				/>
 			</div>

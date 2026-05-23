@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { SESSION_COOKIE, createSessionCookie } from '$lib/server/session';
+import { SESSION_COOKIE, createSessionCookie, SESSION_DURATION_MS } from '$lib/server/session';
 import { adminAuth } from '$lib/firebase/admin';
 import { upsertUserProfile } from '$lib/server/user';
 
@@ -11,7 +11,13 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		return json({ error: 'Missing idToken' }, { status: 400 });
 	}
 
-	const decoded = await adminAuth.verifyIdToken(idToken);
+	let decoded;
+	try {
+		decoded = await adminAuth.verifyIdToken(idToken);
+	} catch {
+		return json({ error: 'Invalid or expired token' }, { status: 401 });
+	}
+
 	await upsertUserProfile(decoded.uid, {
 		uid: decoded.uid,
 		email: decoded.email ?? '',
@@ -27,7 +33,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		httpOnly: true,
 		secure: true,
 		sameSite: 'strict',
-		maxAge: 60 * 60 * 24 * 5
+		maxAge: SESSION_DURATION_MS / 1000
 	});
 
 	return json({ status: 'ok' });
