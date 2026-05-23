@@ -36,6 +36,10 @@
 		const res = await fetch(
 			`https://api.sleeper.app/v1/user/${data.user.sleeperUserId}/leagues/nfl/${season}`
 		);
+		if (!res.ok) {
+			leaguesLoading = false;
+			return;
+		}
 		leagues = await res.json();
 		leaguesLoading = false;
 

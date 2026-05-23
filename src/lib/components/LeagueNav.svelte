@@ -62,6 +62,7 @@
 		if (cached) seasonChain = cached;
 
 		const res = await fetch(`https://api.sleeper.app/v1/league/${leagueId}`);
+		if (!res.ok) return;
 		league = await res.json();
 
 		if (!cached) {
@@ -71,6 +72,7 @@
 			let prevId: string = league!.previous_league_id ?? '';
 			while (prevId && prevId !== '0') {
 				const r = await fetch(`https://api.sleeper.app/v1/league/${prevId}`);
+				if (!r.ok) break;
 				const d: SleeperLeague = await r.json();
 				chain.push({ leagueId: prevId, season: d.season });
 				seasonChain = [...chain];

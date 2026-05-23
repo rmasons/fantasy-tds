@@ -2,6 +2,15 @@ import { adminDb } from '$lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import type { ManagerProfile, ManagerLeagueProfile } from '$lib/types';
 
+export const PROFILE_MAX_LENGTHS: Record<string, number> = {
+	bio: 280,
+	location: 60,
+	favoriteNFLTeam: 60,
+	favoritePlayer: 60,
+	funFact: 200,
+	twitterHandle: 50,
+};
+
 export async function getManagerProfile(sleeperUserId: string): Promise<ManagerProfile | null> {
 	const doc = await adminDb.collection('managerProfiles').doc(sleeperUserId).get();
 	if (!doc.exists) return null;

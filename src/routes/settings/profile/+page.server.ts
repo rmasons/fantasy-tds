@@ -1,6 +1,6 @@
 import { redirect, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { getManagerProfile, getManagerLeagueProfile, upsertManagerProfile, upsertManagerLeagueProfile } from '$lib/server/managerProfile';
+import { getManagerProfile, getManagerLeagueProfile, upsertManagerProfile, upsertManagerLeagueProfile, PROFILE_MAX_LENGTHS } from '$lib/server/managerProfile';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) throw redirect(302, '/login');
@@ -28,17 +28,8 @@ export const actions: Actions = {
 
 		const data = await request.formData();
 
-		const MAX: Record<string, number> = {
-			bio: 280,
-			location: 60,
-			favoriteNFLTeam: 60,
-			favoritePlayer: 60,
-			funFact: 200,
-			twitterHandle: 50,
-		};
-
 		const update: Record<string, string | undefined> = {};
-		for (const [key, max] of Object.entries(MAX)) {
+		for (const [key, max] of Object.entries(PROFILE_MAX_LENGTHS)) {
 			const raw = (data.get(key) as string | null)?.trim() ?? '';
 			if (raw.length > max) return fail(400, { error: `${key} exceeds ${max} characters` });
 			update[key] = key === 'twitterHandle' ? raw.replace(/^@/, '') || undefined : raw || undefined;
