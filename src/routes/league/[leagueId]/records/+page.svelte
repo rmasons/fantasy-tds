@@ -53,6 +53,7 @@
 	let atBlowouts = $state<GameResult[]>([]);
 	let atClosest = $state<GameResult[]>([]);
 	let atHighs = $state<WeekHigh[]>([]);
+	let atLows = $state<WeekHigh[]>([]);
 
 	let teamName = (id: number, m: Map<number, RosterInfo>) => m.get(id)?.teamName ?? `Roster ${id}`;
 
@@ -73,6 +74,7 @@
 		atBlowouts = [];
 		atClosest = [];
 		atHighs = [];
+		atLows = [];
 		atError = '';
 
 		(async () => {
@@ -186,6 +188,7 @@
 			const managerMap = new Map<string, AllTimeStat>();
 			const allGameResults: GameResult[] = [];
 			const allWeekHighs: WeekHigh[] = [];
+			const allWeekLows: WeekHigh[] = [];
 
 			let curId: string | null = leagueId;
 
@@ -277,6 +280,7 @@
 						if (weekScores.length) {
 							weekScores.sort((a: any, b: any) => b.pts - a.pts);
 							allWeekHighs.push({ season: yr, week, team: weekScores[0].team, pts: weekScores[0].pts });
+							allWeekLows.push({ season: yr, week, team: weekScores[weekScores.length - 1].team, pts: weekScores[weekScores.length - 1].pts });
 						}
 					}
 				}
@@ -292,6 +296,7 @@
 				atBlowouts = [...allGameResults].sort((a, b) => b.diff - a.diff).slice(0, 5);
 				atClosest = [...allGameResults].sort((a, b) => a.diff - b.diff).slice(0, 5);
 				atHighs = [...allWeekHighs].sort((a, b) => b.pts - a.pts).slice(0, 5);
+				atLows = [...allWeekLows].sort((a, b) => a.pts - b.pts).slice(0, 5);
 
 				curId = leagueData.previous_league_id ?? null;
 			}
@@ -451,6 +456,27 @@
 					{/if}
 				</section>
 
+				<!-- Weekly Lows -->
+				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40">
+						🥶 Lowest Single-Week Scores
+					</h2>
+					{#if weekLows.length === 0}
+						<p class="px-4 py-3 text-sm text-slate-500">No completed games yet.</p>
+					{:else}
+						<div>
+							{#each weekLows as h, i}
+								<div class="flex items-center gap-3 px-4 py-2.5 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
+									<span class="text-slate-600 text-xs w-4">{i + 1}</span>
+									<span class="text-sm text-slate-200 flex-1 truncate">{h.team}</span>
+									<span class="text-xs text-slate-500 shrink-0">Wk {h.week}</span>
+									<span class="font-mono text-sm font-semibold text-red-400 ml-2">{h.pts.toFixed(2)}</span>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</section>
+
 			</div>
 		{/if}
 	{/if}
@@ -520,7 +546,7 @@
 			</section>
 
 			<!-- All-time game records -->
-			<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+			<div class="grid sm:grid-cols-2 gap-6">
 
 				<!-- All-time weekly highs -->
 				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
@@ -595,6 +621,29 @@
 										<span class="font-mono text-slate-400 ml-2 shrink-0">{g.loserPts.toFixed(2)}</span>
 									</div>
 									<p class="text-xs text-slate-600 mt-0.5">{g.season} Wk{g.week} · <span class="text-blue-400">{g.diff}</span></p>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</section>
+
+				<!-- All-time weekly lows -->
+				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40">
+						🥶 All-Time Low Scores
+					</h2>
+					{#if atLows.length === 0 && atLoading}
+						<div class="h-32 animate-pulse bg-slate-800/30"></div>
+					{:else if atLows.length === 0}
+						<p class="px-4 py-3 text-sm text-slate-500">No data yet.</p>
+					{:else}
+						<div>
+							{#each atLows as h, i}
+								<div class="flex items-center gap-3 px-4 py-2.5 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
+									<span class="text-slate-600 text-xs w-4">{i + 1}</span>
+									<span class="text-sm text-slate-200 flex-1 truncate">{h.team}</span>
+									<span class="text-xs text-slate-500 shrink-0">{h.season} Wk{h.week}</span>
+									<span class="font-mono text-sm font-semibold text-red-400 ml-1">{h.pts.toFixed(2)}</span>
 								</div>
 							{/each}
 						</div>
