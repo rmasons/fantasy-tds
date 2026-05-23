@@ -1,4 +1,5 @@
 import { adminDb } from '$lib/firebase/admin';
+import { avatarUrl } from '$lib/sleeper';
 
 export interface KeeperPlayerData {
 	playerId: string;
@@ -113,13 +114,15 @@ export async function getKeeperData(leagueId: string): Promise<{
 		sleeperGet(`/league/${leagueId}/users`),
 	]);
 
-	const planningYear = String(parseInt(league.season) + 1);
+	// league.season is the season currently being built — keepers are held for this year.
+	// A player drafted in (season - 1) is in their first year kept.
+	const planningYear = league.season as string;
 
 	const userMap = new Map<string, { name: string; avatar: string | null }>();
 	for (const u of (usersRaw ?? [])) {
 		userMap.set(u.user_id, {
 			name: u.metadata?.team_name || u.display_name || u.username || u.user_id,
-			avatar: u.avatar ?? null,
+			avatar: avatarUrl(u.metadata?.avatar ?? u.avatar),
 		});
 	}
 
