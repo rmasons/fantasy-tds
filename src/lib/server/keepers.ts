@@ -16,8 +16,6 @@ export interface KeeperPlayerData {
 	yearsKept: number;
 	yearsKeptOverridden: boolean;
 	keeperCost: number | null;
-	/** Player is already designated as a keeper in Sleeper */
-	sleeperKeeper: boolean;
 }
 
 export interface KeeperRosterData {
@@ -26,6 +24,8 @@ export interface KeeperRosterData {
 	ownerName: string;
 	ownerAvatar: string | null;
 	players: KeeperPlayerData[];
+	/** FAAB remaining before keeper deductions (budget - waiver_budget_used) */
+	faabRemaining: number;
 }
 
 interface DraftPick { round: number; season: string }
@@ -66,7 +66,10 @@ async function walkDraftHistory(startLeagueId: string): Promise<Map<string, Draf
 			catch { continue; }
 
 			for (const pick of (picks ?? [])) {
-				// Walking newest → oldest: first occurrence is most recent draft
+				// Skip keeper picks — they appear in the draft but are carries from prior years.
+				// We want the original non-keeper draft (the true base cost and draft year).
+				// Walking newest → oldest means first non-keeper occurrence = most recent fresh draft.
+				if (pick.is_keeper === true) continue;
 				if (pick.player_id && !result.has(pick.player_id)) {
 					result.set(pick.player_id, { round: pick.round, season });
 				}
@@ -79,24 +82,28 @@ async function walkDraftHistory(startLeagueId: string): Promise<Map<string, Draf
 	return result;
 }
 
+// Bump when walk logic changes — forces a rebuild of any existing stored history.
+const DRAFT_HISTORY_SCHEMA_VERSION = 2;
+
 async function getCachedDraftHistory(leagueId: string): Promise<Map<string, DraftPick>> {
-	const cacheRef = adminDb.collection('cache').doc(`keeperDrafts_${leagueId}`);
+	const ref = adminDb.collection('keeperDraftHistory').doc(leagueId);
 	try {
-		const doc = await cacheRef.get();
+		const doc = await ref.get();
 		if (doc.exists) {
-			const cached = doc.data()!;
-			const ageMs = Date.now() - new Date(cached.cachedAt).getTime();
-			if (ageMs < 7 * 24 * 60 * 60 * 1000) {
-				return new Map(Object.entries(cached.data as Record<string, DraftPick>));
+			const stored = doc.data()!;
+			if (stored.schemaVersion === DRAFT_HISTORY_SCHEMA_VERSION) {
+				return new Map(Object.entries(stored.data as Record<string, DraftPick>));
 			}
+			// Schema mismatch — fall through to re-walk
 		}
-	} catch { /* cache miss */ }
+	} catch { /* miss */ }
 
 	const history = await walkDraftHistory(leagueId);
-	cacheRef.set({
+	ref.set({
+		schemaVersion: DRAFT_HISTORY_SCHEMA_VERSION,
+		walkedAt: new Date().toISOString(),
 		data: Object.fromEntries(history),
-		cachedAt: new Date().toISOString(),
-	}).catch(e => console.error('[keepers] Failed to write draft cache:', e));
+	}).catch(e => console.error('[keepers] Failed to write draft history:', e));
 	return history;
 }
 
@@ -109,6 +116,8 @@ function posRank(pos: string) {
 export async function getKeeperData(leagueId: string): Promise<{
 	rosters: KeeperRosterData[];
 	planningYear: string;
+	maxKeepers: number;
+	faabBudget: number;
 }> {
 	const [league, rostersRaw, usersRaw] = await Promise.all([
 		sleeperGet(`/league/${leagueId}`),
@@ -119,6 +128,8 @@ export async function getKeeperData(leagueId: string): Promise<{
 	// league.season is the season currently being built — keepers are held for this year.
 	// A player drafted in (season - 1) is in their first year kept.
 	const planningYear = league.season as string;
+	const faabBudget: number = league.settings?.waiver_budget ?? 100;
+	const maxKeepers: number = league.settings?.num_keepers ?? 0;
 
 	const userMap = new Map<string, { name: string; avatar: string | null }>();
 	for (const u of (usersRaw ?? [])) {
@@ -147,7 +158,7 @@ export async function getKeeperData(leagueId: string): Promise<{
 		const ownerInfo = userMap.get(ownerUserId);
 		const ownerName = ownerInfo?.name ?? `Roster ${roster.roster_id}`;
 		const ownerAvatar = ownerInfo?.avatar ?? null;
-		const sleeperKeeperSet = new Set<string>(roster.keepers ?? []);
+		const faabRemaining = faabBudget - (roster.settings?.waiver_budget_used ?? 0);
 
 		const players: KeeperPlayerData[] = [];
 
@@ -189,16 +200,15 @@ export async function getKeeperData(leagueId: string): Promise<{
 				yearsKept,
 				yearsKeptOverridden,
 				keeperCost,
-				sleeperKeeper: sleeperKeeperSet.has(playerId),
 			});
 		}
 
 		players.sort((a, b) => posRank(a.pos) - posRank(b.pos) || a.name.localeCompare(b.name));
-		rosters.push({ rosterId: roster.roster_id, ownerUserId, ownerName, ownerAvatar, players });
+		rosters.push({ rosterId: roster.roster_id, ownerUserId, ownerName, ownerAvatar, players, faabRemaining });
 	}
 
 	rosters.sort((a, b) => a.ownerName.localeCompare(b.ownerName));
-	return { rosters, planningYear };
+	return { rosters, planningYear, maxKeepers, faabBudget };
 }
 
 export async function setPlayerOverride(
@@ -247,5 +257,5 @@ export function resetPlayerOverride(leagueId: string, playerId: string) {
 }
 
 export function invalidateDraftCache(leagueId: string) {
-	return adminDb.collection('cache').doc(`keeperDrafts_${leagueId}`).delete();
+	return adminDb.collection('keeperDraftHistory').doc(leagueId).delete();
 }

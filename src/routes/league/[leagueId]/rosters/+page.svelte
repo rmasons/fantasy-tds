@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import type { LayoutData } from '../$types';
 	import type { SlimPlayer } from '$lib/types';
 	import { fetchLeagueCore, buildRosterInfoMap } from '$lib/sleeper';
@@ -19,7 +20,33 @@
 	let teams = $state<RosterTeam[]>([]);
 	let loading = $state(true);
 	let error = $state('');
-	let expandedId = $state<number | null>(null);
+	let expandedRow = $state<number | null>(null);
+	let colCount = $state(1);
+
+	onMount(() => {
+		function updateCols() {
+			if (window.innerWidth >= 1024) colCount = 3;
+			else if (window.innerWidth >= 640) colCount = 2;
+			else colCount = 1;
+		}
+		updateCols();
+		window.addEventListener('resize', updateCols);
+		return () => window.removeEventListener('resize', updateCols);
+	});
+
+	function toggle(i: number) {
+		const row = Math.floor(i / colCount);
+		expandedRow = expandedRow === row ? null : row;
+	}
+
+	function isExpanded(i: number): boolean {
+		return Math.floor(i / colCount) === expandedRow;
+	}
+
+	function teamLogoUrl(team: string): string | null {
+		if (!team || team === 'FA' || team === '?') return null;
+		return `https://sleepercdn.com/images/team_logos/nfl/${team.toLowerCase()}.png`;
+	}
 
 	function playerInfo(id: string, players: Record<string, SlimPlayer>) {
 		const p = players[id];
@@ -33,7 +60,7 @@
 		teams = [];
 		loading = true;
 		error = '';
-		expandedId = null;
+		expandedRow = null;
 
 		(async () => {
 			try {
@@ -102,11 +129,11 @@
 		<p class="text-red-400">Failed to load rosters: {error}</p>
 	{:else}
 		<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-			{#each teams as team (team.rosterId)}
+			{#each teams as team, i (team.rosterId)}
 				<div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
 					<!-- Team header -->
 					<button
-						onclick={() => expandedId = expandedId === team.rosterId ? null : team.rosterId}
+						onclick={() => toggle(i)}
 						class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800/60 transition-colors text-left"
 					>
 						{#if team.avatar}
@@ -121,22 +148,26 @@
 							{/if}
 						</div>
 						<div class="text-slate-500 text-sm">{team.starters.length + team.bench.length}</div>
-						<span class="text-slate-500 text-xs ml-1">{expandedId === team.rosterId ? '▲' : '▼'}</span>
+						<span class="text-slate-500 text-xs ml-1">{isExpanded(i) ? '▲' : '▼'}</span>
 					</button>
 
-					{#if expandedId === team.rosterId}
+					{#if isExpanded(i)}
 						<div class="border-t border-slate-800 px-4 py-3 space-y-4">
 							<!-- Starters -->
 							{#if team.starters.length}
 								<div>
 									<p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Starters</p>
 									<div class="space-y-1">
-										{#each team.starters as p, i}
+										{#each team.starters as p}
 											<div class="flex items-center gap-2 text-sm">
-												<span class="text-xs text-slate-600 w-4 text-right">{i + 1}</span>
-												<span class="text-xs px-1.5 py-0.5 rounded font-bold {pc(p.pos)}">{p.pos}</span>
+												<span class="text-xs w-16 text-center py-0.5 rounded font-bold shrink-0 {pc(p.pos)}">{p.pos}</span>
 												<span class="text-slate-200 truncate flex-1">{p.name}</span>
-												<span class="text-xs text-slate-500 shrink-0">{p.team}</span>
+												<span class="flex items-center gap-1 shrink-0">
+													{#if teamLogoUrl(p.team)}
+														<img src={teamLogoUrl(p.team)} alt={p.team} class="w-4 h-4 object-contain" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
+													{/if}
+													<span class="text-xs text-slate-500">{p.team}</span>
+												</span>
 											</div>
 										{/each}
 									</div>
@@ -150,9 +181,14 @@
 									<div class="space-y-1">
 										{#each team.bench as p}
 											<div class="flex items-center gap-2 text-sm">
-												<span class="text-xs px-1.5 py-0.5 rounded font-bold {pc(p.pos)}">{p.pos}</span>
+												<span class="text-xs w-16 text-center py-0.5 rounded font-bold shrink-0 {pc(p.pos)}">{p.pos}</span>
 												<span class="text-slate-400 truncate flex-1">{p.name}</span>
-												<span class="text-xs text-slate-600 shrink-0">{p.team}</span>
+												<span class="flex items-center gap-1 shrink-0">
+													{#if teamLogoUrl(p.team)}
+														<img src={teamLogoUrl(p.team)} alt={p.team} class="w-4 h-4 object-contain" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
+													{/if}
+													<span class="text-xs text-slate-600">{p.team}</span>
+												</span>
 											</div>
 										{/each}
 									</div>
@@ -166,9 +202,14 @@
 									<div class="space-y-1">
 										{#each team.ir as p}
 											<div class="flex items-center gap-2 text-sm">
-												<span class="text-xs px-1.5 py-0.5 rounded font-bold bg-red-900/50 text-red-400">{p.pos}</span>
+												<span class="text-xs w-16 text-center py-0.5 rounded font-bold shrink-0 bg-red-900/50 text-red-400">{p.pos}</span>
 												<span class="text-slate-400 truncate flex-1">{p.name}</span>
-												<span class="text-xs text-slate-600 shrink-0">{p.team}</span>
+												<span class="flex items-center gap-1 shrink-0">
+													{#if teamLogoUrl(p.team)}
+														<img src={teamLogoUrl(p.team)} alt={p.team} class="w-4 h-4 object-contain" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
+													{/if}
+													<span class="text-xs text-slate-600">{p.team}</span>
+												</span>
 											</div>
 										{/each}
 									</div>

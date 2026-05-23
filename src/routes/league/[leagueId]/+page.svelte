@@ -120,10 +120,10 @@
 	</div>
 {:else if league}
 	<!-- Hero banner -->
-	<div class="relative rounded-2xl overflow-hidden mb-4 border border-slate-800/60">
-		<div class="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800"></div>
-		<div class="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-transparent to-violet-600/10 pointer-events-none"></div>
-		<div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
+	<div class="relative rounded-2xl overflow-hidden mb-4 border border-white/[0.07]">
+		<div class="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800/80"></div>
+		<div class="absolute inset-0 bg-gradient-to-br from-amber-500/8 via-transparent to-orange-600/5 pointer-events-none"></div>
+		<div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-400/40 to-transparent"></div>
 
 		<div class="relative p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-5">
 			{#if league.avatar}
@@ -133,7 +133,7 @@
 					class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-2 ring-white/10 shrink-0"
 				/>
 			{:else}
-				<div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center text-3xl shrink-0">
+				<div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-3xl shrink-0">
 					🏈
 				</div>
 			{/if}
@@ -150,7 +150,7 @@
 					</p>
 				{/if}
 				<div class="flex items-center gap-2 mt-3 flex-wrap">
-					<span class="inline-flex items-center bg-blue-500/15 text-blue-400 text-xs font-semibold px-2.5 py-1 rounded-full ring-1 ring-blue-500/25">
+					<span class="inline-flex items-center bg-amber-500/10 text-amber-400 text-xs font-semibold px-2.5 py-1 rounded-full ring-1 ring-amber-500/20">
 						{league.total_rosters} teams
 					</span>
 					<span class="inline-flex items-center bg-slate-800 text-slate-400 text-xs font-medium px-2.5 py-1 rounded-full">

@@ -114,7 +114,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	if (!locals.user) return json({ error: 'Unauthorized' }, { status: 401 });
 
 	const { leagueId } = params;
-	const docRef = adminDb.collection('cache').doc(`records_${leagueId}`);
+	const docRef = adminDb.collection('cache').doc(`records_v2_${leagueId}`);
 
 	try {
 		const doc = await docRef.get();

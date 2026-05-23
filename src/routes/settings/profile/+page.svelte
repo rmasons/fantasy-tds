@@ -5,6 +5,8 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	// Global field state — seeded from saved values
+	let firstName = $state(data.globalProfile?.firstName ?? '');
+	let lastName = $state(data.globalProfile?.lastName ?? '');
 	let bio = $state(data.globalProfile?.bio ?? '');
 	let location = $state(data.globalProfile?.location ?? '');
 	let favoriteNFLTeam = $state(data.globalProfile?.favoriteNFLTeam ?? '');
@@ -78,6 +80,34 @@
 				<section class="bg-slate-900 rounded-xl border border-slate-800 p-6 space-y-5">
 					<h2 class="text-base font-semibold text-slate-200">About Me</h2>
 
+					<!-- Name -->
+					<div class="grid sm:grid-cols-2 gap-4">
+						<div>
+							<label for="firstName" class="block text-sm font-medium text-slate-300 mb-1.5">First Name</label>
+							<input
+								id="firstName"
+								name="firstName"
+								type="text"
+								maxlength="50"
+								bind:value={firstName}
+								placeholder="First"
+								class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+							/>
+						</div>
+						<div>
+							<label for="lastName" class="block text-sm font-medium text-slate-300 mb-1.5">Last Name</label>
+							<input
+								id="lastName"
+								name="lastName"
+								type="text"
+								maxlength="50"
+								bind:value={lastName}
+								placeholder="Last"
+								class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+							/>
+						</div>
+					</div>
+
 					<!-- Bio -->
 					<div>
 						<label for="bio" class="block text-sm font-medium text-slate-300 mb-1.5">
@@ -90,7 +120,7 @@
 							maxlength="280"
 							bind:value={bio}
 							placeholder="Tell your league who you are..."
-							class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-none"
+							class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 resize-none"
 						></textarea>
 						<p class="text-xs text-slate-600 mt-1 text-right">{bio.length}/280</p>
 					</div>
@@ -107,7 +137,7 @@
 							maxlength="60"
 							bind:value={location}
 							placeholder="City, State"
-							class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500"
+							class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
 						/>
 					</div>
 
@@ -124,7 +154,7 @@
 								maxlength="60"
 								bind:value={favoriteNFLTeam}
 								placeholder="e.g. Kansas City Chiefs"
-								class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500"
+								class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
 							/>
 						</div>
 						<div>
@@ -138,7 +168,7 @@
 								maxlength="60"
 								bind:value={favoritePlayer}
 								placeholder="e.g. Justin Jefferson"
-								class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500"
+								class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
 							/>
 						</div>
 					</div>
@@ -155,7 +185,7 @@
 							maxlength="200"
 							bind:value={funFact}
 							placeholder="One thing your league needs to know..."
-							class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500"
+							class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
 						/>
 						<p class="text-xs text-slate-600 mt-1 text-right">{funFact.length}/200</p>
 					</div>
@@ -174,7 +204,7 @@
 								maxlength="50"
 								bind:value={twitterHandle}
 								placeholder="yourhandle"
-								class="flex-1 bg-slate-800 border border-slate-700 rounded-r-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500"
+								class="flex-1 bg-slate-800 border border-slate-700 rounded-r-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
 							/>
 						</div>
 					</div>
@@ -183,7 +213,7 @@
 						<button
 							type="submit"
 							disabled={savingGlobal}
-							class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition-colors"
+							class="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition-colors"
 						>
 							{savingGlobal ? 'Saving…' : 'Save Profile'}
 						</button>
@@ -222,7 +252,7 @@
 								max="2100"
 								bind:value={joinedYear}
 								placeholder="e.g. 2018"
-								class="w-36 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500"
+								class="w-36 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
 							/>
 						</div>
 
@@ -230,7 +260,7 @@
 							<button
 								type="submit"
 								disabled={savingLeague}
-								class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition-colors"
+								class="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition-colors"
 							>
 								{savingLeague ? 'Saving…' : 'Save League Info'}
 							</button>

@@ -21,7 +21,22 @@
       "Bash(git -C /Users/masonrussell/Desktop/development/fantasy-tds add src/routes/league/\\\\[leagueId\\\\]/blog/\\\\[slug\\\\]/+page.svelte)",
       "Bash(git -C /Users/masonrussell/Desktop/development/fantasy-tds commit -m ' *)",
       "Bash(git *)",
-      "Bash([ -f \"/Users/masonrussell/Desktop/development/fantasy-tds/src/routes/league/[leagueId]/$dir/+page.svelte\" ])"
+      "Bash([ -f \"/Users/masonrussell/Desktop/development/fantasy-tds/src/routes/league/[leagueId]/$dir/+page.svelte\" ])",
+      "Bash(grep *)",
+      "Bash(gh pr *)",
+      "Bash(firebase deploy *)",
+      "Bash(npx firebase *)",
+      "Bash(firebase use *)",
+      "Bash(npx svelte-check *)",
+      "Skill(interface-design:init)",
+      "Read(//Users/masonrussell/.claude/**)",
+      "Read(//Users/masonrussell/.claude/plugins/**)",
+      "Bash(curl *)",
+      "Bash(python3 -c \"import json,sys; users=json.load\\(sys.stdin\\); [print\\(u['display_name'], '| avatar:', u.get\\('avatar'\\), '| meta_avatar:', u.get\\('metadata',{}\\).get\\('avatar'\\)\\) for u in users]\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); r=d[0]; print\\(json.dumps\\({k:v for k,v in r.items\\(\\) if 'keep' in k.lower\\(\\) or k in \\('players','reserve','metadata','settings'\\)}, indent=2\\)\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('season:', d.get\\('season'\\)\\); print\\('settings.waiver_budget:', d.get\\('settings',{}\\).get\\('waiver_budget'\\)\\); print\\('settings.num_keepers:', d.get\\('settings',{}\\).get\\('num_keepers'\\)\\)\")",
+      "Bash(node *)"
     ]
   }
 }

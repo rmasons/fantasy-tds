@@ -95,6 +95,9 @@ export interface StandingRow {
 
 export interface ManagerProfile {
 	sleeperUserId: string;
+	firstName?: string;       // max 50 chars
+	lastName?: string;        // max 50 chars
+	email?: string;           // written automatically on first login
 	bio?: string;             // max 280 chars
 	location?: string;        // max 60 chars
 	favoriteNFLTeam?: string; // max 60 chars

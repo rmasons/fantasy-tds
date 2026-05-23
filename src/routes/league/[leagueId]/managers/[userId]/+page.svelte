@@ -119,10 +119,10 @@
 	const careerGames = $derived(careerWins + careerLosses + careerTies);
 	const winPct = $derived(careerGames > 0 ? ((careerWins + careerTies * 0.5) / careerGames * 100).toFixed(1) : '—');
 
-	// Show edit button only if the logged-in user owns this profile
 	const isOwnProfile = $derived(
 		!!(data as any).user?.sleeperUserId && (data as any).user.sleeperUserId === data.userId
 	);
+	const isAdmin = $derived(!!(data as any).isAdmin);
 	const editHref = $derived(`/settings/profile?leagueId=${data.leagueId}`);
 
 	const hasAnyProfile = $derived(
@@ -130,6 +130,77 @@
 		   profile?.favoritePlayer || profile?.funFact || profile?.twitterHandle ||
 		   leagueProfile?.joinedYear)
 	);
+
+	// Commissioner edit state
+	let commishEditing = $state(false);
+	let commishSaving = $state(false);
+	let commishError = $state('');
+	let commishSuccess = $state(false);
+
+	let ceFirstName = $state('');
+	let ceLastName = $state('');
+	let ceBio = $state('');
+	let ceLocation = $state('');
+	let ceFavoriteNFLTeam = $state('');
+	let ceFavoritePlayer = $state('');
+	let ceFunFact = $state('');
+	let ceTwitterHandle = $state('');
+	let ceJoinedYear = $state('');
+
+	function openCommishEdit() {
+		ceFirstName = profile?.firstName ?? '';
+		ceLastName = profile?.lastName ?? '';
+		ceBio = profile?.bio ?? '';
+		ceLocation = profile?.location ?? '';
+		ceFavoriteNFLTeam = profile?.favoriteNFLTeam ?? '';
+		ceFavoritePlayer = profile?.favoritePlayer ?? '';
+		ceFunFact = profile?.funFact ?? '';
+		ceTwitterHandle = profile?.twitterHandle ?? '';
+		ceJoinedYear = leagueProfile?.joinedYear?.toString() ?? '';
+		commishError = '';
+		commishSuccess = false;
+		commishEditing = true;
+	}
+
+	async function saveCommishEdit() {
+		commishSaving = true;
+		commishError = '';
+		commishSuccess = false;
+		try {
+			const res = await fetch(
+				`/api/profile/${data.userId}?leagueId=${data.leagueId}`,
+				{
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						firstName: ceFirstName,
+						lastName: ceLastName,
+						bio: ceBio,
+						location: ceLocation,
+						favoriteNFLTeam: ceFavoriteNFLTeam,
+						favoritePlayer: ceFavoritePlayer,
+						funFact: ceFunFact,
+						twitterHandle: ceTwitterHandle,
+						joinedYear: ceJoinedYear ? parseInt(ceJoinedYear) : null,
+					}),
+				}
+			);
+			if (!res.ok) {
+				const d = await res.json().catch(() => ({}));
+				throw new Error(d.message ?? `HTTP ${res.status}`);
+			}
+			// Refresh profile
+			const refreshed = await fetch(`/api/profile/${data.userId}?leagueId=${data.leagueId}`).then(r => r.json());
+			profile = refreshed?.global ?? null;
+			leagueProfile = refreshed?.league ?? null;
+			commishSuccess = true;
+			commishEditing = false;
+		} catch (e: any) {
+			commishError = e.message;
+		} finally {
+			commishSaving = false;
+		}
+	}
 </script>
 
 <div>
@@ -158,16 +229,29 @@
 				<div class="flex items-start justify-between gap-3">
 					<div class="min-w-0">
 						<h1 class="text-2xl font-bold text-white">{manager.teamName}</h1>
+						{#if profile?.firstName || profile?.lastName}
+							<p class="text-slate-200 text-sm font-medium">{[profile.firstName, profile.lastName].filter(Boolean).join(' ')}</p>
+						{/if}
 						<p class="text-slate-400 text-sm">{manager.displayName}</p>
 					</div>
-					{#if isOwnProfile}
-						<a
-							href={editHref}
-							class="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-colors"
-						>
-							Edit Profile
-						</a>
-					{/if}
+					<div class="flex items-center gap-2 shrink-0">
+						{#if isOwnProfile}
+							<a
+								href={editHref}
+								class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-colors"
+							>
+								Edit Profile
+							</a>
+						{/if}
+						{#if isAdmin}
+							<button
+								onclick={openCommishEdit}
+								class="text-xs px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-colors"
+							>
+								Commissioner Edit
+							</button>
+						{/if}
+					</div>
 				</div>
 				{#if careerGames > 0}
 					<div class="flex flex-wrap gap-4 mt-2 text-sm">
@@ -179,6 +263,87 @@
 			</div>
 		</div>
 
+		<!-- Commissioner edit form -->
+		{#if commishEditing}
+			<div class="mb-5 p-5 bg-slate-900 rounded-xl border border-amber-500/30 space-y-4">
+				<div class="flex items-center justify-between">
+					<h2 class="text-sm font-semibold text-amber-400 uppercase tracking-wider">Commissioner Edit</h2>
+					<button onclick={() => commishEditing = false} class="text-slate-500 hover:text-white text-xs">Cancel</button>
+				</div>
+
+				{#if commishError}
+					<p class="text-red-400 text-sm">{commishError}</p>
+				{/if}
+
+				<div class="grid sm:grid-cols-2 gap-3">
+					<div>
+						<label class="block text-xs text-slate-400 mb-1">First Name</label>
+						<input type="text" maxlength="50" bind:value={ceFirstName} placeholder="First" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+					</div>
+					<div>
+						<label class="block text-xs text-slate-400 mb-1">Last Name</label>
+						<input type="text" maxlength="50" bind:value={ceLastName} placeholder="Last" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+					</div>
+				</div>
+
+				<div>
+					<label class="block text-xs text-slate-400 mb-1">Bio</label>
+					<textarea rows="2" maxlength="280" bind:value={ceBio} placeholder="Bio…" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 resize-none"></textarea>
+				</div>
+
+				<div class="grid sm:grid-cols-2 gap-3">
+					<div>
+						<label class="block text-xs text-slate-400 mb-1">Location</label>
+						<input type="text" maxlength="60" bind:value={ceLocation} placeholder="City, State" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+					</div>
+					<div>
+						<label class="block text-xs text-slate-400 mb-1">In League Since</label>
+						<input type="number" min="1990" max="2100" bind:value={ceJoinedYear} placeholder="e.g. 2018" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+					</div>
+				</div>
+
+				<div class="grid sm:grid-cols-2 gap-3">
+					<div>
+						<label class="block text-xs text-slate-400 mb-1">Favorite NFL Team</label>
+						<input type="text" maxlength="60" bind:value={ceFavoriteNFLTeam} placeholder="e.g. Kansas City Chiefs" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+					</div>
+					<div>
+						<label class="block text-xs text-slate-400 mb-1">Favorite Player</label>
+						<input type="text" maxlength="60" bind:value={ceFavoritePlayer} placeholder="e.g. Justin Jefferson" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+					</div>
+				</div>
+
+				<div>
+					<label class="block text-xs text-slate-400 mb-1">Fun Fact / Trash Talk</label>
+					<input type="text" maxlength="200" bind:value={ceFunFact} placeholder="One thing your league needs to know…" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+				</div>
+
+				<div>
+					<label class="block text-xs text-slate-400 mb-1">X / Twitter Handle</label>
+					<div class="flex items-center">
+						<span class="bg-slate-700 border border-r-0 border-slate-700 rounded-l-lg px-3 py-2 text-slate-400 text-sm select-none">@</span>
+						<input type="text" maxlength="50" bind:value={ceTwitterHandle} placeholder="yourhandle" class="flex-1 bg-slate-800 border border-slate-700 rounded-r-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+					</div>
+				</div>
+
+				<div class="pt-1">
+					<button
+						onclick={saveCommishEdit}
+						disabled={commishSaving}
+						class="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 disabled:opacity-50 rounded-lg text-sm font-semibold transition-colors"
+					>
+						{commishSaving ? 'Saving…' : 'Save'}
+					</button>
+				</div>
+			</div>
+		{/if}
+
+		{#if commishSuccess}
+			<div class="mb-5 bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-green-300 text-sm">
+				Profile updated.
+			</div>
+		{/if}
+
 		<!-- Profile "About" card -->
 		{#if hasAnyProfile}
 			<div class="mb-5 p-5 bg-slate-900 rounded-xl border border-slate-800 space-y-3">
@@ -186,6 +351,10 @@
 
 				{#if profile?.bio}
 					<p class="text-slate-300 text-sm leading-relaxed">{profile.bio}</p>
+				{/if}
+
+				{#if isAdmin && profile?.email}
+					<p class="text-xs text-amber-400/60 font-mono">{profile.email}</p>
 				{/if}
 
 				<div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">

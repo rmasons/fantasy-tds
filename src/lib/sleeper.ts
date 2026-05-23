@@ -20,9 +20,11 @@ export interface RawMatchup {
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
-/** CDN thumbnail URL from a Sleeper avatar hash. */
+/** CDN thumbnail URL from a Sleeper avatar hash or full URL. */
 export function avatarUrl(hash: string | null | undefined): string | null {
-	return hash ? `https://sleepercdn.com/avatars/thumbs/${hash}` : null;
+	if (!hash) return null;
+	if (hash.startsWith('http')) return hash;
+	return `https://sleepercdn.com/avatars/thumbs/${hash}`;
 }
 
 /** Combine Sleeper's split fpts + fpts_decimal fields into a single float. */

@@ -8,6 +8,8 @@
 	// ── State ──────────────────────────────────────────────────────────────
 	let rosters = $state<KeeperRosterData[]>([]);
 	let planningYear = $state('');
+	let maxKeepers = $state(0);
+	let faabBudget = $state(100);
 	let loading = $state(true);
 	let fetchError = $state('');
 
@@ -41,14 +43,9 @@
 			const d = await res.json();
 			rosters = d.rosters;
 			planningYear = d.planningYear;
-			// Pre-check players already designated as keepers in Sleeper
-			const pre: Record<string, boolean> = {};
-			for (const roster of d.rosters) {
-				for (const player of roster.players) {
-					if (player.sleeperKeeper) pre[player.playerId] = true;
-				}
-			}
-			checked = pre;
+			maxKeepers = d.maxKeepers ?? 0;
+			faabBudget = d.faabBudget ?? 100;
+			checked = {};
 		} catch (e: any) {
 			fetchError = e.message;
 		} finally {
@@ -69,6 +66,14 @@
 		return roster.players.filter(p => checked[p.playerId]).length;
 	}
 
+	function rosterFaabAfter(roster: KeeperRosterData): number {
+		return roster.faabRemaining - rosterTotal(roster);
+	}
+
+	function atKeeperLimit(roster: KeeperRosterData): boolean {
+		return maxKeepers > 0 && rosterKeeperCount(roster) >= maxKeepers;
+	}
+
 	const grandTotal = $derived(
 		rosters.reduce((s, r) => s + rosterTotal(r), 0)
 	);
@@ -76,6 +81,16 @@
 	const grandCount = $derived(
 		Object.values(checked).filter(Boolean).length
 	);
+
+	// Identify the logged-in manager's own roster
+	const myRoster = $derived(
+		data.user?.sleeperUserId
+			? rosters.find(r => r.ownerUserId === data.user!.sleeperUserId) ?? null
+			: null
+	);
+	const myKeeperCost = $derived(myRoster ? rosterTotal(myRoster) : 0);
+	const myFaabAfter = $derived(myRoster ? rosterFaabAfter(myRoster) : null);
+	const myCount = $derived(myRoster ? rosterKeeperCount(myRoster) : 0);
 
 	// ── Cost helpers ───────────────────────────────────────────────────────
 	function fmt(n: number | null): string {
@@ -190,7 +205,7 @@
 
 <div>
 	<!-- ── Header ── -->
-	<div class="flex items-start justify-between mb-6 flex-wrap gap-3">
+	<div class="flex items-start justify-between mb-4 flex-wrap gap-3">
 		<div>
 			<h1 class="text-2xl font-extrabold text-white">
 				Keepers
@@ -199,6 +214,7 @@
 			{#if !loading && !fetchError}
 				<p class="text-sm text-slate-500 mt-0.5">
 					{grandCount} selected · <span class="text-amber-400 font-semibold">${grandTotal} FAAB</span>
+					{#if maxKeepers > 0}· <span class="text-slate-400">max {maxKeepers} per team</span>{/if}
 				</p>
 			{/if}
 		</div>
@@ -232,6 +248,38 @@
 		</div>
 	</div>
 
+	<!-- ── My FAAB banner (logged-in manager only) ── -->
+	{#if !loading && !fetchError && myRoster && myFaabAfter !== null}
+		<div class="mb-6 rounded-xl border {myFaabAfter < 0 ? 'border-red-500/40 bg-red-950/20' : 'border-amber-500/20 bg-amber-950/10'} px-4 py-3 flex items-center gap-4 flex-wrap">
+			<div class="flex items-center gap-2 shrink-0">
+				{#if myRoster.ownerAvatar}
+					<img src={myRoster.ownerAvatar} alt="" class="w-6 h-6 rounded-full object-cover ring-1 ring-slate-700" />
+				{/if}
+				<span class="text-sm font-semibold text-white">Your team</span>
+			</div>
+			<div class="flex items-center gap-4 text-sm flex-wrap">
+				<span class="text-slate-400">
+					FAAB available: <span class="font-bold text-white">${myRoster.faabRemaining}</span>
+				</span>
+				{#if myKeeperCost > 0}
+					<span class="text-slate-500">−</span>
+					<span class="text-slate-400">
+						Keeper cost: <span class="font-bold text-amber-400">${myKeeperCost}</span>
+					</span>
+					<span class="text-slate-500">=</span>
+					<span class="font-bold {myFaabAfter < 0 ? 'text-red-400' : 'text-green-400'}">
+						${myFaabAfter} remaining
+					</span>
+				{/if}
+			</div>
+			{#if maxKeepers > 0}
+				<span class="ml-auto text-xs {myCount >= maxKeepers ? 'text-amber-400 font-bold' : 'text-slate-500'} shrink-0">
+					{myCount}/{maxKeepers} keepers
+				</span>
+			{/if}
+		</div>
+	{/if}
+
 	<!-- ── Loading / error ── -->
 	{#if loading}
 		<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -253,7 +301,8 @@
 			{#each rosters as roster}
 				{@const total = rosterTotal(roster)}
 				{@const count = rosterKeeperCount(roster)}
-				<div class="bg-slate-900 rounded-xl border border-slate-800/60 overflow-hidden flex flex-col">
+				{@const isMyRoster = roster.ownerUserId === data.user?.sleeperUserId}
+				<div class="bg-slate-900 rounded-xl border {isMyRoster ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-slate-800/60'} overflow-hidden flex flex-col">
 					<!-- Roster header -->
 					<div class="flex items-center gap-2.5 px-4 py-3 border-b border-slate-800/60 bg-slate-900/80">
 						{#if roster.ownerAvatar}
@@ -268,9 +317,16 @@
 							</div>
 						{/if}
 						<span class="font-semibold text-white text-sm truncate flex-1">{roster.ownerName}</span>
-						{#if count > 0}
-							<span class="text-xs font-bold text-amber-400 shrink-0">${total}</span>
-						{/if}
+						<div class="flex flex-col items-end shrink-0 text-right gap-0.5">
+							{#if maxKeepers > 0}
+								<span class="text-xs {count >= maxKeepers ? 'text-amber-400 font-bold' : 'text-slate-500'}">
+									{count}/{maxKeepers}
+								</span>
+							{/if}
+								<span class="text-xs font-semibold {rosterFaabAfter(roster) < 0 ? 'text-red-400' : count > 0 ? 'text-green-400' : 'text-slate-500'}">
+								${rosterFaabAfter(roster)}
+							</span>
+						</div>
 					</div>
 
 					<!-- Player rows -->
@@ -343,15 +399,11 @@
 										<input
 											type="checkbox"
 											bind:checked={checked[player.playerId]}
-											class="accent-amber-400 w-3.5 h-3.5 shrink-0 rounded cursor-pointer"
+											disabled={!checked[player.playerId] && atKeeperLimit(roster)}
+											class="accent-amber-400 w-3.5 h-3.5 shrink-0 rounded cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
 										/>
 										<span class="text-xs font-semibold {posColor(player.pos)} w-6 shrink-0">{player.pos}</span>
-										<span class="text-sm text-white truncate flex-1">
-									{player.name}
-									{#if player.sleeperKeeper}
-										<span class="ml-1 text-xs text-amber-500/70" title="Designated keeper in Sleeper">★</span>
-									{/if}
-								</span>
+										<span class="text-sm text-white truncate flex-1">{player.name}</span>
 										<!-- Cost info -->
 										<div class="flex items-center gap-2 shrink-0 text-right">
 											{#if player.baseCost === null}
@@ -391,9 +443,14 @@
 
 					<!-- Roster footer total -->
 					{#if count > 0}
+						{@const faabLeft = rosterFaabAfter(roster)}
 						<div class="px-4 py-2.5 border-t border-slate-800/60 bg-slate-900/60 flex items-center justify-between">
-							<span class="text-xs text-slate-500">{count} keeper{count !== 1 ? 's' : ''}</span>
-							<span class="text-sm font-bold text-amber-400">${total} FAAB</span>
+							<span class="text-xs text-slate-500">
+								{count}{maxKeepers > 0 ? `/${maxKeepers}` : ''} keeper{count !== 1 ? 's' : ''} · <span class="text-amber-400">${total}</span>
+							</span>
+							<span class="text-sm font-bold {faabLeft < 0 ? 'text-red-400' : 'text-green-400'}">
+								${faabLeft} left
+							</span>
 						</div>
 					{/if}
 				</div>

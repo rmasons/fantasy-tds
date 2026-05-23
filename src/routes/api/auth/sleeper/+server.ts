@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { upsertUserProfile } from '$lib/server/user';
+import { upsertManagerProfile } from '$lib/server/managerProfile';
 import type { SleeperUser } from '$lib/types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -28,6 +29,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		sleeperUserId: sleeperUser.user_id,
 		sleeperUsername: sleeperUser.username
 	});
+
+	// Merge email into the manager profile (won't overwrite fields set by commissioner)
+	if (locals.user.email) {
+		await upsertManagerProfile(sleeperUser.user_id, { email: locals.user.email });
+	}
 
 	return json({ sleeperUser });
 };

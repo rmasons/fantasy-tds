@@ -1,11 +1,13 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import type { ManagerProfile } from '$lib/types';
 	import { fetchLeague, fetchLeagueCore, fetchWinnersBracket, fetchLosersBracket, buildRosterInfoMap, avatarUrl } from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
 
 	interface ManagerEntry {
 		rosterId: number;
+		ownerId: string;
 		teamName: string;
 		ownerName: string;
 		avatar: string | null;
@@ -20,14 +22,22 @@
 	}
 
 	let podiums = $state<Podium[]>([]);
+	let profiles = $state<Record<string, ManagerProfile>>({});
 	let loading = $state(true);
 	let loadingStatus = $state('Fetching league history…');
 	let error = $state('');
 	let selectedIdx = $state(0);
 
+	function realName(entry: ManagerEntry): string {
+		const p = profiles[entry.ownerId];
+		const name = [p?.firstName, p?.lastName].filter(Boolean).join(' ');
+		return name || entry.ownerName;
+	}
+
 	$effect(() => {
 		const leagueId = data.leagueId;
 		podiums = [];
+		profiles = {};
 		selectedIdx = 0;
 		loading = true;
 		loadingStatus = 'Fetching league history…';
@@ -60,6 +70,7 @@
 						const info = rosterInfo.get(rid);
 						return {
 							rosterId: rid,
+							ownerId: info?.ownerId ?? '',
 							teamName: info?.teamName ?? `Team ${rid}`,
 							ownerName: info?.ownerName ?? info?.teamName ?? `Team ${rid}`,
 							avatar: info?.avatar ?? null,
@@ -91,6 +102,20 @@
 					}
 
 					curId = leagueData.previous_league_id ?? null;
+				}
+
+				// Fetch real names for all unique owners across all seasons
+				if (data.leagueId !== leagueId) return;
+				const ownerIds = [...new Set(
+					podiums.flatMap(p => [p.champion, p.second, p.third, p.toilet])
+						.filter((e): e is ManagerEntry => !!e && !!e.ownerId)
+						.map(e => e.ownerId)
+				)];
+				if (ownerIds.length) {
+					fetch(`/api/profiles?ids=${ownerIds.join(',')}`)
+						.then(r => r.json())
+						.then(p => { if (data.leagueId === leagueId) profiles = p; })
+						.catch(() => {});
 				}
 			} catch (e: any) {
 				if (data.leagueId !== leagueId) return;
@@ -168,12 +193,10 @@
 						{/if}
 					</div>
 
-					<!-- Team name -->
+					<!-- Name / team -->
 					<div>
-						<h2 class="text-3xl font-black italic text-white leading-tight">{podium.champion.teamName}</h2>
-						{#if podium.champion.ownerName !== podium.champion.teamName}
-							<p class="text-slate-400 text-sm mt-1">{podium.champion.ownerName}</p>
-						{/if}
+						<h2 class="text-3xl font-black italic text-white leading-tight">{realName(podium.champion)}</h2>
+						<p class="text-slate-400 text-sm mt-1">{podium.champion.teamName}</p>
 					</div>
 				</div>
 			</div>
@@ -206,8 +229,8 @@
 								<span class="absolute -bottom-1 -right-1 text-base leading-none">🥈</span>
 							</div>
 							<div class="text-center">
-								<p class="text-sm font-semibold text-slate-300 max-w-[100px] truncate">{podium.second.teamName}</p>
-								<p class="text-xs text-slate-500 max-w-[100px] truncate">{podium.second.ownerName}</p>
+								<p class="text-sm font-semibold text-slate-300 max-w-[100px] truncate">{realName(podium.second)}</p>
+								<p class="text-xs text-slate-500 max-w-[100px] truncate">{podium.second.teamName}</p>
 							</div>
 							<div class="w-24 h-16 bg-gradient-to-b from-slate-500 to-slate-600 rounded-t-md flex items-center justify-center shadow-inner">
 								<span class="text-2xl font-black text-slate-200">2</span>
@@ -227,8 +250,8 @@
 							{/if}
 						</div>
 						<div class="text-center">
-							<p class="text-base font-bold text-white max-w-[130px] truncate">{podium.champion.teamName}</p>
-							<p class="text-sm text-slate-400 max-w-[130px] truncate">{podium.champion.ownerName}</p>
+							<p class="text-base font-bold text-white max-w-[130px] truncate">{realName(podium.champion)}</p>
+							<p class="text-sm text-slate-400 max-w-[130px] truncate">{podium.champion.teamName}</p>
 						</div>
 						<div class="w-28 h-24 bg-gradient-to-b from-amber-600/40 to-amber-800/30 border border-amber-500/40 rounded-t-md flex items-center justify-center shadow-inner">
 							<span class="text-3xl font-black text-amber-400">1</span>
@@ -247,8 +270,8 @@
 								<span class="absolute -bottom-1 -right-1 text-base leading-none">🥉</span>
 							</div>
 							<div class="text-center">
-								<p class="text-sm font-semibold text-slate-300 max-w-[90px] truncate">{podium.third.teamName}</p>
-								<p class="text-xs text-slate-500 max-w-[90px] truncate">{podium.third.ownerName}</p>
+								<p class="text-sm font-semibold text-slate-300 max-w-[90px] truncate">{realName(podium.third)}</p>
+								<p class="text-xs text-slate-500 max-w-[90px] truncate">{podium.third.teamName}</p>
 							</div>
 							<div class="w-20 h-12 bg-gradient-to-b from-amber-900/50 to-amber-950/40 rounded-t-md flex items-center justify-center">
 								<span class="text-xl font-black text-amber-700">3</span>
@@ -278,8 +301,8 @@
 								<div class="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center text-xl border-2 border-slate-600 grayscale opacity-70">🏈</div>
 							{/if}
 						</div>
-						<p class="text-sm text-slate-400 font-medium">{podium.toilet.teamName}</p>
-						<p class="text-xs text-slate-600">{podium.toilet.ownerName}</p>
+						<p class="text-sm text-slate-400 font-medium">{realName(podium.toilet)}</p>
+						<p class="text-xs text-slate-600">{podium.toilet.teamName}</p>
 					</div>
 				</div>
 			{/if}
@@ -308,16 +331,21 @@
 									<td class="px-4 py-3">
 										<div class="flex items-center gap-2">
 											{#if p.champion.avatar}
-												<img src={p.champion.avatar} alt="" class="w-6 h-6 rounded-full" />
+												<img src={p.champion.avatar} alt="" class="w-6 h-6 rounded-full shrink-0" />
 											{/if}
-											<span class="text-white font-semibold truncate max-w-[120px]">{p.champion.teamName}</span>
+											<div class="min-w-0">
+												<p class="text-white font-semibold truncate">{realName(p.champion)}</p>
+												<p class="text-xs text-slate-600 truncate">{p.champion.teamName}</p>
+											</div>
 										</div>
 									</td>
-									<td class="px-4 py-3 text-slate-400 hidden sm:table-cell truncate max-w-[120px]">
-										{p.second?.teamName ?? '—'}
+									<td class="px-4 py-3 hidden sm:table-cell">
+										<p class="text-slate-400 truncate max-w-[120px]">{p.second ? realName(p.second) : '—'}</p>
+										{#if p.second}<p class="text-xs text-slate-600 truncate max-w-[120px]">{p.second.teamName}</p>{/if}
 									</td>
-									<td class="px-4 py-3 text-slate-500 hidden md:table-cell truncate max-w-[120px]">
-										{p.third?.teamName ?? '—'}
+									<td class="px-4 py-3 hidden md:table-cell">
+										<p class="text-slate-500 truncate max-w-[120px]">{p.third ? realName(p.third) : '—'}</p>
+										{#if p.third}<p class="text-xs text-slate-600 truncate max-w-[120px]">{p.third.teamName}</p>{/if}
 									</td>
 								</tr>
 							{/each}

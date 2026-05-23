@@ -61,12 +61,12 @@
 	function rankStyle(rank: number) {
 		if (rank === 1) return 'text-amber-400 font-bold';
 		if (rank === 2) return 'text-slate-300 font-semibold';
-		if (rank === 3) return 'text-amber-700 font-semibold';
+		if (rank === 3) return 'text-orange-600 font-semibold';
 		return 'text-slate-600';
 	}
 
 	function rowStyle(rank: number) {
-		if (rank === 1) return 'bg-amber-500/5 border-l-2 border-amber-500/50';
+		if (rank === 1) return 'bg-amber-500/[0.07] border-l-2 border-amber-400/60';
 		return '';
 	}
 
@@ -103,10 +103,10 @@
 
 	{:else}
 		<!-- Desktop table -->
-		<div class="hidden sm:block overflow-x-auto rounded-xl border border-slate-800">
+		<div class="hidden sm:block overflow-x-auto rounded-xl border border-white/[0.07]">
 			<table class="w-full text-sm">
 				<thead>
-					<tr class="bg-slate-900/80 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-800">
+					<tr class="bg-slate-900/80 text-slate-500 text-xs uppercase tracking-wider border-b border-white/[0.07]">
 						<th class="px-4 py-3 text-left w-8">#</th>
 						<th class="px-4 py-3 text-left">Team</th>
 						<th class="px-4 py-3 text-center">W</th>
@@ -121,17 +121,17 @@
 				</thead>
 				<tbody>
 					{#each standings as row, i}
-						<tr class="border-t border-slate-800/60 hover:bg-slate-800/40 transition-colors {rowStyle(row.rank)}
-						           {i % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900/30'}">
+						<tr class="border-t border-white/[0.05] hover:bg-white/[0.03] transition-colors {rowStyle(row.rank)}
+						           {i % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900/20'}">
 							<td class="px-4 py-3">
 								<span class="font-mono text-xs {rankStyle(row.rank)}">{row.rank}</span>
 							</td>
 							<td class="px-4 py-3">
 								<div class="flex items-center gap-3">
 									{#if row.avatar}
-										<img src={row.avatar} alt="" class="w-9 h-9 rounded-full object-cover shrink-0 ring-1 ring-slate-700" />
+										<img src={row.avatar} alt="" class="w-9 h-9 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
 									{:else}
-										<div class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center shrink-0 text-base">🏈</div>
+										<div class="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center shrink-0 text-base">🏈</div>
 									{/if}
 									<div>
 										<p class="font-semibold text-white leading-tight">{row.teamName}</p>
@@ -141,13 +141,13 @@
 									</div>
 								</div>
 							</td>
-							<td class="px-4 py-3 text-center font-bold text-white tabular-nums">{row.wins}</td>
-							<td class="px-4 py-3 text-center text-slate-400 tabular-nums">{row.losses}</td>
+							<td class="px-4 py-3 text-center font-mono font-bold text-white tabular-nums">{row.wins}</td>
+							<td class="px-4 py-3 text-center font-mono text-slate-500 tabular-nums">{row.losses}</td>
 							{#if hasTies}
-								<td class="px-4 py-3 text-center text-slate-500 tabular-nums">{row.ties}</td>
+								<td class="px-4 py-3 text-center font-mono text-slate-600 tabular-nums">{row.ties}</td>
 							{/if}
-							<td class="px-4 py-3 text-right font-mono text-slate-200 tabular-nums">{row.fpts.toFixed(2)}</td>
-							<td class="px-4 py-3 text-right font-mono text-slate-500 tabular-nums">{row.fptsAgainst.toFixed(2)}</td>
+							<td class="px-4 py-3 text-right font-mono tabular-nums {row.rank === 1 ? 'text-amber-400 font-semibold' : 'text-slate-200'}">{row.fpts.toFixed(2)}</td>
+							<td class="px-4 py-3 text-right font-mono text-slate-600 tabular-nums">{row.fptsAgainst.toFixed(2)}</td>
 							<td class="px-4 py-3 text-center">
 								<span class="inline-block px-2 py-0.5 rounded text-xs font-bold {streakClass(row.streak)}">
 									{row.streak}
@@ -162,12 +162,12 @@
 		<!-- Mobile cards -->
 		<div class="sm:hidden space-y-2">
 			{#each standings as row}
-				<div class="bg-slate-900 rounded-xl border border-slate-800/60 px-4 py-3 flex items-center gap-3 {rowStyle(row.rank)}">
+				<div class="bg-slate-900 rounded-xl border border-white/[0.07] px-4 py-3 flex items-center gap-3 {rowStyle(row.rank)}">
 					<span class="font-mono text-xs w-5 text-center shrink-0 {rankStyle(row.rank)}">{row.rank}</span>
 					{#if row.avatar}
-						<img src={row.avatar} alt="" class="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-slate-700" />
+						<img src={row.avatar} alt="" class="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
 					{:else}
-						<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center shrink-0">🏈</div>
+						<div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center shrink-0">🏈</div>
 					{/if}
 					<div class="flex-1 min-w-0">
 						<p class="font-semibold text-white text-sm truncate">{row.teamName}</p>
