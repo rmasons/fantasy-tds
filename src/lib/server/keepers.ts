@@ -16,6 +16,8 @@ export interface KeeperPlayerData {
 	yearsKept: number;
 	yearsKeptOverridden: boolean;
 	keeperCost: number | null;
+	/** Player is already designated as a keeper in Sleeper */
+	sleeperKeeper: boolean;
 }
 
 export interface KeeperRosterData {
@@ -145,6 +147,7 @@ export async function getKeeperData(leagueId: string): Promise<{
 		const ownerInfo = userMap.get(ownerUserId);
 		const ownerName = ownerInfo?.name ?? `Roster ${roster.roster_id}`;
 		const ownerAvatar = ownerInfo?.avatar ?? null;
+		const sleeperKeeperSet = new Set<string>(roster.keepers ?? []);
 
 		const players: KeeperPlayerData[] = [];
 
@@ -186,6 +189,7 @@ export async function getKeeperData(leagueId: string): Promise<{
 				yearsKept,
 				yearsKeptOverridden,
 				keeperCost,
+				sleeperKeeper: sleeperKeeperSet.has(playerId),
 			});
 		}
 

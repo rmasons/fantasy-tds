@@ -41,6 +41,14 @@
 			const d = await res.json();
 			rosters = d.rosters;
 			planningYear = d.planningYear;
+			// Pre-check players already designated as keepers in Sleeper
+			const pre: Record<string, boolean> = {};
+			for (const roster of d.rosters) {
+				for (const player of roster.players) {
+					if (player.sleeperKeeper) pre[player.playerId] = true;
+				}
+			}
+			checked = pre;
 		} catch (e: any) {
 			fetchError = e.message;
 		} finally {
@@ -250,7 +258,7 @@
 					<div class="flex items-center gap-2.5 px-4 py-3 border-b border-slate-800/60 bg-slate-900/80">
 						{#if roster.ownerAvatar}
 							<img
-								src="https://sleepercdn.com/avatars/thumbs/{roster.ownerAvatar}"
+								src={roster.ownerAvatar}
 								alt=""
 								class="w-7 h-7 rounded-full object-cover ring-1 ring-slate-700 shrink-0"
 							/>
@@ -338,7 +346,12 @@
 											class="accent-amber-400 w-3.5 h-3.5 shrink-0 rounded cursor-pointer"
 										/>
 										<span class="text-xs font-semibold {posColor(player.pos)} w-6 shrink-0">{player.pos}</span>
-										<span class="text-sm text-white truncate flex-1">{player.name}</span>
+										<span class="text-sm text-white truncate flex-1">
+									{player.name}
+									{#if player.sleeperKeeper}
+										<span class="ml-1 text-xs text-amber-500/70" title="Designated keeper in Sleeper">★</span>
+									{/if}
+								</span>
 										<!-- Cost info -->
 										<div class="flex items-center gap-2 shrink-0 text-right">
 											{#if player.baseCost === null}
