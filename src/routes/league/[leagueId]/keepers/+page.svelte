@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import type { KeeperPlayerData, KeeperRosterData } from '$lib/server/keepers';
+	import type { KeeperPlayerData, KeeperRosterData, KeeperSelection } from '$lib/server/keepers';
 	import { onMount } from 'svelte';
 
 	let { data } = $props<{ data: PageData }>();
@@ -9,7 +9,6 @@
 	let rosters = $state<KeeperRosterData[]>([]);
 	let planningYear = $state('');
 	let maxKeepers = $state(0);
-	let faabBudget = $state(100);
 	let loading = $state(true);
 	let fetchError = $state('');
 
@@ -30,6 +29,11 @@
 	let importing = $state(false);
 	let importMsg = $state('');
 
+	// Keeper selections (submitted by managers)
+	let selections = $state<Record<string, KeeperSelection>>({});
+	let submitting = $state(false);
+	let submitError = $state('');
+
 	// Draft cache refresh
 	let refreshing = $state(false);
 	let refreshError = $state('');
@@ -39,14 +43,32 @@
 		loading = true;
 		fetchError = '';
 		try {
-			const res = await fetch(`/api/keepers?leagueId=${encodeURIComponent(data.leagueId)}`);
-			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			const d = await res.json();
+			const [rosterRes, selectRes] = await Promise.all([
+				fetch(`/api/keepers?leagueId=${encodeURIComponent(data.leagueId)}`),
+				fetch(`/api/keeper-selections?leagueId=${encodeURIComponent(data.leagueId)}`),
+			]);
+			if (!rosterRes.ok) throw new Error(`HTTP ${rosterRes.status}`);
+			const d = await rosterRes.json();
 			rosters = d.rosters;
 			planningYear = d.planningYear;
 			maxKeepers = d.maxKeepers ?? 0;
-			faabBudget = d.faabBudget ?? 100;
-			checked = {};
+
+			const newChecked: Record<string, boolean> = {};
+			if (selectRes.ok) {
+				const sd = await selectRes.json();
+				selections = Object.fromEntries(
+					(sd.selections as KeeperSelection[]).map((s: KeeperSelection) => [s.ownerUserId, s])
+				);
+				const myUserId = data.user?.sleeperUserId;
+				if (myUserId && selections[myUserId]) {
+					for (const pid of selections[myUserId].playerIds) {
+						newChecked[pid] = true;
+					}
+				}
+			} else {
+				selections = {};
+			}
+			checked = newChecked;
 		} catch (e: any) {
 			fetchError = e.message;
 		} finally {
@@ -74,14 +96,6 @@
 	function atKeeperLimit(roster: KeeperRosterData): boolean {
 		return maxKeepers > 0 && rosterKeeperCount(roster) >= maxKeepers;
 	}
-
-	const grandTotal = $derived(
-		rosters.reduce((s, r) => s + rosterTotal(r), 0)
-	);
-
-	const grandCount = $derived(
-		Object.values(checked).filter(Boolean).length
-	);
 
 	// Identify the logged-in manager's own roster
 	const myRoster = $derived(
@@ -189,6 +203,39 @@
 		}
 	}
 
+	// ── Keeper submission ──────────────────────────────────────────────────
+	async function submitKeepers() {
+		if (!myRoster || !data.user?.sleeperUserId) return;
+		submitting = true;
+		submitError = '';
+		try {
+			const playerIds = myRoster.players
+				.filter(p => checked[p.playerId])
+				.map(p => p.playerId);
+			const res = await fetch(
+				`/api/keeper-selections?leagueId=${encodeURIComponent(data.leagueId)}`,
+				{
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ rosterId: myRoster.rosterId, playerIds }),
+				},
+			);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const d = await res.json();
+			selections = { ...selections, [data.user.sleeperUserId]: d.selection };
+		} catch (e: any) {
+			submitError = e.message;
+		} finally {
+			submitting = false;
+		}
+	}
+
+	function formatSubmittedAt(iso: string): string {
+		return new Date(iso).toLocaleString('en-US', {
+			month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+		});
+	}
+
 	// ── Draft cache refresh ────────────────────────────────────────────────
 	async function refreshDraftCache() {
 		refreshing = true;
@@ -217,8 +264,10 @@
 				{#if planningYear}<span class="text-slate-500 font-normal text-lg ml-2">{planningYear}</span>{/if}
 			</h1>
 			{#if !loading && !fetchError}
+				{@const submittedCount = Object.keys(selections).length}
 				<p class="text-sm text-slate-500 mt-0.5">
-					{grandCount} selected · <span class="text-amber-400 font-semibold">${grandTotal} FAAB</span>
+					<span class="{submittedCount > 0 ? 'text-green-400 font-semibold' : ''}">{submittedCount}/{rosters.length} submitted</span>
+					{#if myKeeperCost > 0}· <span class="text-amber-400 font-semibold">${myKeeperCost} your cost</span>{/if}
 					{#if maxKeepers > 0}· <span class="text-slate-400">max {maxKeepers} per team</span>{/if}
 				</p>
 			{/if}
@@ -314,6 +363,7 @@
 				{@const count = rosterKeeperCount(roster)}
 				{@const faabLeft = rosterFaabAfter(roster)}
 				{@const isMyRoster = roster.ownerUserId === data.user?.sleeperUserId}
+				{@const mySelection = selections[roster.ownerUserId]}
 				<div class="bg-navy-850 rounded-lg border {isMyRoster ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-navy-700'} overflow-hidden flex flex-col">
 					<!-- Roster header -->
 					<div class="flex items-center gap-2.5 px-4 py-3 border-b border-navy-700 bg-navy-900">
@@ -329,16 +379,22 @@
 							</div>
 						{/if}
 						<span class="font-semibold text-white text-sm truncate flex-1">{roster.ownerName}</span>
-						<div class="flex flex-col items-end shrink-0 text-right gap-0.5">
-							{#if maxKeepers > 0}
-								<span class="text-xs {count >= maxKeepers ? 'text-amber-400 font-bold' : 'text-slate-500'}">
-									{count}/{maxKeepers}
-								</span>
-							{/if}
-								<span class="text-xs font-semibold {faabLeft < 0 ? 'text-red-400' : count > 0 ? 'text-green-400' : 'text-slate-500'}">
-								${faabLeft}
-							</span>
-						</div>
+						{#if mySelection && !isMyRoster}
+							<span class="text-xs text-green-400 font-semibold shrink-0">✓ {mySelection.playerIds.length} set</span>
+						{:else}
+							<div class="flex flex-col items-end shrink-0 text-right gap-0.5">
+								{#if isMyRoster && maxKeepers > 0}
+									<span class="text-xs {count >= maxKeepers ? 'text-amber-400 font-bold' : 'text-slate-500'}">
+										{count}/{maxKeepers}
+									</span>
+								{/if}
+								{#if isMyRoster}
+									<span class="text-xs font-semibold {faabLeft < 0 ? 'text-red-400' : count > 0 ? 'text-green-400' : 'text-slate-500'}">
+										${faabLeft}
+									</span>
+								{/if}
+							</div>
+						{/if}
 					</div>
 
 					<!-- Player rows -->
@@ -407,21 +463,30 @@
 									</div>
 								{:else}
 									<!-- Normal row -->
+									{@const playerSubmitted = isCommish && mySelection?.playerIds.includes(player.playerId)}
 									<div class="flex items-center gap-2">
-										<input
-											type="checkbox"
-											bind:checked={checked[player.playerId]}
-											disabled={!checked[player.playerId] && atKeeperLimit(roster)}
-											class="accent-amber-400 w-3.5 h-3.5 shrink-0 rounded cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-										/>
+										{#if isMyRoster}
+											<input
+												type="checkbox"
+												bind:checked={checked[player.playerId]}
+												disabled={!checked[player.playerId] && atKeeperLimit(roster)}
+												class="accent-amber-400 w-3.5 h-3.5 shrink-0 rounded cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+											/>
+										{:else if isCommish && playerSubmitted}
+											<svg class="w-3.5 h-3.5 shrink-0 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+											</svg>
+										{:else}
+											<span class="w-3.5 h-3.5 shrink-0"></span>
+										{/if}
 										<span class="text-xs font-semibold {posColor(player.pos)} w-6 shrink-0">{player.pos}</span>
-										<span class="text-sm text-white truncate flex-1">{player.name}</span>
+										<span class="text-sm {playerSubmitted ? 'text-white font-medium' : 'text-white'} truncate flex-1">{player.name}</span>
 										<!-- Cost info -->
 										<div class="flex items-center gap-2 shrink-0 text-right">
 											<span class="text-xs text-slate-500" title="Base cost · years kept">
 												{fmt(player.baseCost)} × {1 + (0.2 * (player.yearsKept + 1))}
 											</span>
-											<span class="text-sm font-semibold w-10 text-right text-amber-400">
+											<span class="text-sm font-semibold w-10 text-right {playerSubmitted ? 'text-green-400' : 'text-amber-400'}">
 												{fmt(player.keeperCost)}
 											</span>
 											{#if isCommish}
@@ -455,15 +520,55 @@
 						{/each}
 					</div>
 
-					<!-- Roster footer total -->
-					{#if count > 0}
+					<!-- Roster footer -->
+					{#if isMyRoster}
+						<div class="px-4 py-2.5 border-t border-navy-700 bg-navy-900">
+							{#if count > 0}
+								<div class="flex items-center justify-between mb-2">
+									<span class="text-xs text-slate-500">
+										{count}{maxKeepers > 0 ? `/${maxKeepers}` : ''} keeper{count !== 1 ? 's' : ''} · <span class="text-amber-400">${total}</span>
+									</span>
+									<span class="text-sm font-bold {faabLeft < 0 ? 'text-red-400' : 'text-green-400'}">
+										${faabLeft} left
+									</span>
+								</div>
+							{/if}
+							<div class="flex items-center justify-between gap-3">
+								{#if mySelection}
+									<span class="text-xs text-green-400 leading-tight">
+										✓ Submitted {formatSubmittedAt(mySelection.submittedAt)}
+									</span>
+									<button
+										onclick={submitKeepers}
+										disabled={submitting}
+										class="px-3 py-1 text-xs font-semibold bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-200 rounded-lg transition-colors shrink-0"
+									>
+										{submitting ? 'Saving…' : 'Update'}
+									</button>
+								{:else}
+									<span class="text-xs text-slate-500">Not yet submitted</span>
+									<button
+										onclick={submitKeepers}
+										disabled={submitting}
+										class="px-3 py-1 text-xs font-semibold bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-900 rounded-lg transition-colors shrink-0"
+									>
+										{submitting ? 'Saving…' : 'Submit keepers'}
+									</button>
+								{/if}
+							</div>
+							{#if submitError}
+								<p class="text-xs text-red-400 mt-1">{submitError}</p>
+							{/if}
+						</div>
+					{:else if mySelection && isCommish}
+						{@const submittedCost = roster.players
+							.filter(p => mySelection.playerIds.includes(p.playerId))
+							.reduce((s, p) => s + p.keeperCost, 0)}
 						<div class="px-4 py-2.5 border-t border-navy-700 bg-navy-900 flex items-center justify-between">
 							<span class="text-xs text-slate-500">
-								{count}{maxKeepers > 0 ? `/${maxKeepers}` : ''} keeper{count !== 1 ? 's' : ''} · <span class="text-amber-400">${total}</span>
+								{mySelection.playerIds.length} keeper{mySelection.playerIds.length !== 1 ? 's' : ''} · <span class="text-amber-400">${submittedCost}</span>
 							</span>
-							<span class="text-sm font-bold {faabLeft < 0 ? 'text-red-400' : 'text-green-400'}">
-								${faabLeft} left
-							</span>
+							<span class="text-xs text-green-400 font-semibold">✓ Submitted</span>
 						</div>
 					{/if}
 				</div>

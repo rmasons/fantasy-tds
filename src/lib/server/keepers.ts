@@ -270,3 +270,49 @@ export function resetPlayerOverride(leagueId: string, playerId: string) {
 export function invalidateDraftCache(leagueId: string) {
 	return adminDb.collection('keeperDraftHistory').doc(leagueId).delete();
 }
+
+export interface KeeperSelection {
+	ownerUserId: string;
+	rosterId: number;
+	playerIds: string[];
+	submittedAt: string;
+}
+
+export async function getKeeperSelections(leagueId: string): Promise<KeeperSelection[]> {
+	const snap = await adminDb
+		.collection('keeperSelections')
+		.doc(leagueId)
+		.collection('managers')
+		.get();
+	return snap.docs.map(d => d.data() as KeeperSelection);
+}
+
+export async function setKeeperSelection(
+	leagueId: string,
+	ownerUserId: string,
+	rosterId: number,
+	playerIds: string[],
+): Promise<KeeperSelection> {
+	const selection: KeeperSelection = {
+		ownerUserId,
+		rosterId,
+		playerIds,
+		submittedAt: new Date().toISOString(),
+	};
+	await adminDb
+		.collection('keeperSelections')
+		.doc(leagueId)
+		.collection('managers')
+		.doc(ownerUserId)
+		.set(selection);
+	return selection;
+}
+
+export function clearKeeperSelection(leagueId: string, ownerUserId: string) {
+	return adminDb
+		.collection('keeperSelections')
+		.doc(leagueId)
+		.collection('managers')
+		.doc(ownerUserId)
+		.delete();
+}
