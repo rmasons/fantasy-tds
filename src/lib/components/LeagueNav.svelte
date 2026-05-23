@@ -30,6 +30,7 @@
 		{ href: 'managers',        label: 'Managers'        },
 		{ href: 'rivalry',         label: 'Rivalry'         },
 		{ href: 'blog',            label: 'Blog'            },
+		{ href: 'keepers',         label: 'Keepers'         },
 	];
 
 	function currentSubPath(): string {
@@ -116,10 +117,10 @@
 }} />
 
 <!-- ─── Desktop sidebar (lg+) ─────────────────────────────────── -->
-<aside class="hidden lg:flex flex-col fixed inset-y-0 left-0 w-56 bg-slate-900 border-r border-slate-800 z-40">
+<aside class="hidden lg:flex flex-col fixed inset-y-0 left-0 w-56 bg-slate-900 border-r border-white/[0.07] z-40">
 
 	<!-- League header -->
-	<div class="p-4 border-b border-slate-800">
+	<div class="p-4 border-b border-white/[0.07]">
 		<a href="/league/{leagueId}" class="flex items-center gap-2.5 min-w-0 group mb-3">
 			{#if league?.avatar}
 				<img
@@ -128,7 +129,7 @@
 					class="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-slate-700 group-hover:ring-blue-500 transition-all"
 				/>
 			{:else}
-				<div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center shrink-0 text-sm">
+				<div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shrink-0 text-sm">
 					🏈
 				</div>
 			{/if}
@@ -165,7 +166,7 @@
 								onclick={() => switchSeason(entry.leagueId)}
 								class="w-full text-left px-3 py-2 text-sm transition-colors
 								       {entry.leagueId === leagueId
-								           ? 'bg-blue-600 text-white font-semibold'
+								           ? 'bg-amber-500 text-slate-950 font-bold'
 								           : 'text-slate-300 hover:bg-slate-700'}"
 							>
 								{entry.season}
@@ -184,8 +185,8 @@
 				href="/league/{leagueId}/{link.href}"
 				class="flex items-center px-3 py-2 rounded-lg text-sm transition-all
 				       {isActive(link.href)
-				           ? 'bg-gradient-to-r from-blue-600/30 to-violet-600/10 border-l-2 border-blue-500 text-white font-semibold pl-[10px]'
-				           : 'text-slate-400 hover:text-white hover:bg-slate-800 border-l-2 border-transparent'}"
+				           ? 'bg-amber-500/10 border-l-2 border-amber-400 text-amber-50 font-semibold pl-[10px]'
+				           : 'text-slate-400 hover:text-white hover:bg-white/[0.05] border-l-2 border-transparent'}"
 			>
 				{link.label}
 			</a>
@@ -193,7 +194,7 @@
 	</nav>
 
 	<!-- Bottom auth -->
-	<div class="p-2 border-t border-slate-800 space-y-0.5">
+	<div class="p-2 border-t border-white/[0.07] space-y-0.5">
 		{#if page.data.user}
 			{#if page.data.user.sleeperUserId}
 				<a
@@ -227,7 +228,7 @@
 </aside>
 
 <!-- ─── Mobile top nav (<lg) ──────────────────────────────────── -->
-<nav class="lg:hidden bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+<nav class="lg:hidden bg-slate-900 border-b border-white/[0.07] sticky top-0 z-50">
 	<div class="max-w-7xl mx-auto px-4 flex items-center h-14 gap-3">
 
 		<!-- League name / home link -->
@@ -273,7 +274,7 @@
 								onclick={() => switchSeason(entry.leagueId)}
 								class="w-full text-left px-4 py-2 text-sm transition-colors
 								       {entry.leagueId === leagueId
-								           ? 'bg-blue-600 text-white font-semibold'
+								           ? 'bg-amber-500 text-slate-950 font-bold'
 								           : 'text-slate-300 hover:bg-slate-700'}"
 							>
 								{entry.season}
@@ -321,9 +322,9 @@
 
 	<!-- Mobile dropdown -->
 	{#if menuOpen}
-		<div class="md:hidden bg-slate-900 border-t border-slate-800 px-4 py-3 flex flex-col gap-1">
+		<div class="md:hidden bg-slate-900 border-t border-white/[0.07] px-4 py-3 flex flex-col gap-1">
 			{#if hasHistory}
-				<div class="mb-2 pb-2 border-b border-slate-800">
+				<div class="mb-2 pb-2 border-b border-white/[0.07]">
 					<p class="text-xs text-slate-600 uppercase tracking-wider mb-1.5 px-1">Season</p>
 					<div class="flex flex-wrap gap-1">
 						{#each seasonChain as entry}
@@ -331,7 +332,7 @@
 								onclick={() => switchSeason(entry.leagueId)}
 								class="px-3 py-1 rounded-lg text-xs font-medium transition-colors
 								       {entry.leagueId === leagueId
-								           ? 'bg-blue-600 text-white'
+								           ? 'bg-amber-500 text-slate-950 font-bold'
 								           : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}"
 							>
 								{entry.season}
@@ -347,14 +348,14 @@
 					onclick={() => (menuOpen = false)}
 					class="px-3 py-2 rounded-md text-sm transition-colors
 					       {isActive(link.href)
-					           ? 'bg-blue-600 text-white font-semibold'
-					           : 'text-slate-300 hover:bg-slate-800'}"
+					           ? 'bg-amber-500/15 text-amber-50 font-semibold border-l-2 border-amber-400 pl-[10px]'
+					           : 'text-slate-300 hover:bg-white/[0.05]'}"
 				>
 					{link.label}
 				</a>
 			{/each}
 
-			<div class="border-t border-slate-800 mt-2 pt-2 flex flex-wrap gap-4">
+			<div class="border-t border-white/[0.07] mt-2 pt-2 flex flex-wrap gap-4">
 				{#if page.data.user}
 					{#if page.data.user.sleeperUserId}
 						<a href="/settings/profile?leagueId={leagueId}" onclick={() => (menuOpen = false)} class="text-xs text-slate-500 hover:text-slate-300">Edit profile</a>
