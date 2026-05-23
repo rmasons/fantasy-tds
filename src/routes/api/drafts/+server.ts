@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getCachedDraftList, getCachedDraftPicks } from '$lib/server/drafts';
+import { getCachedDraftList, getCachedDraftPicks, seedLeagueChain } from '$lib/server/drafts';
 
 function validateParam(id: string | null, name: string): string {
 	if (!id) throw error(400, `Missing ${name}`);
@@ -24,5 +24,17 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	} catch (e) {
 		console.error('[drafts] GET failed:', e);
 		throw error(502, 'Failed to load draft data');
+	}
+};
+
+export const POST: RequestHandler = async ({ url, locals }) => {
+	if (!locals.user?.isAdmin) throw error(403, 'Forbidden');
+	const leagueId = validateParam(url.searchParams.get('leagueId'), 'leagueId');
+	try {
+		const results = await seedLeagueChain(leagueId);
+		return json({ results });
+	} catch (e) {
+		console.error('[drafts] seed failed:', e);
+		throw error(502, 'Seed failed');
 	}
 };
