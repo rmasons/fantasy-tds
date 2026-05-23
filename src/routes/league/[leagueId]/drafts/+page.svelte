@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { LayoutData } from '../$types';
 	import type { SlimPlayer } from '$lib/types';
-	import { fetchLeagueCore, fetchDrafts as fetchLeagueDrafts, fetchDraftPicks, buildRosterInfoMap } from '$lib/sleeper';
+	import { fetchLeagueCore, buildRosterInfoMap } from '$lib/sleeper';
 
 	let { data } = $props<{ data: LayoutData }>();
 
@@ -53,9 +53,12 @@
 
 		(async () => {
 			try {
-				const [{ rosters, users }, draftList, rawPlayers] = await Promise.all([
+				const [{ rosters, users }, { drafts: draftList }, rawPlayers] = await Promise.all([
 					fetchLeagueCore(leagueId),
-					fetchLeagueDrafts(leagueId),
+					fetch(`/api/drafts?leagueId=${encodeURIComponent(leagueId)}`).then(r => {
+						if (!r.ok) throw new Error(`HTTP ${r.status}`);
+						return r.json();
+					}),
 					fetch('/api/players').then(r => r.ok ? r.json() : {}),
 				]);
 
@@ -96,13 +99,18 @@
 		if (!meta) { currentPicks = []; return; }
 
 		const draftId = meta.id;
+		const leagueId = data.leagueId;
 		loadingPicks = true;
 		picksError = '';
 
 		(async () => {
 			try {
-				const rawPicks = await fetchDraftPicks(draftId);
-				if (draftsMeta[selectedIdx]?.id !== draftId) return;
+				const res = await fetch(
+					`/api/drafts?leagueId=${encodeURIComponent(leagueId)}&draftId=${encodeURIComponent(draftId)}`,
+				);
+				if (!res.ok) throw new Error(`HTTP ${res.status}`);
+				const { picks: rawPicks } = await res.json();
+				if (data.leagueId !== leagueId || draftsMeta[selectedIdx]?.id !== draftId) return;
 
 				currentPicks = rawPicks.map((p: any) => {
 					const player = playersMap[p.player_id];
@@ -120,10 +128,10 @@
 					};
 				});
 			} catch (e: any) {
-				if (draftsMeta[selectedIdx]?.id !== draftId) return;
+				if (data.leagueId !== leagueId || draftsMeta[selectedIdx]?.id !== draftId) return;
 				picksError = e.message;
 			} finally {
-				if (draftsMeta[selectedIdx]?.id !== draftId) return;
+				if (data.leagueId !== leagueId || draftsMeta[selectedIdx]?.id !== draftId) return;
 				loadingPicks = false;
 			}
 		})();
