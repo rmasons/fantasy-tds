@@ -1,15 +1,11 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { adminBucket } from '$lib/firebase/admin';
+import { adminDb } from '$lib/firebase/admin';
 import { fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
 import type { SeasonRecords, RosterSummary, RecordGame, RecordScore } from '$lib/types';
 
 function today(): string {
 	return new Date().toISOString().split('T')[0];
-}
-
-function cacheKey(leagueId: string): string {
-	return `cache/records_${leagueId}.json`;
 }
 
 async function buildRecords(leagueId: string): Promise<SeasonRecords> {
@@ -118,14 +114,16 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	if (!locals.user) return json({ error: 'Unauthorized' }, { status: 401 });
 
 	const { leagueId } = params;
-	const file = adminBucket().file(cacheKey(leagueId));
+	const docRef = adminDb.collection('cache').doc(`records_${leagueId}`);
 
 	try {
-		const [metadata] = await file.getMetadata();
-		const meta = metadata.metadata as Record<string, string> | undefined;
-		if (meta?.status === 'complete' || meta?.date === today()) {
-			const [content] = await file.download();
-			return json(JSON.parse(content.toString()));
+		const doc = await docRef.get();
+		if (doc.exists) {
+			const data = doc.data()!;
+			if (data.status === 'complete' || data.cachedDate === today()) {
+				const { cachedDate: _, ...records } = data;
+				return json(records);
+			}
 		}
 	} catch {
 		// cache miss — fall through to Sleeper
@@ -134,10 +132,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	const records = await buildRecords(leagueId);
 
 	try {
-		await file.save(JSON.stringify(records), {
-			contentType: 'application/json',
-			metadata: { status: records.status, date: today() },
-		});
+		await docRef.set({ ...records, cachedDate: today() });
 	} catch (e) {
 		console.error('[records] Failed to write cache:', e);
 	}
