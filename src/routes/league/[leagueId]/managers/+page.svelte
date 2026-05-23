@@ -99,7 +99,7 @@
 		<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
 			{#each managers as mgr}
 				{@const profile = profiles[mgr.userId]}
-				{@const realName = profile?.displayName || [profile?.firstName, profile?.lastName].filter(Boolean).join(' ')}
+				{@const realName = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ')}
 				<a
 					href="/league/{data.leagueId}/managers/{mgr.userId}"
 					class="bg-navy-850 rounded-lg border border-navy-700 hover:border-navy-600 hover:bg-navy-800 transition-colors p-4 flex gap-4 items-start"

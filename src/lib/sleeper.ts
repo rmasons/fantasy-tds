@@ -50,8 +50,8 @@ export function buildRosterInfoMap(
 	for (const r of rosters) {
 		const u = userMap.get(r.owner_id);
 		map.set(r.roster_id, {
-			teamName: u?.metadata?.team_name ?? u?.display_name ?? `Team ${r.roster_id}`,
-			ownerName: nameOverrides?.get(r.owner_id) ?? u?.display_name ?? null,
+			teamName: nameOverrides?.get(r.owner_id) ?? u?.metadata?.team_name ?? u?.display_name ?? `Team ${r.roster_id}`,
+			ownerName: u?.display_name ?? null,
 			avatar: avatarUrl(u?.metadata?.avatar ?? u?.avatar),
 			ownerId: r.owner_id,
 		});

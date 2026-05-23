@@ -30,7 +30,6 @@
 
 	function realName(entry: ManagerEntry): string {
 		const p = profiles[entry.ownerId];
-		if (p?.displayName) return p.displayName;
 		const name = [p?.firstName, p?.lastName].filter(Boolean).join(' ');
 		return name || entry.ownerName;
 	}
