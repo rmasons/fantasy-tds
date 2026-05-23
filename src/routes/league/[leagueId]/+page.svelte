@@ -110,18 +110,18 @@
 
 {#if loading}
 	<div class="space-y-4 animate-pulse">
-		<div class="h-36 bg-slate-800 rounded-2xl"></div>
-		<div class="h-20 bg-slate-800/60 rounded-2xl"></div>
+		<div class="h-36 bg-navy-850 rounded-xl"></div>
+		<div class="h-20 bg-navy-850/60 rounded-xl"></div>
 		<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
 			{#each Array(6) as _}
-				<div class="h-24 bg-slate-800 rounded-xl"></div>
+				<div class="h-24 bg-navy-850 rounded-lg"></div>
 			{/each}
 		</div>
 	</div>
 {:else if league}
 	<!-- Hero banner -->
-	<div class="relative rounded-2xl overflow-hidden mb-4 border border-white/[0.07]">
-		<div class="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800/80"></div>
+	<div class="relative rounded-xl overflow-hidden mb-4 border border-navy-700">
+		<div class="absolute inset-0 bg-gradient-to-br from-navy-900 via-navy-850 to-navy-875"></div>
 		<div class="absolute inset-0 bg-gradient-to-br from-amber-500/8 via-transparent to-orange-600/5 pointer-events-none"></div>
 		<div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-400/40 to-transparent"></div>
 
@@ -139,7 +139,7 @@
 			{/if}
 
 			<div class="min-w-0">
-				<h1 class="text-2xl sm:text-3xl font-extrabold text-white leading-tight truncate">{league.name}</h1>
+				<h1 class="font-sport font-black text-3xl sm:text-4xl uppercase tracking-tight text-white leading-tight truncate">{league.name}</h1>
 				{#if nflState}
 					<p class="text-slate-400 text-sm mt-1 font-medium">
 						NFL {nflState.season}
@@ -174,7 +174,7 @@
 	{#if champion}
 		<a
 			href="/league/{data.leagueId}/awards"
-			class="group relative flex items-center gap-4 rounded-2xl overflow-hidden mb-6
+			class="group relative flex items-center gap-4 rounded-xl overflow-hidden mb-6
 			       border border-amber-500/25 hover:border-amber-400/40 transition-colors"
 		>
 			<div class="absolute inset-0 bg-slate-900"></div>
@@ -229,12 +229,12 @@
 		{#each navItems as nav}
 			<a
 				href="/league/{data.leagueId}/{nav.href}"
-				class="group flex flex-col items-center justify-center gap-2.5 p-5 rounded-xl
-				       bg-slate-900 border border-slate-800/60 hover:border-slate-700
-				       hover:bg-slate-800/80 transition-all duration-150"
+				class="group flex flex-col items-center justify-center gap-2.5 p-5 rounded-lg
+				       bg-navy-850 border border-navy-700 hover:border-navy-600
+				       hover:bg-navy-800 transition-all duration-150"
 			>
 				<span class="text-3xl group-hover:scale-110 transition-transform duration-150">{nav.icon}</span>
-				<span class="text-sm font-medium text-slate-400 group-hover:text-white transition-colors">{nav.label}</span>
+				<span class="font-sport font-bold uppercase text-xs tracking-wider text-navy-500 group-hover:text-white transition-colors">{nav.label}</span>
 			</a>
 		{/each}
 	</div>

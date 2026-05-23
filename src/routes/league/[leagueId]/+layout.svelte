@@ -5,7 +5,7 @@
 	let { data, children } = $props<{ data: LayoutData; children: any }>();
 </script>
 
-<div class="min-h-screen bg-slate-950 text-white">
+<div class="min-h-screen bg-navy-950 text-white">
 	<LeagueNav leagueId={data.leagueId} />
 	<!-- lg: offset for fixed sidebar; mobile: offset for sticky top nav -->
 	<div class="lg:pl-56 pt-14 lg:pt-0">

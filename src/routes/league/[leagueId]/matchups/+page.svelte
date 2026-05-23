@@ -225,60 +225,59 @@
 
 <div>
 	<!-- Header -->
-	<div class="flex items-start justify-between mb-6 flex-wrap gap-3">
-		<div>
-			<h1 class="text-2xl font-extrabold text-white">Matchups</h1>
-			<p class="text-slate-500 text-sm mt-0.5">{season} Season</p>
-		</div>
-		<div class="flex items-center gap-2">
-			<!-- View tabs -->
-			<div class="flex gap-1 bg-slate-900 rounded-xl p-1">
-				<button
-					onclick={() => (view = 'weekly')}
-					class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-					       {view === 'weekly' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}"
-				>Weekly</button>
-				<button
-					onclick={() => loadBracket()}
-					class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-					       {view === 'bracket' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}"
-				>
-					{bracketLoading ? 'Loading…' : 'Bracket'}
-				</button>
-			</div>
+	<div class="mb-6">
+		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Matchups</h1>
+		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">{season} Season</p>
+	</div>
 
-			<!-- Week navigator -->
-			{#if view === 'weekly'}
-				<div class="flex items-center gap-0.5 bg-slate-900 rounded-xl p-1">
-					<button
-						onclick={() => selectedWeek > 1 && loadWeek(selectedWeek - 1)}
-						disabled={selectedWeek <= 1 || weekLoading}
-						class="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
-					>‹</button>
-					<select
-						value={selectedWeek}
-						onchange={(e) => loadWeek(parseInt((e.target as HTMLSelectElement).value))}
-						disabled={weekLoading}
-						class="bg-transparent text-sm font-semibold text-white px-2 py-1.5 focus:outline-none cursor-pointer disabled:opacity-50"
-					>
-						{#each Array.from({ length: maxWeek }, (_, i) => i + 1) as w}
-							<option value={w} class="bg-slate-900">{weekLabel(w)}</option>
-						{/each}
-					</select>
-					<button
-						onclick={() => selectedWeek < maxWeek && loadWeek(selectedWeek + 1)}
-						disabled={selectedWeek >= maxWeek || weekLoading}
-						class="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
-					>›</button>
-				</div>
-			{/if}
+	<!-- View tabs + week navigator -->
+	<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+		<div class="flex border-b border-navy-700">
+			<button
+				onclick={() => (view = 'weekly')}
+				class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+				       {view === 'weekly' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
+			>Weekly</button>
+			<button
+				onclick={() => loadBracket()}
+				class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+				       {view === 'bracket' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
+			>
+				{bracketLoading ? 'Loading…' : 'Bracket'}
+			</button>
 		</div>
+
+		<!-- Week navigator -->
+		{#if view === 'weekly'}
+			<div class="flex items-center gap-0.5 bg-navy-850 rounded-lg p-1 border border-navy-700">
+				<button
+					onclick={() => selectedWeek > 1 && loadWeek(selectedWeek - 1)}
+					disabled={selectedWeek <= 1 || weekLoading}
+					class="px-3 py-1.5 rounded text-sm text-navy-500 hover:text-white disabled:opacity-30 transition-colors"
+				>‹</button>
+				<select
+					value={selectedWeek}
+					onchange={(e) => loadWeek(parseInt((e.target as HTMLSelectElement).value))}
+					disabled={weekLoading}
+					class="bg-transparent text-sm font-semibold text-white px-2 py-1.5 focus:outline-none cursor-pointer disabled:opacity-50"
+				>
+					{#each Array.from({ length: maxWeek }, (_, i) => i + 1) as w}
+						<option value={w}>{weekLabel(w)}</option>
+					{/each}
+				</select>
+				<button
+					onclick={() => selectedWeek < maxWeek && loadWeek(selectedWeek + 1)}
+					disabled={selectedWeek >= maxWeek || weekLoading}
+					class="px-3 py-1.5 rounded text-sm text-navy-500 hover:text-white disabled:opacity-30 transition-colors"
+				>›</button>
+			</div>
+		{/if}
 	</div>
 
 	{#if loading}
 		<div class="grid sm:grid-cols-2 gap-3">
 			{#each Array(6) as _}
-				<div class="h-16 bg-slate-800 rounded-xl animate-pulse"></div>
+				<div class="h-16 bg-navy-850 rounded-lg animate-pulse"></div>
 			{/each}
 		</div>
 
@@ -290,59 +289,59 @@
 		{#if weekLoading}
 			<div class="grid sm:grid-cols-2 gap-3">
 				{#each Array(6) as _}
-					<div class="h-16 bg-slate-800 rounded-xl animate-pulse"></div>
+					<div class="h-16 bg-navy-850 rounded-lg animate-pulse"></div>
 				{/each}
 			</div>
 		{:else if weekMatchups.length === 0}
-			<p class="text-slate-400">No matchups found for this week.</p>
+			<p class="text-navy-500">No matchups found for this week.</p>
 		{:else}
-			<!-- Pill-style matchup cards -->
+			<!-- Scoreboard matchup cards -->
 			<div class="grid sm:grid-cols-2 gap-3">
 				{#each weekMatchups as matchup (matchup.id)}
 					{@const homeWon = matchup.home.points > matchup.away.points}
 					{@const awayWon = matchup.away.points > matchup.home.points}
 
-					<div class="flex rounded-xl overflow-hidden border border-slate-700/30 shadow-lg">
+					<div class="flex rounded-lg overflow-hidden border border-navy-700">
 						<!-- Home team (left half) -->
 						<div class="flex-1 flex items-center gap-2 px-3 py-3 min-w-0
-						            {homeWon ? 'bg-red-900/80' : 'bg-slate-800/90'}">
+						            {homeWon ? 'bg-red-900/80' : 'bg-navy-850'}">
 							{#if matchup.home.avatar}
 								<img src={matchup.home.avatar} alt="" class="w-9 h-9 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
 							{:else}
-								<div class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center shrink-0 text-sm">🏈</div>
+								<div class="w-9 h-9 rounded-full bg-navy-800 flex items-center justify-center shrink-0 text-sm">🏈</div>
 							{/if}
-							<p class="flex-1 min-w-0 text-sm italic font-semibold truncate leading-tight
-							          {homeWon ? 'text-white' : 'text-slate-400'}">
+							<p class="flex-1 min-w-0 text-sm font-semibold truncate leading-tight
+							          {homeWon ? 'text-white' : 'text-navy-500'}">
 								{matchup.home.teamName}
 							</p>
 							<div class="shrink-0 pl-1 text-right">
-								<p class="font-mono font-bold text-sm leading-none
-								          {homeWon ? 'text-white' : 'text-slate-400'}">
+								<p class="font-mono font-bold text-sm leading-none tabular-nums
+								          {homeWon ? 'text-white' : 'text-navy-500'}">
 									{matchup.home.points.toFixed(2)}
 								</p>
 							</div>
 						</div>
 
 						<!-- Divider -->
-						<div class="w-px shrink-0 bg-slate-600/40"></div>
+						<div class="w-px shrink-0 bg-navy-700"></div>
 
 						<!-- Away team (right half, mirrored) -->
 						<div class="flex-1 flex items-center gap-2 px-3 py-3 min-w-0
-						            {awayWon ? 'bg-red-900/80' : 'bg-slate-800/90'}">
+						            {awayWon ? 'bg-red-900/80' : 'bg-navy-850'}">
 							<div class="shrink-0 pr-1 text-left">
-								<p class="font-mono font-bold text-sm leading-none
-								          {awayWon ? 'text-white' : 'text-slate-400'}">
+								<p class="font-mono font-bold text-sm leading-none tabular-nums
+								          {awayWon ? 'text-white' : 'text-navy-500'}">
 									{matchup.away.points.toFixed(2)}
 								</p>
 							</div>
-							<p class="flex-1 min-w-0 text-sm italic font-semibold text-right truncate leading-tight
-							          {awayWon ? 'text-white' : 'text-slate-400'}">
+							<p class="flex-1 min-w-0 text-sm font-semibold text-right truncate leading-tight
+							          {awayWon ? 'text-white' : 'text-navy-500'}">
 								{matchup.away.teamName}
 							</p>
 							{#if matchup.away.avatar}
 								<img src={matchup.away.avatar} alt="" class="w-9 h-9 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
 							{:else}
-								<div class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center shrink-0 text-sm">🏈</div>
+								<div class="w-9 h-9 rounded-full bg-navy-800 flex items-center justify-center shrink-0 text-sm">🏈</div>
 							{/if}
 						</div>
 					</div>
@@ -355,63 +354,63 @@
 		{#if bracketLoading}
 			<div class="space-y-3">
 				{#each Array(4) as _}
-					<div class="h-16 bg-slate-800 rounded-xl animate-pulse"></div>
+					<div class="h-16 bg-navy-850 rounded-lg animate-pulse"></div>
 				{/each}
 			</div>
 		{:else if winnersRounds.length === 0 && losersRounds.length === 0}
-			<p class="text-slate-400">No bracket data available for this season.</p>
+			<p class="text-navy-500">No bracket data available for this season.</p>
 		{:else}
 			{#snippet bracketSection(rounds: BracketMatch[][], title: string, finalIcon: string, accent: string)}
 				{#if rounds.length > 0}
 					<div class="mb-10">
-						<h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">{title}</h2>
+						<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-4 flex items-center gap-2"><span class="text-amber-400">◆</span>{title}</h2>
 						<div class="overflow-x-auto pb-3">
 							<div class="flex gap-4 items-start min-w-max">
 								{#each rounds as roundMatches, ri}
 									{@const isChampionRound = ri === rounds.length - 1}
 									<div class="flex flex-col gap-3" style="min-width: 190px; max-width: 230px;">
-										<p class="text-xs text-slate-500 uppercase tracking-wider text-center font-medium">
+										<p class="text-[10px] text-navy-500 uppercase tracking-wider text-center font-semibold">
 											{roundMatches[0]?.label ?? `Round ${ri + 1}`}
 										</p>
 										{#each roundMatches as match}
-											<div class="rounded-xl overflow-hidden border
+											<div class="rounded-lg overflow-hidden border
 											            {isChampionRound
 											                ? 'border-amber-500/40 shadow-lg shadow-amber-900/20'
-											                : 'border-slate-700/60'}">
+											                : 'border-navy-700'}">
 												{#each [match.t1, match.t2] as side, si}
 													{#if side.bye}
 														<div class="flex items-center gap-2 px-3 py-2.5
-														            {si === 0 ? 'border-b border-slate-800' : ''}
-														            bg-slate-900 text-slate-600 text-xs italic">
+														            {si === 0 ? 'border-b border-navy-700' : ''}
+														            bg-navy-850 text-navy-500 text-xs italic">
 															BYE
 														</div>
 													{:else}
 														<div class="flex items-center gap-2 px-3 py-2.5
-														            {si === 0 ? 'border-b border-slate-800/80' : ''}
+														            {si === 0 ? 'border-b border-navy-700' : ''}
 														            {side.won
 														                ? isChampionRound
 														                    ? 'bg-amber-950/60'
-														                    : 'bg-slate-800'
-														                : 'bg-slate-900/80'}">
+														                    : 'bg-navy-800'
+														                : 'bg-navy-850'}">
 															{#if side.avatar}
 																<img src={side.avatar} alt="" class="w-7 h-7 rounded-full object-cover shrink-0
 																            {side.won ? 'ring-2 ring-white/30' : 'opacity-60'}" />
 															{:else}
-																<div class="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-sm shrink-0
+																<div class="w-7 h-7 rounded-full bg-navy-800 flex items-center justify-center text-sm shrink-0
 																            {side.won ? '' : 'opacity-50'}">🏈</div>
 															{/if}
 															<span class="text-xs font-semibold truncate flex-1 leading-tight
 															             {side.won
 															                 ? isChampionRound ? 'text-amber-200' : 'text-white'
-															                 : 'text-slate-500'}">
+															                 : 'text-navy-500'}">
 																{side.teamName ?? '—'}
 															</span>
 															{#if side.won && isChampionRound}
 																<span class="text-sm shrink-0">{finalIcon}</span>
 															{/if}
 															{#if side.points !== null}
-																<span class="font-mono text-xs shrink-0
-																             {side.won ? 'text-white' : 'text-slate-600'}">
+																<span class="font-mono text-xs shrink-0 tabular-nums
+																             {side.won ? 'text-white' : 'text-navy-500'}">
 																	{side.points.toFixed(1)}
 																</span>
 															{/if}

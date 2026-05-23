@@ -118,36 +118,38 @@
 </script>
 
 <div>
-	<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-		<h1 class="text-2xl font-bold">Transactions</h1>
-
-		<div class="flex gap-1 bg-slate-900 rounded-xl p-1">
-			{#each (['all', 'trade', 'waiver', 'free_agent'] as TxType[]) as f}
-				<button
-					onclick={() => (filter = f)}
-					class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-					       {filter === f ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}"
-				>
-					{f === 'all' ? 'All' : f === 'free_agent' ? 'Free Agent' : f.charAt(0).toUpperCase() + f.slice(1)}
-				</button>
-			{/each}
+	<div class="flex items-start justify-between mb-6 flex-wrap gap-3">
+		<div>
+			<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Transactions</h1>
 		</div>
+	</div>
+
+	<div class="flex mb-6 border-b border-navy-700">
+		{#each (['all', 'trade', 'waiver', 'free_agent'] as TxType[]) as f}
+			<button
+				onclick={() => (filter = f)}
+				class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+				       {filter === f ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
+			>
+				{f === 'all' ? 'All' : f === 'free_agent' ? 'Free Agent' : f.charAt(0).toUpperCase() + f.slice(1)}
+			</button>
+		{/each}
 	</div>
 
 	{#if loading}
 		<div class="space-y-3">
 			{#each Array(8) as _}
-				<div class="h-16 bg-slate-800 rounded-xl animate-pulse"></div>
+				<div class="h-16 bg-navy-850 rounded-lg animate-pulse"></div>
 			{/each}
 		</div>
 	{:else if error}
 		<p class="text-red-400">Failed to load transactions: {error}</p>
 	{:else if filtered.length === 0}
-		<p class="text-slate-400">No transactions found.</p>
+		<p class="text-navy-500">No transactions found.</p>
 	{:else}
 		<div class="space-y-3">
 			{#each filtered as tx (tx.id)}
-				<div class="bg-slate-900 rounded-xl border border-slate-800 px-4 py-3">
+				<div class="bg-navy-850 rounded-lg border border-navy-700 px-4 py-3">
 					<div class="flex items-center gap-2 mb-2">
 						<span class="text-xs px-2 py-0.5 rounded-full font-semibold {typeBadge[tx.type] ?? 'bg-slate-700 text-slate-300'}">
 							{typeLabel[tx.type] ?? tx.type}

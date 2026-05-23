@@ -132,40 +132,40 @@
 
 <div>
 	<div class="mb-6">
-		<h1 class="text-2xl font-extrabold text-white">Awards</h1>
+		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Awards</h1>
 	</div>
 
 	{#if loading && podiums.length === 0}
 		<div class="space-y-3">
 			{#each Array(3) as _}
-				<div class="h-12 bg-slate-800 rounded-xl animate-pulse"></div>
+				<div class="h-12 bg-navy-850 rounded-lg animate-pulse"></div>
 			{/each}
-			<p class="text-slate-500 text-sm">{loadingStatus}</p>
+			<p class="text-navy-500 text-sm">{loadingStatus}</p>
 		</div>
 	{:else if error}
 		<p class="text-red-400">Failed to load awards: {error}</p>
 	{:else if podiums.length === 0}
-		<p class="text-slate-400">No completed seasons found.</p>
+		<p class="text-navy-500">No completed seasons found.</p>
 	{:else}
 		<!-- Season tabs -->
-		<div class="flex gap-1 bg-slate-900 rounded-xl p-1 mb-8 w-fit flex-wrap">
+		<div class="flex mb-8 border-b border-navy-700 flex-wrap">
 			{#each podiums as p, i}
 				<button
 					onclick={() => (selectedIdx = i)}
-					class="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
-					       {selectedIdx === i ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}"
+					class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+					       {selectedIdx === i ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
 				>
 					{p.season}
 				</button>
 			{/each}
 			{#if loading}
-				<span class="px-4 py-1.5 text-xs text-slate-600 italic self-center">{loadingStatus}</span>
+				<span class="px-4 py-2.5 text-xs text-navy-500 italic self-center">{loadingStatus}</span>
 			{/if}
 		</div>
 
 		{#if podium}
 			<!-- ── CHAMPION HERO ──────────────────────────────── -->
-			<div class="relative rounded-2xl overflow-hidden mb-8 border border-amber-500/25">
+			<div class="relative rounded-xl overflow-hidden mb-8 border border-amber-500/25">
 				<!-- Background layers -->
 				<div class="absolute inset-0 bg-slate-900"></div>
 				<div class="absolute inset-0 bg-gradient-to-b from-amber-500/12 via-transparent to-transparent"></div>
@@ -309,11 +309,11 @@
 
 			<!-- ── ALL-TIME CHAMPIONS ─────────────────────────── -->
 			<div class="mt-10">
-				<h2 class="text-base font-bold uppercase tracking-wider text-slate-500 mb-3">All-Time Champions</h2>
-				<div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+				<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2"><span class="text-amber-400">◆</span>All-Time Champions</h2>
+				<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden">
 					<table class="w-full text-sm">
 						<thead>
-							<tr class="border-b border-slate-800 text-slate-500 text-xs uppercase tracking-wider">
+							<tr class="border-b border-navy-700 text-navy-500 text-[10px] uppercase tracking-wider">
 								<th class="px-4 py-3 text-left">Season</th>
 								<th class="px-4 py-3 text-left">Champion</th>
 								<th class="px-4 py-3 text-left hidden sm:table-cell">Runner-up</th>
@@ -324,8 +324,8 @@
 							{#each podiums as p, i}
 								<tr
 									onclick={() => (selectedIdx = i)}
-									class="border-b border-slate-800/50 cursor-pointer transition-colors
-									       {selectedIdx === i ? 'bg-amber-500/10' : 'hover:bg-slate-800/50'}"
+									class="border-b border-navy-700/50 cursor-pointer transition-colors
+									       {selectedIdx === i ? 'bg-amber-500/10' : 'hover:bg-navy-800'}"
 								>
 									<td class="px-4 py-3 font-mono text-slate-400">{p.season}</td>
 									<td class="px-4 py-3">

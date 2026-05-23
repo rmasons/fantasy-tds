@@ -81,32 +81,32 @@
 
 <div>
 	<div class="mb-6">
-		<h1 class="text-2xl font-extrabold text-white">Standings</h1>
-		<p class="text-slate-500 text-sm mt-0.5">{season} Season</p>
+		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Standings</h1>
+		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">{season} Season</p>
 	</div>
 
 	{#if loading}
 		<div class="space-y-2">
 			{#each Array(10) as _}
-				<div class="h-14 bg-slate-800 rounded-xl animate-pulse"></div>
+				<div class="h-14 bg-navy-850 rounded-lg animate-pulse"></div>
 			{/each}
 		</div>
 
 	{:else if error}
-		<div class="bg-slate-900 rounded-xl border border-slate-800 p-6 text-center">
+		<div class="bg-navy-850 rounded-lg border border-navy-700 p-6 text-center">
 			<p class="text-slate-400">Failed to load standings.</p>
-			<p class="text-slate-600 text-sm mt-1">{error}</p>
+			<p class="text-navy-500 text-sm mt-1">{error}</p>
 		</div>
 
 	{:else if standings.length === 0}
-		<p class="text-slate-400">No standings available yet — season may not have started.</p>
+		<p class="text-navy-500">No standings available yet — season may not have started.</p>
 
 	{:else}
 		<!-- Desktop table -->
-		<div class="hidden sm:block overflow-x-auto rounded-xl border border-white/[0.07]">
+		<div class="hidden sm:block overflow-x-auto rounded-lg border border-navy-700">
 			<table class="w-full text-sm">
 				<thead>
-					<tr class="bg-slate-900/80 text-slate-500 text-xs uppercase tracking-wider border-b border-white/[0.07]">
+					<tr class="bg-navy-900 text-navy-500 text-[10px] uppercase tracking-wider border-b border-navy-700">
 						<th class="px-4 py-3 text-left w-8">#</th>
 						<th class="px-4 py-3 text-left">Team</th>
 						<th class="px-4 py-3 text-center">W</th>
@@ -121,8 +121,8 @@
 				</thead>
 				<tbody>
 					{#each standings as row, i}
-						<tr class="border-t border-white/[0.05] hover:bg-white/[0.03] transition-colors {rowStyle(row.rank)}
-						           {i % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900/20'}">
+						<tr class="border-t border-navy-700/50 hover:bg-navy-800 transition-colors {rowStyle(row.rank)}
+						           {i % 2 !== 0 ? 'bg-navy-875' : ''}">
 							<td class="px-4 py-3">
 								<span class="font-mono text-xs {rankStyle(row.rank)}">{row.rank}</span>
 							</td>
@@ -131,12 +131,12 @@
 									{#if row.avatar}
 										<img src={row.avatar} alt="" class="w-9 h-9 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
 									{:else}
-										<div class="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center shrink-0 text-base">🏈</div>
+										<div class="w-9 h-9 rounded-full bg-navy-800 flex items-center justify-center shrink-0 text-base">🏈</div>
 									{/if}
 									<div>
 										<p class="font-semibold text-white leading-tight">{row.teamName}</p>
 										{#if row.ownerName && row.ownerName !== row.teamName}
-											<p class="text-xs text-slate-500">{row.ownerName}</p>
+											<p class="text-xs text-navy-500">{row.ownerName}</p>
 										{/if}
 									</div>
 								</div>
@@ -144,10 +144,10 @@
 							<td class="px-4 py-3 text-center font-mono font-bold text-white tabular-nums">{row.wins}</td>
 							<td class="px-4 py-3 text-center font-mono text-slate-500 tabular-nums">{row.losses}</td>
 							{#if hasTies}
-								<td class="px-4 py-3 text-center font-mono text-slate-600 tabular-nums">{row.ties}</td>
+								<td class="px-4 py-3 text-center font-mono text-navy-500 tabular-nums">{row.ties}</td>
 							{/if}
 							<td class="px-4 py-3 text-right font-mono tabular-nums {row.rank === 1 ? 'text-amber-400 font-semibold' : 'text-slate-200'}">{row.fpts.toFixed(2)}</td>
-							<td class="px-4 py-3 text-right font-mono text-slate-600 tabular-nums">{row.fptsAgainst.toFixed(2)}</td>
+							<td class="px-4 py-3 text-right font-mono text-navy-500 tabular-nums">{row.fptsAgainst.toFixed(2)}</td>
 							<td class="px-4 py-3 text-center">
 								<span class="inline-block px-2 py-0.5 rounded text-xs font-bold {streakClass(row.streak)}">
 									{row.streak}
@@ -162,22 +162,22 @@
 		<!-- Mobile cards -->
 		<div class="sm:hidden space-y-2">
 			{#each standings as row}
-				<div class="bg-slate-900 rounded-xl border border-white/[0.07] px-4 py-3 flex items-center gap-3 {rowStyle(row.rank)}">
+				<div class="bg-navy-850 rounded-lg border border-navy-700 px-4 py-3 flex items-center gap-3 {rowStyle(row.rank)}">
 					<span class="font-mono text-xs w-5 text-center shrink-0 {rankStyle(row.rank)}">{row.rank}</span>
 					{#if row.avatar}
 						<img src={row.avatar} alt="" class="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
 					{:else}
-						<div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center shrink-0">🏈</div>
+						<div class="w-10 h-10 rounded-full bg-navy-800 flex items-center justify-center shrink-0">🏈</div>
 					{/if}
 					<div class="flex-1 min-w-0">
 						<p class="font-semibold text-white text-sm truncate">{row.teamName}</p>
-						<p class="text-xs text-slate-500">{row.ownerName}</p>
+						<p class="text-xs text-navy-500">{row.ownerName}</p>
 					</div>
 					<div class="text-right shrink-0">
 						<p class="font-bold text-white text-sm tabular-nums">{row.wins}–{row.losses}{row.ties > 0 ? `–${row.ties}` : ''}</p>
-						<p class="text-xs text-slate-500 tabular-nums">
+						<p class="text-xs text-navy-500 tabular-nums">
 							<span class={streakClass(row.streak).split(' ')[0]}>{row.streak}</span>
-							<span class="text-slate-600"> · </span>{row.fpts.toFixed(0)} pts
+							<span class="text-navy-700"> · </span>{row.fpts.toFixed(0)} pts
 						</p>
 					</div>
 				</div>

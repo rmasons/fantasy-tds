@@ -32,6 +32,7 @@
 
 	// Draft cache refresh
 	let refreshing = $state(false);
+	let refreshError = $state('');
 
 	// ── Load data ──────────────────────────────────────────────────────────
 	async function load() {
@@ -191,6 +192,7 @@
 	// ── Draft cache refresh ────────────────────────────────────────────────
 	async function refreshDraftCache() {
 		refreshing = true;
+		refreshError = '';
 		try {
 			const res = await fetch(
 				`/api/keepers?leagueId=${encodeURIComponent(data.leagueId)}&action=invalidate-cache`,
@@ -198,6 +200,8 @@
 			);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			await load();
+		} catch (e: any) {
+			refreshError = e.message;
 		} finally {
 			refreshing = false;
 		}
@@ -208,7 +212,7 @@
 	<!-- ── Header ── -->
 	<div class="flex items-start justify-between mb-4 flex-wrap gap-3">
 		<div>
-			<h1 class="text-2xl font-extrabold text-white">
+			<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">
 				Keepers
 				{#if planningYear}<span class="text-slate-500 font-normal text-lg ml-2">{planningYear}</span>{/if}
 			</h1>
@@ -218,6 +222,9 @@
 					{#if maxKeepers > 0}· <span class="text-slate-400">max {maxKeepers} per team</span>{/if}
 				</p>
 			{/if}
+			<p class="text-xs text-slate-600 mt-1 font-mono whitespace-nowrap">
+				salary = base × (1 + (0.20 × (years kept + 1)))
+			</p>
 		</div>
 
 		<div class="flex items-center gap-2 flex-wrap">
@@ -248,6 +255,9 @@
 			{/if}
 		</div>
 	</div>
+	{#if refreshError}
+		<p class="mb-3 text-xs text-red-400">Cache refresh failed: {refreshError}</p>
+	{/if}
 
 	<!-- ── My FAAB banner (logged-in manager only) ── -->
 	{#if !loading && !fetchError && myRoster && myFaabAfter !== null}
@@ -285,14 +295,14 @@
 	{#if loading}
 		<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
 			{#each Array(6) as _}
-				<div class="h-64 bg-slate-800 rounded-xl animate-pulse"></div>
+				<div class="h-64 bg-navy-850 rounded-lg animate-pulse"></div>
 			{/each}
 		</div>
 	{:else if fetchError}
-		<div class="bg-slate-900 rounded-xl border border-slate-800 p-6 text-center">
-			<p class="text-slate-400 mb-1">Failed to load keeper data.</p>
-			<p class="text-slate-600 text-sm">{fetchError}</p>
-			<button onclick={load} class="mt-3 px-4 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 transition-colors">
+		<div class="bg-navy-850 rounded-lg border border-navy-700 p-6 text-center">
+			<p class="text-navy-500 mb-1">Failed to load keeper data.</p>
+			<p class="text-navy-500 text-sm">{fetchError}</p>
+			<button onclick={load} class="mt-3 px-4 py-1.5 text-sm bg-navy-800 hover:bg-navy-700 rounded-lg text-slate-200 transition-colors">
 				Retry
 			</button>
 		</div>
@@ -304,9 +314,9 @@
 				{@const count = rosterKeeperCount(roster)}
 				{@const faabLeft = rosterFaabAfter(roster)}
 				{@const isMyRoster = roster.ownerUserId === data.user?.sleeperUserId}
-				<div class="bg-slate-900 rounded-xl border {isMyRoster ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-slate-800/60'} overflow-hidden flex flex-col">
+				<div class="bg-navy-850 rounded-lg border {isMyRoster ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-navy-700'} overflow-hidden flex flex-col">
 					<!-- Roster header -->
-					<div class="flex items-center gap-2.5 px-4 py-3 border-b border-slate-800/60 bg-slate-900/80">
+					<div class="flex items-center gap-2.5 px-4 py-3 border-b border-navy-700 bg-navy-900">
 						{#if roster.ownerAvatar}
 							<img
 								src={roster.ownerAvatar}
@@ -332,7 +342,7 @@
 					</div>
 
 					<!-- Player rows -->
-					<div class="flex-1 divide-y divide-slate-800/40">
+					<div class="flex-1 divide-y divide-navy-700/40">
 						{#each roster.players as player}
 							{@const isEditing = isCommish && editingId === player.playerId}
 							<div class="px-3 py-2 {checked[player.playerId] ? 'bg-amber-500/5' : ''}">
@@ -408,14 +418,10 @@
 										<span class="text-sm text-white truncate flex-1">{player.name}</span>
 										<!-- Cost info -->
 										<div class="flex items-center gap-2 shrink-0 text-right">
-											{#if player.baseCost === null}
-												<span class="text-xs text-slate-600" title="Base cost unknown — set via commissioner edit">?</span>
-											{:else}
-												<span class="text-xs text-slate-500" title="Base cost · years kept">
-													{fmt(player.baseCost)}×{player.yearsKept}
-												</span>
-											{/if}
-											<span class="text-sm font-semibold w-10 text-right {player.keeperCost !== null ? 'text-amber-400' : 'text-slate-600'}">
+											<span class="text-xs text-slate-500" title="Base cost · years kept">
+												{fmt(player.baseCost)} × {1 + (0.2 * (player.yearsKept + 1))}
+											</span>
+											<span class="text-sm font-semibold w-10 text-right text-amber-400">
 												{fmt(player.keeperCost)}
 											</span>
 											{#if isCommish}
@@ -431,13 +437,19 @@
 											{/if}
 										</div>
 									</div>
-									<!-- Subtle source hint for known items -->
-									{#if player.draftSeason && !isCommish}
-										<p class="text-xs text-slate-700 ml-6 mt-0.5 leading-none">
-											R{player.draftRound} · {player.draftSeason}
-											{#if player.yearsKeptOverridden}<span class="text-amber-900"> · override</span>{/if}
-										</p>
-									{/if}
+									<!-- Subtitle line -->
+									<div class="flex justify-between ml-6 mt-0.5">
+										{#if player.draftSeason && !isCommish}
+											<span class="text-xs text-slate-700 leading-none">
+												R{player.draftRound} · {player.draftSeason}
+											</span>
+										{:else}
+											<span></span>
+										{/if}
+										<span class="text-xs text-slate-500 leading-none whitespace-nowrap text-right">
+											Years kept: {player.yearsKept}
+										</span>
+									</div>
 								{/if}
 							</div>
 						{/each}
@@ -445,7 +457,7 @@
 
 					<!-- Roster footer total -->
 					{#if count > 0}
-						<div class="px-4 py-2.5 border-t border-slate-800/60 bg-slate-900/60 flex items-center justify-between">
+						<div class="px-4 py-2.5 border-t border-navy-700 bg-navy-900 flex items-center justify-between">
 							<span class="text-xs text-slate-500">
 								{count}{maxKeepers > 0 ? `/${maxKeepers}` : ''} keeper{count !== 1 ? 's' : ''} · <span class="text-amber-400">${total}</span>
 							</span>
@@ -470,7 +482,7 @@
 		onclick={(e) => { if (e.target === e.currentTarget) showImport = false; }}
 		onkeydown={(e) => { if (e.key === 'Escape') showImport = false; }}
 	>
-		<div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl p-6">
+		<div class="bg-navy-850 border border-navy-700 rounded-xl w-full max-w-lg shadow-2xl p-6">
 			<h2 class="text-lg font-bold text-white mb-1">Import pre-Sleeper keepers</h2>
 			<p class="text-sm text-slate-400 mb-4">
 				Paste a JSON array. Each entry needs a Sleeper <code class="text-amber-400">playerId</code>
@@ -485,8 +497,8 @@
 				bind:value={importJson}
 				rows="8"
 				placeholder="Paste JSON here…"
-				class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200
-				       placeholder:text-slate-600 font-mono resize-none focus:outline-none focus:border-amber-400 transition-colors"
+				class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-slate-200
+				       placeholder:text-navy-500 font-mono resize-none focus:outline-none focus:border-amber-400 transition-colors"
 			></textarea>
 			{#if importMsg}
 				<p class="text-sm mt-2 {importMsg.startsWith('Error') ? 'text-red-400' : 'text-green-400'}">{importMsg}</p>

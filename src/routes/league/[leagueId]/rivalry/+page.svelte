@@ -157,10 +157,10 @@
 </script>
 
 <div>
-	<h1 class="text-2xl font-bold mb-6">Rivalry</h1>
+	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Rivalry</h1>
 
 	{#if loadingManagers}
-		<div class="h-20 bg-slate-800 rounded-xl animate-pulse"></div>
+		<div class="h-20 bg-navy-850 rounded-lg animate-pulse"></div>
 	{:else}
 		<!-- Manager selectors -->
 		<div class="grid sm:grid-cols-2 gap-4 mb-6">
@@ -168,12 +168,12 @@
 				{ label: 'Manager 1', bind: 'one', val: userOneId, other: userTwoId, set: (v: string) => { userOneId = v; rivalry = null; } },
 				{ label: 'Manager 2', bind: 'two', val: userTwoId, other: userOneId, set: (v: string) => { userTwoId = v; rivalry = null; } },
 			] as sel}
-				<div class="bg-slate-900 rounded-xl border border-slate-800 p-4">
-					<p class="text-xs text-slate-500 uppercase tracking-wider mb-2">{sel.label}</p>
+				<div class="bg-navy-850 rounded-lg border border-navy-700 p-4">
+					<p class="text-[10px] text-navy-500 uppercase tracking-widest mb-2">{sel.label}</p>
 					<select
 						value={sel.val}
 						onchange={(e) => sel.set((e.target as HTMLSelectElement).value)}
-						class="w-full bg-slate-800 text-slate-200 rounded-lg px-3 py-2 text-sm border border-slate-700 focus:outline-none focus:border-blue-500"
+						class="w-full bg-navy-800 text-slate-200 rounded-lg px-3 py-2 text-sm border border-navy-700 focus:outline-none focus:border-amber-500"
 					>
 						<option value="">Select manager…</option>
 						{#each managers as m}
@@ -197,8 +197,8 @@
 		<button
 			onclick={analyzeRivalry}
 			disabled={!userOneId || !userTwoId || userOneId === userTwoId || analysing}
-			class="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed
-			       text-white text-sm font-medium rounded-lg transition-colors mb-8"
+			class="px-5 py-2 bg-amber-500 hover:bg-amber-400 disabled:bg-navy-800 disabled:text-navy-500 disabled:cursor-not-allowed
+			       text-slate-900 font-sport font-bold uppercase tracking-wider text-sm rounded-lg transition-colors mb-8"
 		>
 			{analysing ? analyseStatus : 'Analyze Rivalry'}
 		</button>
@@ -209,28 +209,28 @@
 
 		{#if rivalry && managerOne && managerTwo}
 			{#if totalMatchups === 0}
-				<p class="text-slate-400">These managers have never faced each other.</p>
+				<p class="text-navy-500">These managers have never faced each other.</p>
 			{:else}
 				<!-- Scoreboard -->
-				<div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden mb-6">
+				<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden mb-6">
 					<!-- Header: names -->
-					<div class="grid grid-cols-3 border-b border-slate-800">
-						<div class="flex flex-col items-center gap-1 p-4 border-r border-slate-800">
+					<div class="grid grid-cols-3 border-b border-navy-700">
+						<div class="flex flex-col items-center gap-1 p-4 border-r border-navy-700">
 							{#if managerOne.avatar}
 								<img src={managerOne.avatar} alt="" class="w-10 h-10 rounded-full" />
 							{:else}
-								<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">🏈</div>
+								<div class="w-10 h-10 rounded-full bg-navy-800 flex items-center justify-center">🏈</div>
 							{/if}
 							<p class="text-sm font-semibold text-white text-center truncate max-w-[100px]">{managerOne.teamName}</p>
 						</div>
 						<div class="flex items-center justify-center">
-							<span class="text-slate-500 text-sm font-medium">vs</span>
+							<span class="text-navy-500 text-sm font-medium">vs</span>
 						</div>
-						<div class="flex flex-col items-center gap-1 p-4 border-l border-slate-800">
+						<div class="flex flex-col items-center gap-1 p-4 border-l border-navy-700">
 							{#if managerTwo.avatar}
 								<img src={managerTwo.avatar} alt="" class="w-10 h-10 rounded-full" />
 							{:else}
-								<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">🏈</div>
+								<div class="w-10 h-10 rounded-full bg-navy-800 flex items-center justify-center">🏈</div>
 							{/if}
 							<p class="text-sm font-semibold text-white text-center truncate max-w-[100px]">{managerTwo.teamName}</p>
 						</div>
@@ -243,33 +243,33 @@
 					] as stat}
 						{@const oneNum = parseFloat(String(stat.one))}
 						{@const twoNum = parseFloat(String(stat.two))}
-						<div class="grid grid-cols-3 border-b border-slate-800/50 items-center">
+						<div class="grid grid-cols-3 border-b border-navy-700/50 items-center">
 							<div class="p-3 text-center">
-								<span class="text-lg font-bold {oneNum > twoNum ? 'text-green-400' : oneNum < twoNum ? 'text-slate-500' : 'text-slate-300'}">{stat.one}</span>
+								<span class="text-lg font-bold tabular-nums {oneNum > twoNum ? 'text-green-400' : oneNum < twoNum ? 'text-navy-500' : 'text-slate-300'}">{stat.one}</span>
 							</div>
 							<div class="p-3 text-center">
-								<span class="text-xs text-slate-500">{stat.label}</span>
+								<span class="text-[10px] text-navy-500 uppercase tracking-widest">{stat.label}</span>
 							</div>
 							<div class="p-3 text-center">
-								<span class="text-lg font-bold {twoNum > oneNum ? 'text-green-400' : twoNum < oneNum ? 'text-slate-500' : 'text-slate-300'}">{stat.two}</span>
+								<span class="text-lg font-bold tabular-nums {twoNum > oneNum ? 'text-green-400' : twoNum < oneNum ? 'text-navy-500' : 'text-slate-300'}">{stat.two}</span>
 							</div>
 						</div>
 					{/each}
 
 					{#if rivalry.ties > 0}
-						<div class="p-3 text-center text-xs text-slate-600">
+						<div class="p-3 text-center text-xs text-navy-500">
 							{rivalry.ties} tie{rivalry.ties !== 1 ? 's' : ''}
 						</div>
 					{/if}
 				</div>
 
 				<!-- Matchup history -->
-				<h2 class="text-base font-semibold mb-3 text-slate-300">Matchup History ({totalMatchups})</h2>
+				<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2"><span class="text-amber-400">◆</span>Matchup History ({totalMatchups})</h2>
 				<div class="space-y-2">
 					{#each rivalry.matchups as m}
 						{@const oneWon = m.teamOne.points > m.teamTwo.points}
 						{@const twoWon = m.teamTwo.points > m.teamOne.points}
-						<div class="bg-slate-900 rounded-xl border border-slate-800 px-4 py-3 grid grid-cols-3 items-center text-sm">
+						<div class="bg-navy-850 rounded-lg border border-navy-700 px-4 py-3 grid grid-cols-3 items-center text-sm">
 							<div class="flex items-center gap-2">
 								<span class="text-base font-bold {oneWon ? 'text-white' : 'text-slate-500'}">{m.teamOne.points.toFixed(2)}</span>
 								{#if oneWon}<span class="text-xs text-green-500">W</span>{:else if !twoWon}<span class="text-xs text-yellow-600">T</span>{/if}

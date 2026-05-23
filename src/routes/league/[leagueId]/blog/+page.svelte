@@ -63,58 +63,56 @@
 </script>
 
 <div>
-	<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-		<div>
-			<h1 class="text-2xl font-extrabold text-white">Blog</h1>
-		</div>
-
-		{#if categories.length > 0}
-			<div class="flex gap-1 flex-wrap">
-				<button
-					onclick={() => (filterType = '')}
-					class="px-3 py-1 rounded-full text-xs font-medium transition-colors
-					       {filterType === '' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}"
-				>All</button>
-				{#each categories as cat}
-					<button
-						onclick={() => (filterType = cat)}
-						class="px-3 py-1 rounded-full text-xs font-medium transition-colors
-						       {filterType === cat ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}"
-					>{cat}</button>
-				{/each}
-			</div>
-		{/if}
+	<div class="mb-6">
+		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Blog</h1>
 	</div>
+
+	{#if categories.length > 0}
+		<div class="flex mb-6 border-b border-navy-700 flex-wrap">
+			<button
+				onclick={() => (filterType = '')}
+				class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+				       {filterType === '' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
+			>All</button>
+			{#each categories as cat}
+				<button
+					onclick={() => (filterType = cat)}
+					class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+					       {filterType === cat ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
+				>{cat}</button>
+			{/each}
+		</div>
+	{/if}
 
 	{#if loading}
 		<div class="space-y-4">
 			{#each Array(4) as _}
-				<div class="h-28 bg-slate-800 rounded-xl animate-pulse"></div>
+				<div class="h-28 bg-navy-850 rounded-lg animate-pulse"></div>
 			{/each}
 		</div>
 	{:else if error}
-		<div class="bg-slate-900 rounded-xl border border-slate-800 p-6 text-center">
-			<p class="text-slate-400 mb-2">Could not load blog posts.</p>
-			<p class="text-slate-600 text-sm">{error}</p>
+		<div class="bg-navy-850 rounded-lg border border-navy-700 p-6 text-center">
+			<p class="text-navy-500 mb-2">Could not load blog posts.</p>
+			<p class="text-navy-500 text-sm">{error}</p>
 		</div>
 	{:else if filtered.length === 0}
-		<p class="text-slate-400">No posts found.</p>
+		<p class="text-navy-500">No posts found.</p>
 	{:else}
 		<div class="space-y-3">
 			{#each filtered as post}
 				<a
 					href="/league/{data.leagueId}/blog/{post.slug}"
-					class="block bg-slate-900 rounded-xl border border-slate-800/60 hover:border-slate-700
-					       hover:bg-slate-800/60 transition-all p-5 group"
+					class="block bg-navy-850 rounded-lg border border-navy-700 hover:border-navy-600
+					       hover:bg-navy-800 transition-all p-5 group"
 				>
 					<div class="flex items-center gap-2 mb-2">
-						<span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-semibold ring-1 ring-blue-500/25">{post.type}</span>
-						<span class="text-xs text-slate-500">{formatDate(post.createdAt)}</span>
-						<span class="text-xs text-slate-600 ml-auto">{post.author}</span>
+						<span class="text-xs px-2 py-0.5 rounded font-semibold bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/25">{post.type}</span>
+						<span class="text-xs text-navy-500">{formatDate(post.createdAt)}</span>
+						<span class="text-xs text-navy-500 ml-auto">{post.author}</span>
 					</div>
-					<h2 class="text-base font-semibold text-white mb-1 group-hover:text-blue-300 transition-colors">{post.title}</h2>
+					<h2 class="text-base font-semibold text-white mb-1 group-hover:text-amber-300 transition-colors">{post.title}</h2>
 					{#if post.excerpt}
-						<p class="text-sm text-slate-500 line-clamp-2 leading-relaxed">{post.excerpt}</p>
+						<p class="text-sm text-navy-500 line-clamp-2 leading-relaxed">{post.excerpt}</p>
 					{/if}
 				</a>
 			{/each}

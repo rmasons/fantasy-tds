@@ -83,18 +83,18 @@
 </script>
 
 <div>
-	<h1 class="text-2xl font-bold mb-6">Managers</h1>
+	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Managers</h1>
 
 	{#if loading}
 		<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
 			{#each Array(6) as _}
-				<div class="h-28 bg-slate-800 rounded-xl animate-pulse"></div>
+				<div class="h-28 bg-navy-850 rounded-lg animate-pulse"></div>
 			{/each}
 		</div>
 	{:else if error}
 		<p class="text-red-400">Failed to load managers: {error}</p>
 	{:else if managers.length === 0}
-		<p class="text-slate-400">No managers found.</p>
+		<p class="text-navy-500">No managers found.</p>
 	{:else}
 		<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
 			{#each managers as mgr}
@@ -102,32 +102,32 @@
 				{@const realName = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ')}
 				<a
 					href="/league/{data.leagueId}/managers/{mgr.userId}"
-					class="bg-slate-900 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors p-4 flex gap-4 items-start"
+					class="bg-navy-850 rounded-lg border border-navy-700 hover:border-navy-600 hover:bg-navy-800 transition-colors p-4 flex gap-4 items-start"
 				>
 					{#if mgr.avatar}
 						<img src={mgr.avatar} alt="" class="w-12 h-12 rounded-full object-cover shrink-0 mt-0.5" />
 					{:else}
-						<div class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-xl shrink-0 mt-0.5">🏈</div>
+						<div class="w-12 h-12 rounded-full bg-navy-800 flex items-center justify-center text-xl shrink-0 mt-0.5">🏈</div>
 					{/if}
 					<div class="min-w-0 flex-1">
 						<p class="font-semibold text-white truncate">{mgr.teamName}</p>
-						<p class="text-xs text-slate-400 truncate">{realName || mgr.displayName}</p>
+						<p class="text-xs text-navy-500 truncate">{realName || mgr.displayName}</p>
 						<div class="flex items-center gap-3 mt-1">
-							<span class="text-xs text-slate-400">
+							<span class="text-xs text-slate-400 tabular-nums">
 								{mgr.wins}–{mgr.losses}{mgr.ties ? `–${mgr.ties}` : ''}
 							</span>
-							<span class="text-xs text-slate-600">{mgr.fpts.toFixed(2)} pts</span>
+							<span class="text-xs text-navy-500 tabular-nums">{mgr.fpts.toFixed(2)} pts</span>
 						</div>
 						{#if profile?.bio}
-							<p class="text-xs text-slate-500 mt-1.5 line-clamp-2 leading-relaxed">{profile.bio}</p>
+							<p class="text-xs text-navy-500 mt-1.5 line-clamp-2 leading-relaxed">{profile.bio}</p>
 						{/if}
 						{#if profile?.location || profile?.favoriteNFLTeam}
 							<div class="flex flex-wrap gap-1.5 mt-1.5">
 								{#if profile.location}
-									<span class="text-[11px] text-slate-600 bg-slate-800 rounded-full px-2 py-0.5">{profile.location}</span>
+									<span class="text-[11px] text-navy-500 bg-navy-800 rounded px-2 py-0.5">{profile.location}</span>
 								{/if}
 								{#if profile.favoriteNFLTeam}
-									<span class="text-[11px] text-slate-600 bg-slate-800 rounded-full px-2 py-0.5">{profile.favoriteNFLTeam}</span>
+									<span class="text-[11px] text-navy-500 bg-navy-800 rounded px-2 py-0.5">{profile.favoriteNFLTeam}</span>
 								{/if}
 							</div>
 						{/if}

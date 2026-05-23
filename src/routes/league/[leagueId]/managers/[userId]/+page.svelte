@@ -181,7 +181,7 @@
 						favoritePlayer: ceFavoritePlayer,
 						funFact: ceFunFact,
 						twitterHandle: ceTwitterHandle,
-						joinedYear: ceJoinedYear ? parseInt(ceJoinedYear) : null,
+						joinedYear: ceJoinedYear ? parseInt(ceJoinedYear, 10) : null,
 					}),
 				}
 			);
@@ -195,6 +195,7 @@
 			leagueProfile = refreshed?.league ?? null;
 			commishSuccess = true;
 			commishEditing = false;
+			setTimeout(() => { commishSuccess = false; }, 3000);
 		} catch (e: any) {
 			commishError = e.message;
 		} finally {
@@ -211,15 +212,15 @@
 
 	{#if loading && !manager}
 		<div class="space-y-3 mt-4">
-			<div class="h-24 bg-slate-800 rounded-xl animate-pulse"></div>
-			<div class="h-48 bg-slate-800 rounded-xl animate-pulse"></div>
-			<p class="text-slate-500 text-sm">{loadingStatus}</p>
+			<div class="h-24 bg-navy-850 rounded-lg animate-pulse"></div>
+			<div class="h-48 bg-navy-850 rounded-lg animate-pulse"></div>
+			<p class="text-navy-500 text-sm">{loadingStatus}</p>
 		</div>
 	{:else if error}
 		<p class="text-red-400 mt-4">Failed to load manager: {error}</p>
 	{:else if manager}
 		<!-- Manager header -->
-		<div class="flex items-start gap-4 mt-4 mb-5 p-5 bg-slate-900 rounded-xl border border-slate-800">
+		<div class="flex items-start gap-4 mt-4 mb-5 p-5 bg-navy-850 rounded-lg border border-navy-700">
 			{#if manager.avatar}
 				<img src={manager.avatar} alt="" class="w-20 h-20 rounded-full object-cover border-2 border-slate-700 shrink-0" />
 			{:else}
@@ -265,9 +266,9 @@
 
 		<!-- Commissioner edit form -->
 		{#if commishEditing}
-			<div class="mb-5 p-5 bg-slate-900 rounded-xl border border-amber-500/30 space-y-4">
+			<div class="mb-5 p-5 bg-navy-850 rounded-lg border border-amber-500/30 space-y-4">
 				<div class="flex items-center justify-between">
-					<h2 class="text-sm font-semibold text-amber-400 uppercase tracking-wider">Commissioner Edit</h2>
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-amber-400 flex items-center gap-2"><span>◆</span>Commissioner Edit</h2>
 					<button onclick={() => commishEditing = false} class="text-slate-500 hover:text-white text-xs">Cancel</button>
 				</div>
 
@@ -277,52 +278,52 @@
 
 				<div class="grid sm:grid-cols-2 gap-3">
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">First Name</label>
-						<input type="text" maxlength="50" bind:value={ceFirstName} placeholder="First" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+						<label class="block text-xs text-navy-500 mb-1">First Name</label>
+						<input type="text" maxlength="50" bind:value={ceFirstName} placeholder="First" class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500" />
 					</div>
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">Last Name</label>
-						<input type="text" maxlength="50" bind:value={ceLastName} placeholder="Last" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+						<label class="block text-xs text-navy-500 mb-1">Last Name</label>
+						<input type="text" maxlength="50" bind:value={ceLastName} placeholder="Last" class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500" />
 					</div>
 				</div>
 
 				<div>
-					<label class="block text-xs text-slate-400 mb-1">Bio</label>
-					<textarea rows="2" maxlength="280" bind:value={ceBio} placeholder="Bio…" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 resize-none"></textarea>
+					<label class="block text-xs text-navy-500 mb-1">Bio</label>
+					<textarea rows="2" maxlength="280" bind:value={ceBio} placeholder="Bio…" class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500 resize-none"></textarea>
 				</div>
 
 				<div class="grid sm:grid-cols-2 gap-3">
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">Location</label>
-						<input type="text" maxlength="60" bind:value={ceLocation} placeholder="City, State" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+						<label class="block text-xs text-navy-500 mb-1">Location</label>
+						<input type="text" maxlength="60" bind:value={ceLocation} placeholder="City, State" class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500" />
 					</div>
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">In League Since</label>
-						<input type="number" min="1990" max="2100" bind:value={ceJoinedYear} placeholder="e.g. 2018" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+						<label class="block text-xs text-navy-500 mb-1">In League Since</label>
+						<input type="number" min="1990" max="2100" bind:value={ceJoinedYear} placeholder="e.g. 2018" class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500" />
 					</div>
 				</div>
 
 				<div class="grid sm:grid-cols-2 gap-3">
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">Favorite NFL Team</label>
-						<input type="text" maxlength="60" bind:value={ceFavoriteNFLTeam} placeholder="e.g. Kansas City Chiefs" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+						<label class="block text-xs text-navy-500 mb-1">Favorite NFL Team</label>
+						<input type="text" maxlength="60" bind:value={ceFavoriteNFLTeam} placeholder="e.g. Kansas City Chiefs" class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500" />
 					</div>
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">Favorite Player</label>
-						<input type="text" maxlength="60" bind:value={ceFavoritePlayer} placeholder="e.g. Justin Jefferson" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+						<label class="block text-xs text-navy-500 mb-1">Favorite Player</label>
+						<input type="text" maxlength="60" bind:value={ceFavoritePlayer} placeholder="e.g. Justin Jefferson" class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500" />
 					</div>
 				</div>
 
 				<div>
-					<label class="block text-xs text-slate-400 mb-1">Fun Fact / Trash Talk</label>
-					<input type="text" maxlength="200" bind:value={ceFunFact} placeholder="One thing your league needs to know…" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+					<label class="block text-xs text-navy-500 mb-1">Fun Fact / Trash Talk</label>
+					<input type="text" maxlength="200" bind:value={ceFunFact} placeholder="One thing your league needs to know…" class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500" />
 				</div>
 
 				<div>
-					<label class="block text-xs text-slate-400 mb-1">X / Twitter Handle</label>
+					<label class="block text-xs text-navy-500 mb-1">X / Twitter Handle</label>
 					<div class="flex items-center">
-						<span class="bg-slate-700 border border-r-0 border-slate-700 rounded-l-lg px-3 py-2 text-slate-400 text-sm select-none">@</span>
-						<input type="text" maxlength="50" bind:value={ceTwitterHandle} placeholder="yourhandle" class="flex-1 bg-slate-800 border border-slate-700 rounded-r-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500" />
+						<span class="bg-navy-900 border border-r-0 border-navy-700 rounded-l-lg px-3 py-2 text-navy-500 text-sm select-none">@</span>
+						<input type="text" maxlength="50" bind:value={ceTwitterHandle} placeholder="yourhandle" class="flex-1 bg-navy-800 border border-navy-700 rounded-r-lg px-3 py-2 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500" />
 					</div>
 				</div>
 
@@ -346,8 +347,8 @@
 
 		<!-- Profile "About" card -->
 		{#if hasAnyProfile}
-			<div class="mb-5 p-5 bg-slate-900 rounded-xl border border-slate-800 space-y-3">
-				<h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">About</h2>
+			<div class="mb-5 p-5 bg-navy-850 rounded-lg border border-navy-700 space-y-3">
+				<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 flex items-center gap-2"><span class="text-amber-400">◆</span>About</h2>
 
 				{#if profile?.bio}
 					<p class="text-slate-300 text-sm leading-relaxed">{profile.bio}</p>
@@ -384,7 +385,7 @@
 					{/if}
 					{#if profile?.twitterHandle}
 						<div>
-							<p class="text-xs text-slate-600 uppercase tracking-wider mb-0.5">X / Twitter</p>
+							<p class="text-xs text-navy-500 uppercase tracking-wider mb-0.5">X / Twitter</p>
 							<a
 								href="https://x.com/{profile.twitterHandle}"
 								target="_blank"
@@ -404,11 +405,11 @@
 			</div>
 		{:else if isOwnProfile && !loading}
 			<!-- Nudge empty-state for own profile -->
-			<div class="mb-5 p-4 bg-slate-900 rounded-xl border border-dashed border-slate-700 flex items-center justify-between gap-4">
-				<p class="text-slate-500 text-sm">Your profile is empty. Add a bio and some info to stand out.</p>
+			<div class="mb-5 p-4 bg-navy-850 rounded-lg border border-dashed border-navy-700 flex items-center justify-between gap-4">
+				<p class="text-navy-500 text-sm">Your profile is empty. Add a bio and some info to stand out.</p>
 				<a
 					href={editHref}
-					class="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+					class="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold transition-colors"
 				>
 					Set up profile
 				</a>
@@ -417,11 +418,11 @@
 
 		<!-- Season history -->
 		{#if seasons.length > 0}
-			<h2 class="text-lg font-semibold mb-3 text-slate-300">Season History</h2>
-			<div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+			<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2"><span class="text-amber-400">◆</span>Season History</h2>
+			<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden">
 				<table class="w-full text-sm">
 					<thead>
-						<tr class="border-b border-slate-800 text-slate-500 text-xs uppercase">
+						<tr class="border-b border-navy-700 text-navy-500 text-[10px] uppercase tracking-wider">
 							<th class="px-4 py-3 text-left">Season</th>
 							<th class="px-4 py-3 text-left">Team Name</th>
 							<th class="px-4 py-3 text-right">W–L{careerTies ? '–T' : ''}</th>
@@ -431,25 +432,25 @@
 					</thead>
 					<tbody>
 						{#each seasons as s}
-							<tr class="border-b border-slate-800/50 hover:bg-slate-800/30">
-								<td class="px-4 py-3 font-mono text-slate-400">{s.season}</td>
+							<tr class="border-b border-navy-700/50 hover:bg-navy-800">
+								<td class="px-4 py-3 font-mono text-navy-500 tabular-nums">{s.season}</td>
 								<td class="px-4 py-3 text-slate-200 truncate max-w-[140px]">{s.teamName}</td>
-								<td class="px-4 py-3 text-right text-slate-300">
+								<td class="px-4 py-3 text-right text-slate-300 tabular-nums">
 									{s.wins}–{s.losses}{s.ties ? `–${s.ties}` : ''}
 								</td>
-								<td class="px-4 py-3 text-right text-slate-400">{s.fpts.toFixed(2)}</td>
-								<td class="px-4 py-3 text-right text-slate-600 hidden sm:table-cell">{s.fptsAgainst.toFixed(2)}</td>
+								<td class="px-4 py-3 text-right text-slate-400 tabular-nums">{s.fpts.toFixed(2)}</td>
+								<td class="px-4 py-3 text-right text-navy-500 hidden sm:table-cell tabular-nums">{s.fptsAgainst.toFixed(2)}</td>
 							</tr>
 						{/each}
 					</tbody>
 					{#if seasons.length > 1}
 						<tfoot>
-							<tr class="border-t border-slate-700 bg-slate-800/30">
-								<td class="px-4 py-3 text-slate-500 text-xs uppercase font-medium" colspan="2">Career</td>
-								<td class="px-4 py-3 text-right font-semibold text-slate-300">
+							<tr class="border-t border-navy-700 bg-navy-900">
+								<td class="px-4 py-3 text-navy-500 text-xs uppercase font-medium tracking-wider" colspan="2">Career</td>
+								<td class="px-4 py-3 text-right font-semibold text-slate-300 tabular-nums">
 									{careerWins}–{careerLosses}{careerTies ? `–${careerTies}` : ''}
 								</td>
-								<td class="px-4 py-3 text-right font-semibold text-slate-400">{careerFpts.toFixed(2)}</td>
+								<td class="px-4 py-3 text-right font-semibold text-slate-400 tabular-nums">{careerFpts.toFixed(2)}</td>
 								<td class="px-4 py-3 hidden sm:table-cell"></td>
 							</tr>
 						</tfoot>
@@ -457,10 +458,10 @@
 				</table>
 			</div>
 			{#if loading}
-				<p class="text-slate-600 text-xs mt-2">{loadingStatus}</p>
+				<p class="text-navy-500 text-xs mt-2">{loadingStatus}</p>
 			{/if}
 		{:else if !loading}
-			<p class="text-slate-400">No season data found for this manager.</p>
+			<p class="text-navy-500">No season data found for this manager.</p>
 		{/if}
 	{/if}
 </div>

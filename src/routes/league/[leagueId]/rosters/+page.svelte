@@ -118,12 +118,12 @@
 </script>
 
 <div>
-	<h1 class="text-2xl font-bold mb-6">Rosters</h1>
+	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Rosters</h1>
 
 	{#if loading}
 		<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
 			{#each Array(12) as _}
-				<div class="h-24 bg-slate-800 rounded-xl animate-pulse"></div>
+				<div class="h-24 bg-navy-850 rounded-lg animate-pulse"></div>
 			{/each}
 		</div>
 	{:else if error}
@@ -131,41 +131,42 @@
 	{:else}
 		<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
 			{#each teams as team, i (team.rosterId)}
-				<div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+				<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden">
 					<!-- Team header -->
 					<button
 						onclick={() => toggle(i)}
-						class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800/60 transition-colors text-left"
+						class="w-full flex items-center gap-3 px-4 py-3 hover:bg-navy-800 transition-colors text-left"
 					>
 						{#if team.avatar}
 							<img src={team.avatar} alt="" class="w-10 h-10 rounded-full object-cover shrink-0" />
 						{:else}
-							<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center shrink-0">🏈</div>
+							<div class="w-10 h-10 rounded-full bg-navy-800 flex items-center justify-center shrink-0">🏈</div>
 						{/if}
 						<div class="flex-1 min-w-0">
 							<p class="font-medium text-white text-sm truncate">{team.teamName}</p>
 							{#if team.ownerName && team.ownerName !== team.teamName}
-								<p class="text-xs text-slate-500">{team.ownerName}</p>
+								<p class="text-xs text-navy-500">{team.ownerName}</p>
 							{/if}
 						</div>
-						<div class="text-slate-500 text-sm">{team.starters.length + team.bench.length}</div>
-						<span class="text-slate-500 text-xs ml-1">{isExpanded(i) ? '▲' : '▼'}</span>
+						<div class="text-navy-500 text-sm">{team.starters.length + team.bench.length}</div>
+						<span class="text-navy-500 text-xs ml-1">{isExpanded(i) ? '▲' : '▼'}</span>
 					</button>
 
 					{#if isExpanded(i)}
-						<div class="border-t border-slate-800 px-4 py-3 space-y-4">
+						<div class="border-t border-navy-700 px-4 py-3 space-y-4">
 							<!-- Starters -->
 							{#if team.starters.length}
 								<div>
-									<p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Starters</p>
+									<p class="font-sport font-bold text-[10px] uppercase tracking-widest text-slate-300 mb-2 flex items-center gap-1.5"><span class="text-amber-400">◆</span>Starters</p>
 									<div class="space-y-1">
 										{#each team.starters as p}
+											{@const logo = teamLogoUrl(p.team)}
 											<div class="flex items-center gap-2 text-sm">
 												<span class="text-xs w-16 text-center py-0.5 rounded font-bold shrink-0 {pc(p.pos)}">{p.pos}</span>
 												<span class="text-slate-200 truncate flex-1">{p.name}</span>
 												<span class="flex items-center gap-1 shrink-0">
-													{#if teamLogoUrl(p.team)}
-														<img src={teamLogoUrl(p.team)} alt={p.team} class="w-4 h-4 object-contain" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
+													{#if logo}
+														<img src={logo} alt={p.team} class="w-4 h-4 object-contain" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
 													{/if}
 													<span class="text-xs text-slate-500">{p.team}</span>
 												</span>
@@ -178,15 +179,16 @@
 							<!-- Bench -->
 							{#if team.bench.length}
 								<div>
-									<p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Bench</p>
+									<p class="font-sport font-bold text-[10px] uppercase tracking-widest text-slate-300 mb-2 flex items-center gap-1.5"><span class="text-amber-400">◆</span>Bench</p>
 									<div class="space-y-1">
 										{#each team.bench as p}
+											{@const logo = teamLogoUrl(p.team)}
 											<div class="flex items-center gap-2 text-sm">
 												<span class="text-xs w-16 text-center py-0.5 rounded font-bold shrink-0 {pc(p.pos)}">{p.pos}</span>
 												<span class="text-slate-400 truncate flex-1">{p.name}</span>
 												<span class="flex items-center gap-1 shrink-0">
-													{#if teamLogoUrl(p.team)}
-														<img src={teamLogoUrl(p.team)} alt={p.team} class="w-4 h-4 object-contain" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
+													{#if logo}
+														<img src={logo} alt={p.team} class="w-4 h-4 object-contain" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
 													{/if}
 													<span class="text-xs text-slate-600">{p.team}</span>
 												</span>
@@ -199,15 +201,16 @@
 							<!-- IR -->
 							{#if team.ir.length}
 								<div>
-									<p class="text-xs font-semibold text-red-500/70 uppercase tracking-wider mb-2">IR</p>
+									<p class="font-sport font-bold text-[10px] uppercase tracking-widest text-red-400/80 mb-2 flex items-center gap-1.5"><span class="text-red-500">◆</span>IR</p>
 									<div class="space-y-1">
 										{#each team.ir as p}
+											{@const logo = teamLogoUrl(p.team)}
 											<div class="flex items-center gap-2 text-sm">
 												<span class="text-xs w-16 text-center py-0.5 rounded font-bold shrink-0 bg-red-900/50 text-red-400">{p.pos}</span>
 												<span class="text-slate-400 truncate flex-1">{p.name}</span>
 												<span class="flex items-center gap-1 shrink-0">
-													{#if teamLogoUrl(p.team)}
-														<img src={teamLogoUrl(p.team)} alt={p.team} class="w-4 h-4 object-contain" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
+													{#if logo}
+														<img src={logo} alt={p.team} class="w-4 h-4 object-contain" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
 													{/if}
 													<span class="text-xs text-slate-600">{p.team}</span>
 												</span>

@@ -194,23 +194,23 @@
 
 	{#if loading}
 		<div class="space-y-3 mt-4">
-			<div class="h-8 bg-slate-800 rounded animate-pulse w-2/3"></div>
-			<div class="h-4 bg-slate-800 rounded animate-pulse w-1/3"></div>
+			<div class="h-8 bg-navy-850 rounded animate-pulse w-2/3"></div>
+			<div class="h-4 bg-navy-850 rounded animate-pulse w-1/3"></div>
 			{#each Array(5) as _}
-				<div class="h-4 bg-slate-800 rounded animate-pulse"></div>
+				<div class="h-4 bg-navy-850 rounded animate-pulse"></div>
 			{/each}
 		</div>
 	{:else if error}
-		<div class="mt-4 bg-slate-900 rounded-xl border border-slate-800 p-6 text-center">
-			<p class="text-slate-400 mb-2">Could not load post.</p>
-			<p class="text-slate-600 text-sm">{error}</p>
+		<div class="mt-4 bg-navy-850 rounded-lg border border-navy-700 p-6 text-center">
+			<p class="text-navy-500 mb-2">Could not load post.</p>
+			<p class="text-navy-500 text-sm">{error}</p>
 		</div>
 	{:else if post}
 		<article class="mt-4 max-w-2xl">
 			<div class="flex items-center gap-2 mb-3">
-				<span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-semibold ring-1 ring-blue-500/25">{post.type}</span>
-				<span class="text-xs text-slate-500">{formatDate(post.createdAt)}</span>
-				<span class="text-xs text-slate-600 ml-auto">{post.author}</span>
+				<span class="text-xs px-2 py-0.5 rounded font-semibold bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/25">{post.type}</span>
+				<span class="text-xs text-navy-500">{formatDate(post.createdAt)}</span>
+				<span class="text-xs text-navy-500 ml-auto">{post.author}</span>
 			</div>
 			<h1 class="text-3xl font-extrabold text-white mb-6">{post.title}</h1>
 			<div class="text-slate-300 prose-headings:text-white">
@@ -230,28 +230,28 @@
 			{#if commentsLoading && comments.length === 0}
 				<div class="space-y-3">
 					{#each Array(2) as _}
-						<div class="h-16 bg-slate-800 rounded-xl animate-pulse"></div>
+						<div class="h-16 bg-navy-850 rounded-lg animate-pulse"></div>
 					{/each}
 				</div>
 			{:else if comments.length > 0}
 				<div class="space-y-3 mb-6">
 					{#each comments as c}
-						<div class="bg-slate-900 rounded-xl border border-slate-800/60 px-4 py-3">
+						<div class="bg-navy-850 rounded-lg border border-navy-700 px-4 py-3">
 							<div class="flex items-center gap-2 mb-1.5">
 								<span class="text-sm font-semibold text-white">{c.author}</span>
-								<span class="text-xs text-slate-600">{timeAgo(c.createdAt)}</span>
+								<span class="text-xs text-navy-500">{timeAgo(c.createdAt)}</span>
 							</div>
 							<p class="text-sm text-slate-300 whitespace-pre-wrap">{c.comment}</p>
 						</div>
 					{/each}
 				</div>
 			{:else if !commentsLoading}
-				<p class="text-sm text-slate-600 mb-6">No comments yet. Be the first!</p>
+				<p class="text-sm text-navy-500 mb-6">No comments yet. Be the first!</p>
 			{/if}
 
 			{#if data.user}
-				<form onsubmit={submitComment} class="bg-slate-900 rounded-xl border border-slate-800/60 p-4">
-					<p class="text-xs text-slate-500 mb-3">
+				<form onsubmit={submitComment} class="bg-navy-850 rounded-lg border border-navy-700 p-4">
+					<p class="text-xs text-navy-500 mb-3">
 						Commenting as <span class="text-slate-300 font-medium">{data.user.sleeperUsername ?? data.user.email}</span>
 					</p>
 					<textarea
@@ -259,8 +259,8 @@
 						placeholder="Write a comment…"
 						rows="3"
 						maxlength="1000"
-						class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200
-						       placeholder:text-slate-600 resize-none focus:outline-none focus:border-blue-500 transition-colors"
+						class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-slate-200
+						       placeholder:text-navy-500 resize-none focus:outline-none focus:border-amber-500 transition-colors"
 					></textarea>
 					{#if submitError}
 						<p class="text-xs text-red-400 mt-1">{submitError}</p>
@@ -272,16 +272,16 @@
 						<button
 							type="submit"
 							disabled={submitting || !commentText.trim()}
-							class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed
-							       text-white text-sm font-semibold rounded-lg transition-colors"
+							class="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed
+							       text-slate-900 font-bold text-sm rounded-lg transition-colors"
 						>
 							{submitting ? 'Posting…' : 'Post comment'}
 						</button>
 					</div>
 				</form>
 			{:else}
-				<p class="text-sm text-slate-500 bg-slate-900 rounded-xl border border-slate-800/60 px-4 py-3">
-					<a href="/login" class="text-blue-400 hover:underline">Sign in</a> to leave a comment.
+				<p class="text-sm text-navy-500 bg-navy-850 rounded-lg border border-navy-700 px-4 py-3">
+					<a href="/login" class="text-amber-400 hover:underline">Sign in</a> to leave a comment.
 				</p>
 			{/if}
 		</section>

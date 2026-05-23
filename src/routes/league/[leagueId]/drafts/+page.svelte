@@ -1,8 +1,9 @@
 <script lang="ts">
-	import type { LayoutData } from '../$types';
+	import type { PageData } from './$types';
 	import type { SlimPlayer } from '$lib/types';
+	import { onMount } from 'svelte';
 
-	let { data } = $props<{ data: LayoutData }>();
+	let { data } = $props<{ data: PageData }>();
 
 	interface DraftPick {
 		round: number;
@@ -14,7 +15,7 @@
 		playerName: string;
 		pos: string;
 		nflTeam: string;
-		amount?: number; // auction
+		amount?: number;
 	}
 
 	interface DraftMeta {
@@ -28,111 +29,83 @@
 		rosterNames: Map<number, string>;
 	}
 
-	let draftsMeta = $state<DraftMeta[]>([]);
+	const names = $derived(
+		new Map<number, string>(
+			Object.entries(data.rosterInfo as Record<string, string>).map(([k, v]) => [Number(k), v])
+		)
+	);
+
+	const draftsMeta = $derived<DraftMeta[]>(
+		(data.completedDrafts ?? []).map((d: any) => ({
+			id: d.draft_id,
+			season: d.season,
+			type: d.type,
+			status: d.status,
+			rounds: d.settings?.rounds ?? 0,
+			teams: Object.keys(d.slot_to_roster_id ?? {}).length,
+			slotToRoster: d.slot_to_roster_id ?? {},
+			rosterNames: names,
+		}))
+	);
+
 	let selectedIdx = $state(0);
-	let loading = $state(true);
-	let loadingPicks = $state(false);
-	let error = $state('');
+	let loadingPicks = $state(true);
 	let picksError = $state('');
 	let currentPicks = $state<DraftPick[]>([]);
 
-	// Plain variable — not reactive. Set before draftsMeta is populated so it's
-	// always ready when the picks effect runs.
 	let playersMap: Record<string, SlimPlayer> = {};
 
-	// ── Effect 1: load draft list + player lookup on league change ────────────
-	$effect(() => {
-		const leagueId = data.leagueId;
-		draftsMeta = [];
-		selectedIdx = 0;
-		currentPicks = [];
-		loading = true;
-		error = '';
-		playersMap = {};
-
-		(async () => {
-			try {
-				const [{ drafts: draftList, rosterInfo }, rawPlayers] = await Promise.all([
-					fetch(`/api/drafts?leagueId=${encodeURIComponent(leagueId)}`).then(r => {
-						if (!r.ok) throw new Error(`HTTP ${r.status}`);
-						return r.json();
-					}),
-					fetch('/api/players').then(r => r.ok ? r.json() : {}),
-				]);
-
-				if (data.leagueId !== leagueId) return;
-
-				playersMap = rawPlayers;
-
-				const names = new Map<number, string>(
-					Object.entries(rosterInfo as Record<string, string>).map(([k, v]) => [Number(k), v])
-				);
-
-				draftsMeta = draftList
-					.filter((d: any) => d.status === 'complete')
-					.sort((a: any, b: any) => parseInt(b.season, 10) - parseInt(a.season, 10))
-					.map((d: any) => ({
-						id: d.draft_id,
-						season: d.season,
-						type: d.type,
-						status: d.status,
-						rounds: d.settings?.rounds ?? 0,
-						teams: Object.keys(d.slot_to_roster_id ?? {}).length,
-						slotToRoster: d.slot_to_roster_id ?? {},
-						rosterNames: names,
-					}));
-			} catch (e: any) {
-				if (data.leagueId !== leagueId) return;
-				error = e.message;
-			} finally {
-				if (data.leagueId !== leagueId) return;
-				loading = false;
-			}
-		})();
-	});
-
-	// ── Effect 2: load picks for the selected draft ───────────────────────────
-	$effect(() => {
-		const meta = draftsMeta[selectedIdx];
-		if (!meta) { currentPicks = []; return; }
-
+	async function loadPicks(meta: DraftMeta) {
 		const draftId = meta.id;
 		const leagueId = data.leagueId;
 		loadingPicks = true;
 		picksError = '';
+		try {
+			const res = await fetch(
+				`/api/drafts?leagueId=${encodeURIComponent(leagueId)}&draftId=${encodeURIComponent(draftId)}`,
+			);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const { picks: rawPicks } = await res.json();
+			if (data.leagueId !== leagueId || draftsMeta[selectedIdx]?.id !== draftId) return;
+			currentPicks = rawPicks.map((p: any) => {
+				const player = playersMap[p.player_id];
+				return {
+					round: p.round,
+					pickNo: p.pick_no,
+					slot: p.draft_slot,
+					rosterId: p.roster_id,
+					team: meta.rosterNames.get(Number(p.roster_id)) ?? `Team ${p.roster_id}`,
+					playerId: p.player_id,
+					playerName: player?.name ?? p.metadata?.name ?? p.player_id,
+					pos: player?.pos ?? p.metadata?.position ?? '?',
+					nflTeam: player?.team ?? p.metadata?.team ?? 'FA',
+					amount: p.metadata?.amount ? parseInt(p.metadata.amount, 10) : undefined,
+				};
+			});
+		} catch (e: any) {
+			if (data.leagueId !== leagueId || draftsMeta[selectedIdx]?.id !== draftId) return;
+			picksError = e.message;
+		} finally {
+			if (data.leagueId !== leagueId || draftsMeta[selectedIdx]?.id !== draftId) return;
+			loadingPicks = false;
+		}
+	}
 
-		(async () => {
-			try {
-				const res = await fetch(
-					`/api/drafts?leagueId=${encodeURIComponent(leagueId)}&draftId=${encodeURIComponent(draftId)}`,
-				);
-				if (!res.ok) throw new Error(`HTTP ${res.status}`);
-				const { picks: rawPicks } = await res.json();
-				if (data.leagueId !== leagueId || draftsMeta[selectedIdx]?.id !== draftId) return;
+	function selectDraft(idx: number) {
+		selectedIdx = idx;
+		currentPicks = [];
+		const meta = draftsMeta[idx];
+		if (meta) loadPicks(meta);
+	}
 
-				currentPicks = rawPicks.map((p: any) => {
-					const player = playersMap[p.player_id];
-					return {
-						round: p.round,
-						pickNo: p.pick_no,
-						slot: p.draft_slot,
-						rosterId: p.roster_id,
-						team: meta.rosterNames.get(Number(p.roster_id)) ?? `Team ${p.roster_id}`,
-						playerId: p.player_id,
-						playerName: player?.name ?? p.metadata?.name ?? p.player_id,
-						pos: player?.pos ?? p.metadata?.position ?? '?',
-						nflTeam: player?.team ?? p.metadata?.team ?? 'FA',
-						amount: p.metadata?.amount ? parseInt(p.metadata.amount, 10) : undefined,
-					};
-				});
-			} catch (e: any) {
-				if (data.leagueId !== leagueId || draftsMeta[selectedIdx]?.id !== draftId) return;
-				picksError = e.message;
-			} finally {
-				if (data.leagueId !== leagueId || draftsMeta[selectedIdx]?.id !== draftId) return;
-				loadingPicks = false;
-			}
-		})();
+	onMount(async () => {
+		playersMap = await fetch('/api/players').then(r => r.ok ? r.json() : {});
+		const meta = draftsMeta[0];
+		if (meta) {
+			await loadPicks(meta);
+		} else {
+			loadingPicks = false;
+		}
 	});
 
 	const posColor: Record<string, string> = {
@@ -147,14 +120,17 @@
 
 	const draft = $derived(draftsMeta[selectedIdx]);
 
-	function picksGrid(meta: DraftMeta, picks: DraftPick[]): (DraftPick | null)[][] {
-		const grid: (DraftPick | null)[][] = Array.from({ length: meta.rounds }, () =>
-			new Array(meta.teams).fill(null)
+	// grid[round-1][slot-1]; falls back to deriving team count from picks when
+	// slot_to_roster_id was missing from the cached draft metadata.
+	function picksGrid(meta: DraftMeta, picks: DraftPick[], teams: number): (DraftPick | null)[][] {
+		const rounds = meta.rounds > 0 ? meta.rounds : Math.max(0, ...picks.map(p => p.round));
+		const grid: (DraftPick | null)[][] = Array.from({ length: rounds }, () =>
+			new Array(teams).fill(null)
 		);
 		for (const pick of picks) {
 			const row = pick.round - 1;
 			const col = pick.slot - 1;
-			if (row >= 0 && row < meta.rounds && col >= 0 && col < meta.teams) {
+			if (row >= 0 && row < rounds && col >= 0 && col < teams) {
 				grid[row][col] = pick;
 			}
 		}
@@ -163,27 +139,26 @@
 </script>
 
 <div>
-	<h1 class="text-2xl font-bold mb-6">Drafts</h1>
+	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Drafts</h1>
 
-	{#if loading}
-		<div class="space-y-3">
-			{#each Array(3) as _}
-				<div class="h-12 bg-slate-800 rounded-xl animate-pulse"></div>
-			{/each}
-		</div>
-	{:else if error}
-		<p class="text-red-400">Failed to load drafts: {error}</p>
-	{:else if draftsMeta.length === 0}
-		<p class="text-slate-400">No completed drafts found.</p>
+	{#if draftsMeta.length === 0}
+		{#if loadingPicks}
+			<div class="space-y-3">
+				{#each Array(3) as _}
+					<div class="h-12 bg-navy-850 rounded-lg animate-pulse"></div>
+				{/each}
+			</div>
+		{:else}
+			<p class="text-navy-500">No completed drafts found.</p>
+		{/if}
 	{:else}
-		<!-- Draft selector tabs -->
 		{#if draftsMeta.length > 1}
-			<div class="flex gap-1 bg-slate-900 rounded-xl p-1 mb-6 w-fit">
+			<div class="flex mb-6 border-b border-navy-700">
 				{#each draftsMeta as d, i}
 					<button
-						onclick={() => (selectedIdx = i)}
-						class="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
-						       {selectedIdx === i ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}"
+						onclick={() => selectDraft(i)}
+						class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+						       {selectedIdx === i ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
 					>
 						{d.season}
 					</button>
@@ -193,9 +168,9 @@
 
 		{#if draft}
 			<div class="mb-3 flex items-center gap-3">
-				<span class="text-slate-400 text-sm">{draft.season} · {draft.type} · {draft.rounds} rounds · {draft.teams} teams</span>
+				<span class="text-navy-500 text-xs uppercase tracking-wider">{draft.season} · {draft.type} · {draft.rounds} rounds · {draft.teams > 0 ? draft.teams : new Set(currentPicks.map(p => p.slot)).size} teams</span>
 				{#if loadingPicks}
-					<span class="text-slate-600 text-xs">Loading picks…</span>
+					<span class="text-navy-500 text-xs">Loading picks…</span>
 				{/if}
 			</div>
 
@@ -204,19 +179,18 @@
 			{:else if loadingPicks}
 				<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
 					{#each Array(6) as _}
-						<div class="h-24 bg-slate-800 rounded-xl animate-pulse"></div>
+						<div class="h-24 bg-navy-850 rounded-lg animate-pulse"></div>
 					{/each}
 				</div>
 			{:else if draft.type === 'auction'}
-				<!-- Auction: each team's picks sorted by amount -->
 				<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
 					{#each [...draft.rosterNames.entries()].sort((a, b) => a[1].localeCompare(b[1])) as [rid, tname]}
 						{@const teamPicks = currentPicks.filter((p) => p.rosterId === rid).sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0))}
-						<div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-							<div class="px-3 py-2 border-b border-slate-800 bg-slate-800/40">
-								<p class="font-medium text-sm text-white">{tname}</p>
+						<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden">
+							<div class="px-3 py-2 border-b border-navy-700 bg-navy-900">
+								<p class="font-sport font-bold text-sm text-white uppercase tracking-wide">{tname}</p>
 							</div>
-							<div class="divide-y divide-slate-800/60">
+							<div class="divide-y divide-navy-700/60">
 								{#each teamPicks as pick}
 									<div class="flex items-center gap-2 px-3 py-2 border-l-2 {pc(pick.pos)}">
 										<span class="text-xs text-slate-500 w-6 text-right shrink-0">${pick.amount}</span>
@@ -229,18 +203,21 @@
 					{/each}
 				</div>
 			{:else}
-				<!-- Snake / linear: round × pick grid -->
-				{@const grid = picksGrid(draft, currentPicks)}
-				{@const slots = Object.entries(draft.slotToRoster)
+				<!-- Snake / linear: round rows × team columns -->
+				{@const effectiveSlotToRoster = Object.keys(draft.slotToRoster).length > 0
+					? draft.slotToRoster
+					: Object.fromEntries([...new Map(currentPicks.filter(p => p.round === 1).map(p => [p.slot, p.rosterId])).entries()])}
+				{@const slots = Object.entries(effectiveSlotToRoster)
 					.sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
 					.map(([slot, rid]) => [Number(slot), Number(rid)] as [number, number])}
-				<div class="overflow-x-auto rounded-xl border border-slate-800">
+				{@const grid = picksGrid(draft, currentPicks, slots.length)}
+				<div class="overflow-x-auto rounded-lg border border-navy-700">
 					<table class="text-xs border-collapse w-max">
 						<thead>
-							<tr class="bg-slate-900">
-								<th class="px-2 py-2 text-slate-500 text-left font-normal w-12 border-b border-slate-800">Rd</th>
+							<tr class="bg-navy-900">
+								<th class="px-2 py-2 text-navy-500 text-left font-semibold w-12 border-b border-navy-700 uppercase tracking-wider text-[10px]">Rd</th>
 								{#each slots as [, rid]}
-									<th class="px-2 py-2 text-slate-400 font-medium border-b border-slate-800 min-w-[120px] max-w-[150px]">
+									<th class="px-2 py-2 text-navy-500 font-semibold border-b border-navy-700 min-w-[120px] max-w-[150px] uppercase tracking-wider text-[10px]">
 										<span class="truncate block">{draft.rosterNames.get(rid) ?? `T${rid}`}</span>
 									</th>
 								{/each}
@@ -248,16 +225,16 @@
 						</thead>
 						<tbody>
 							{#each grid as row, ri}
-								<tr class="{ri % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900/50'}">
-									<td class="px-2 py-1.5 text-slate-600 font-mono border-r border-slate-800">{ri + 1}</td>
+								<tr class="{ri % 2 !== 0 ? 'bg-navy-875' : ''}">
+									<td class="px-2 py-1.5 text-navy-500 font-mono border-r border-navy-700">{ri + 1}</td>
 									{#each row as pick}
 										{#if pick}
 											<td class="px-2 py-1.5 border-l-2 {pc(pick.pos)}">
 												<p class="text-slate-200 truncate font-medium">{pick.playerName}</p>
-												<p class="text-slate-500">{pick.pos} · {pick.nflTeam}</p>
+												<p class="text-navy-500">{pick.pos} · {pick.nflTeam}</p>
 											</td>
 										{:else}
-											<td class="px-2 py-1.5 text-slate-700">—</td>
+											<td class="px-2 py-1.5 text-navy-700">—</td>
 										{/if}
 									{/each}
 								</tr>

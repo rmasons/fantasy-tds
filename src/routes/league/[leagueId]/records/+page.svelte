@@ -190,80 +190,87 @@
 </script>
 
 <div>
-	<h1 class="text-2xl font-bold mb-4">Records</h1>
+	<!-- Page header -->
+	<div class="mb-5">
+		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Records</h1>
+		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">League Statistics</p>
+	</div>
 
 	<!-- Tab switcher -->
-	<div class="flex gap-1 mb-6 bg-slate-800/50 rounded-lg p-1 w-fit">
+	<div class="flex mb-6 border-b border-navy-700">
 		<button
 			onclick={() => switchTab('season')}
-			class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors
-			       {tab === 'season' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}"
+			class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+			       {tab === 'season' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
 		>
 			{season || 'This Season'}
 		</button>
 		<button
 			onclick={() => switchTab('alltime')}
-			class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors
-			       {tab === 'alltime' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}"
+			class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+			       {tab === 'alltime' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
 		>
 			All Time
 		</button>
 	</div>
 
-	<!-- ── Season tab ──────────────────────────────────────────────────────────── -->
+	<!-- ── Season tab ── -->
 	{#if tab === 'season'}
 		{#if loading}
-			<div class="grid sm:grid-cols-2 gap-6">
+			<div class="grid sm:grid-cols-2 gap-5">
 				{#each Array(4) as _}
-					<div class="h-48 bg-slate-800 rounded-xl animate-pulse"></div>
+					<div class="h-48 bg-navy-850 rounded-lg animate-pulse"></div>
 				{/each}
 			</div>
 		{:else if error}
 			<p class="text-red-400">Failed to load records: {error}</p>
 		{:else}
-			<div class="grid sm:grid-cols-2 gap-6">
+			<div class="grid sm:grid-cols-2 gap-5">
 
 				<!-- Season PF Leaders -->
-				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-[460px]">
-					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40 shrink-0">
-						🏆 Season Points Leaders
+				<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden flex flex-col h-[460px]">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 px-4 py-2.5 bg-navy-900 border-b border-navy-700 shrink-0 flex items-center gap-2">
+						<span class="text-amber-400">◆</span> Points Leaders
 					</h2>
 					<div class="flex-1 flex flex-col min-h-0">
 						{#each seasonLeaders.slice(0, 8) as team, i}
-							<div class="flex-1 flex items-center gap-3 px-4 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
-								<span class="text-slate-600 text-xs w-4">{i + 1}</span>
+							<div class="flex-1 flex items-center gap-3 px-4 {i % 2 !== 0 ? 'bg-navy-875' : ''} border-b border-navy-700/40 last:border-0">
+								<span class="text-navy-600 font-mono text-xs w-4 text-right shrink-0">{i + 1}</span>
 								{#if team.avatar}
-									<img src={team.avatar} alt="" class="w-7 h-7 rounded-full object-cover shrink-0" />
+									<img src={team.avatar} alt="" class="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-navy-700" />
 								{:else}
-									<div class="w-7 h-7 rounded-full bg-slate-700 shrink-0"></div>
+									<div class="w-7 h-7 rounded-full bg-navy-700 shrink-0"></div>
 								{/if}
 								<span class="text-sm text-slate-200 flex-1 truncate">{team.team}</span>
-								<span class="font-mono text-sm font-semibold text-white">{team.fpts.toFixed(2)}</span>
+								<span class="font-mono text-sm font-bold text-white tabular-nums">{team.fpts.toFixed(2)}</span>
 							</div>
 						{/each}
 					</div>
 				</section>
 
 				<!-- Biggest Blowouts -->
-				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-[460px]">
-					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40 shrink-0">
-						💥 Biggest Blowouts
+				<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden flex flex-col h-[460px]">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 px-4 py-2.5 bg-navy-900 border-b border-navy-700 shrink-0 flex items-center gap-2">
+						<span class="text-amber-400">◆</span> Biggest Blowouts
 					</h2>
 					<div class="flex-1 flex flex-col min-h-0">
 						{#if blowouts.length === 0}
-							<p class="px-4 py-3 text-sm text-slate-500">No completed games yet.</p>
+							<p class="px-4 py-3 text-sm text-navy-500">No completed games yet.</p>
 						{:else}
 							{#each blowouts as g, i}
-								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-white font-medium truncate">{g.winner}</span>
-										<span class="font-mono text-white ml-2 shrink-0">{g.winnerPts.toFixed(2)}</span>
+								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 !== 0 ? 'bg-navy-875' : ''} border-b border-navy-700/40 last:border-0">
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm font-semibold text-white truncate flex-1">{g.winner}</span>
+										<span class="font-mono text-sm font-bold text-white ml-3 shrink-0 tabular-nums">{g.winnerPts.toFixed(2)}</span>
 									</div>
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-slate-400 truncate">{g.loser}</span>
-										<span class="font-mono text-slate-400 ml-2 shrink-0">{g.loserPts.toFixed(2)}</span>
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm text-navy-400 truncate flex-1">{g.loser}</span>
+										<span class="font-mono text-sm text-navy-400 ml-3 shrink-0 tabular-nums">{g.loserPts.toFixed(2)}</span>
 									</div>
-									<p class="text-xs text-slate-600 mt-0.5">Week {g.week} · margin: <span class="text-orange-400">{g.diff}</span></p>
+									<div class="flex items-center gap-2 mt-0.5">
+										<span class="text-[10px] text-navy-600 font-medium uppercase tracking-wider">Wk {g.week}</span>
+										<span class="text-[10px] font-bold text-amber-400">+{g.diff}</span>
+									</div>
 								</div>
 							{/each}
 						{/if}
@@ -271,20 +278,20 @@
 				</section>
 
 				<!-- Weekly Highs -->
-				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-[460px]">
-					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40 shrink-0">
-						🔥 Highest Single-Week Scores
+				<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden flex flex-col h-[460px]">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 px-4 py-2.5 bg-navy-900 border-b border-navy-700 shrink-0 flex items-center gap-2">
+						<span class="text-amber-400">◆</span> High Scores
 					</h2>
 					<div class="flex-1 flex flex-col min-h-0">
 						{#if weekHighs.length === 0}
-							<p class="px-4 py-3 text-sm text-slate-500">No completed games yet.</p>
+							<p class="px-4 py-3 text-sm text-navy-500">No completed games yet.</p>
 						{:else}
 							{#each weekHighs as h, i}
-								<div class="flex-1 flex items-center gap-3 px-4 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
-									<span class="text-slate-600 text-xs w-4">{i + 1}</span>
+								<div class="flex-1 flex items-center gap-3 px-4 {i % 2 !== 0 ? 'bg-navy-875' : ''} border-b border-navy-700/40 last:border-0">
+									<span class="text-navy-600 font-mono text-xs w-4 text-right shrink-0">{i + 1}</span>
 									<span class="text-sm text-slate-200 flex-1 truncate">{h.team}</span>
-									<span class="text-xs text-slate-500 shrink-0">Wk {h.week}</span>
-									<span class="font-mono text-sm font-semibold text-green-400 ml-2">{h.pts.toFixed(2)}</span>
+									<span class="text-[10px] text-navy-600 font-medium uppercase tracking-wider shrink-0">Wk {h.week}</span>
+									<span class="font-mono text-sm font-bold text-green-400 ml-1 tabular-nums shrink-0">{h.pts.toFixed(2)}</span>
 								</div>
 							{/each}
 						{/if}
@@ -292,25 +299,28 @@
 				</section>
 
 				<!-- Closest Games -->
-				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-[460px]">
-					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40 shrink-0">
-						🤏 Closest Games
+				<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden flex flex-col h-[460px]">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 px-4 py-2.5 bg-navy-900 border-b border-navy-700 shrink-0 flex items-center gap-2">
+						<span class="text-amber-400">◆</span> Closest Games
 					</h2>
 					<div class="flex-1 flex flex-col min-h-0">
 						{#if closest.length === 0}
-							<p class="px-4 py-3 text-sm text-slate-500">No completed games yet.</p>
+							<p class="px-4 py-3 text-sm text-navy-500">No completed games yet.</p>
 						{:else}
 							{#each closest as g, i}
-								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-white font-medium truncate">{g.winner}</span>
-										<span class="font-mono text-white ml-2 shrink-0">{g.winnerPts.toFixed(2)}</span>
+								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 !== 0 ? 'bg-navy-875' : ''} border-b border-navy-700/40 last:border-0">
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm font-semibold text-white truncate flex-1">{g.winner}</span>
+										<span class="font-mono text-sm font-bold text-white ml-3 shrink-0 tabular-nums">{g.winnerPts.toFixed(2)}</span>
 									</div>
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-slate-400 truncate">{g.loser}</span>
-										<span class="font-mono text-slate-400 ml-2 shrink-0">{g.loserPts.toFixed(2)}</span>
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm text-navy-400 truncate flex-1">{g.loser}</span>
+										<span class="font-mono text-sm text-navy-400 ml-3 shrink-0 tabular-nums">{g.loserPts.toFixed(2)}</span>
 									</div>
-									<p class="text-xs text-slate-600 mt-0.5">Week {g.week} · margin: <span class="text-blue-400">{g.diff}</span></p>
+									<div class="flex items-center gap-2 mt-0.5">
+										<span class="text-[10px] text-navy-600 font-medium uppercase tracking-wider">Wk {g.week}</span>
+										<span class="text-[10px] font-bold text-sky-400">&#916; {g.diff}</span>
+									</div>
 								</div>
 							{/each}
 						{/if}
@@ -318,20 +328,20 @@
 				</section>
 
 				<!-- Weekly Lows -->
-				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-[460px]">
-					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40 shrink-0">
-						🥶 Lowest Single-Week Scores
+				<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden flex flex-col h-[460px]">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 px-4 py-2.5 bg-navy-900 border-b border-navy-700 shrink-0 flex items-center gap-2">
+						<span class="text-amber-400">◆</span> Low Scores
 					</h2>
 					<div class="flex-1 flex flex-col min-h-0">
 						{#if weekLows.length === 0}
-							<p class="px-4 py-3 text-sm text-slate-500">No completed games yet.</p>
+							<p class="px-4 py-3 text-sm text-navy-500">No completed games yet.</p>
 						{:else}
 							{#each weekLows as h, i}
-								<div class="flex-1 flex items-center gap-3 px-4 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
-									<span class="text-slate-600 text-xs w-4">{i + 1}</span>
+								<div class="flex-1 flex items-center gap-3 px-4 {i % 2 !== 0 ? 'bg-navy-875' : ''} border-b border-navy-700/40 last:border-0">
+									<span class="text-navy-600 font-mono text-xs w-4 text-right shrink-0">{i + 1}</span>
 									<span class="text-sm text-slate-200 flex-1 truncate">{h.team}</span>
-									<span class="text-xs text-slate-500 shrink-0">Wk {h.week}</span>
-									<span class="font-mono text-sm font-semibold text-red-400 ml-2">{h.pts.toFixed(2)}</span>
+									<span class="text-[10px] text-navy-600 font-medium uppercase tracking-wider shrink-0">Wk {h.week}</span>
+									<span class="font-mono text-sm font-bold text-red-400 ml-1 tabular-nums shrink-0">{h.pts.toFixed(2)}</span>
 								</div>
 							{/each}
 						{/if}
@@ -339,25 +349,28 @@
 				</section>
 
 				<!-- Highest Scoring Matchups -->
-				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-[460px]">
-					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40 shrink-0">
-						📈 Highest Scoring Matchups
+				<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden flex flex-col h-[460px]">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 px-4 py-2.5 bg-navy-900 border-b border-navy-700 shrink-0 flex items-center gap-2">
+						<span class="text-amber-400">◆</span> Highest Scoring Matchups
 					</h2>
 					<div class="flex-1 flex flex-col min-h-0">
 						{#if highCombined.length === 0}
-							<p class="px-4 py-3 text-sm text-slate-500">No completed games yet.</p>
+							<p class="px-4 py-3 text-sm text-navy-500">No completed games yet.</p>
 						{:else}
 							{#each highCombined as g, i}
-								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-white font-medium truncate">{g.winner}</span>
-										<span class="font-mono text-white ml-2 shrink-0">{g.winnerPts.toFixed(2)}</span>
+								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 !== 0 ? 'bg-navy-875' : ''} border-b border-navy-700/40 last:border-0">
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm font-semibold text-white truncate flex-1">{g.winner}</span>
+										<span class="font-mono text-sm font-bold text-white ml-3 shrink-0 tabular-nums">{g.winnerPts.toFixed(2)}</span>
 									</div>
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-slate-400 truncate">{g.loser}</span>
-										<span class="font-mono text-slate-400 ml-2 shrink-0">{g.loserPts.toFixed(2)}</span>
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm text-navy-400 truncate flex-1">{g.loser}</span>
+										<span class="font-mono text-sm text-navy-400 ml-3 shrink-0 tabular-nums">{g.loserPts.toFixed(2)}</span>
 									</div>
-									<p class="text-xs text-slate-600 mt-0.5">Week {g.week} · combined: <span class="text-purple-400">{(g.winnerPts + g.loserPts).toFixed(2)}</span></p>
+									<div class="flex items-center gap-2 mt-0.5">
+										<span class="text-[10px] text-navy-600 font-medium uppercase tracking-wider">Wk {g.week}</span>
+										<span class="text-[10px] font-bold text-violet-400">{(g.winnerPts + g.loserPts).toFixed(2)} combined</span>
+									</div>
 								</div>
 							{/each}
 						{/if}
@@ -368,90 +381,92 @@
 		{/if}
 	{/if}
 
-	<!-- ── All-time tab ────────────────────────────────────────────────────────── -->
+	<!-- ── All-time tab ── -->
 	{#if tab === 'alltime'}
 		{#if atError}
 			<p class="text-red-400">Failed to load all-time records: {atError}</p>
 		{:else}
 			<!-- All-time standings table -->
-			<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden mb-6">
-				<div class="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-800/40">
-					<h2 class="text-sm font-semibold text-slate-300">📊 All-Time Standings</h2>
+			<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden mb-6">
+				<div class="flex items-center justify-between px-4 py-2.5 bg-navy-900 border-b border-navy-700">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 flex items-center gap-2">
+						<span class="text-amber-400">◆</span> All-Time Standings
+					</h2>
 					{#if atLoading}
-						<span class="text-xs text-slate-500 animate-pulse">{atStatus}</span>
+						<span class="text-[10px] text-navy-500 uppercase tracking-wider animate-pulse">{atStatus}</span>
 					{/if}
 				</div>
 				{#if atManagers.length === 0 && atLoading}
-					<div class="h-48 animate-pulse bg-slate-800/30"></div>
+					<div class="h-48 animate-pulse bg-navy-875"></div>
 				{:else if atManagers.length === 0}
-					<p class="px-4 py-3 text-sm text-slate-500">No history found.</p>
+					<p class="px-4 py-3 text-sm text-navy-500">No history found.</p>
 				{:else}
 					<div class="overflow-x-auto">
 						<table class="w-full text-sm">
 							<thead>
-								<tr class="border-b border-slate-800 text-slate-500 text-xs uppercase">
-									<th class="px-4 py-3 text-left">Manager</th>
-									<th class="px-3 py-3 text-right">W–L</th>
-									<th class="px-3 py-3 text-right">Win%</th>
-									<th class="px-3 py-3 text-right">PF</th>
-									<th class="px-3 py-3 text-right hidden sm:table-cell">PF/G</th>
-									<th class="px-3 py-3 text-right hidden md:table-cell">PA</th>
-									<th class="px-3 py-3 text-right hidden md:table-cell">Yrs</th>
+								<tr class="border-b border-navy-700 text-navy-500 text-[10px] uppercase tracking-wider">
+									<th class="px-4 py-3 text-left font-semibold">Manager</th>
+									<th class="px-3 py-3 text-right font-semibold">W–L</th>
+									<th class="px-3 py-3 text-right font-semibold">Win%</th>
+									<th class="px-3 py-3 text-right font-semibold">PF</th>
+									<th class="px-3 py-3 text-right font-semibold hidden sm:table-cell">PF/G</th>
+									<th class="px-3 py-3 text-right font-semibold hidden md:table-cell">PA</th>
+									<th class="px-3 py-3 text-right font-semibold hidden md:table-cell">Yrs</th>
 								</tr>
 							</thead>
 							<tbody>
 								{#each atManagers as m, i}
-									<tr class="border-b border-slate-800/50 hover:bg-slate-800/30">
+									<tr class="border-b border-navy-700/50 {i % 2 !== 0 ? 'bg-navy-875' : ''} hover:bg-navy-800 transition-colors">
 										<td class="px-4 py-2.5">
 											<div class="flex items-center gap-2">
-												<span class="text-slate-600 text-xs w-4 shrink-0">{i + 1}</span>
+												<span class="text-navy-600 font-mono text-xs w-4 shrink-0">{i + 1}</span>
 												{#if m.avatar}
-													<img src={m.avatar} alt="" class="w-6 h-6 rounded-full object-cover shrink-0" />
+													<img src={m.avatar} alt="" class="w-6 h-6 rounded-full object-cover shrink-0 ring-1 ring-navy-700" />
 												{:else}
-													<div class="w-6 h-6 rounded-full bg-slate-700 shrink-0"></div>
+													<div class="w-6 h-6 rounded-full bg-navy-700 shrink-0"></div>
 												{/if}
 												<span class="text-slate-200 truncate max-w-[120px]">{m.displayName}</span>
 											</div>
 										</td>
-										<td class="px-3 py-2.5 text-right font-mono text-slate-300 whitespace-nowrap">
+										<td class="px-3 py-2.5 text-right font-mono text-slate-300 whitespace-nowrap tabular-nums">
 											{m.wins}–{m.losses}{m.ties ? `–${m.ties}` : ''}
 										</td>
-										<td class="px-3 py-2.5 text-right text-slate-400">{winPct(m)}%</td>
-										<td class="px-3 py-2.5 text-right font-mono text-slate-300">{m.fpts.toFixed(0)}</td>
-										<td class="px-3 py-2.5 text-right text-slate-500 hidden sm:table-cell">{fptsPerGame(m)}</td>
-										<td class="px-3 py-2.5 text-right text-slate-600 hidden md:table-cell">{m.fptsAgainst.toFixed(0)}</td>
-										<td class="px-3 py-2.5 text-right text-slate-600 hidden md:table-cell">{m.seasons}</td>
+										<td class="px-3 py-2.5 text-right text-slate-400 tabular-nums">{winPct(m)}%</td>
+										<td class="px-3 py-2.5 text-right font-mono text-white font-semibold tabular-nums">{m.fpts.toFixed(0)}</td>
+										<td class="px-3 py-2.5 text-right text-slate-500 hidden sm:table-cell tabular-nums">{fptsPerGame(m)}</td>
+										<td class="px-3 py-2.5 text-right text-navy-500 hidden md:table-cell tabular-nums">{m.fptsAgainst.toFixed(0)}</td>
+										<td class="px-3 py-2.5 text-right text-navy-500 hidden md:table-cell">{m.seasons}</td>
 									</tr>
 								{/each}
 							</tbody>
 						</table>
 					</div>
 					{#if atLoading}
-						<p class="px-4 py-2 text-xs text-slate-600 animate-pulse border-t border-slate-800">{atStatus}</p>
+						<p class="px-4 py-2 text-[10px] text-navy-500 uppercase tracking-wider animate-pulse border-t border-navy-700">{atStatus}</p>
 					{/if}
 				{/if}
 			</section>
 
 			<!-- All-time game records -->
-			<div class="grid sm:grid-cols-2 gap-6">
+			<div class="grid sm:grid-cols-2 gap-5">
 
 				<!-- All-time weekly highs -->
-				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-[460px]">
-					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40 shrink-0">
-						🔥 All-Time High Scores
+				<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden flex flex-col h-[460px]">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 px-4 py-2.5 bg-navy-900 border-b border-navy-700 shrink-0 flex items-center gap-2">
+						<span class="text-amber-400">◆</span> All-Time High Scores
 					</h2>
 					<div class="flex-1 flex flex-col min-h-0">
 						{#if atHighs.length === 0 && atLoading}
-							<div class="h-32 animate-pulse bg-slate-800/30"></div>
+							<div class="h-32 animate-pulse bg-navy-875"></div>
 						{:else if atHighs.length === 0}
-							<p class="px-4 py-3 text-sm text-slate-500">No data yet.</p>
+							<p class="px-4 py-3 text-sm text-navy-500">No data yet.</p>
 						{:else}
 							{#each atHighs as h, i}
-								<div class="flex-1 flex items-center gap-3 px-4 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
-									<span class="text-slate-600 text-xs w-4">{i + 1}</span>
+								<div class="flex-1 flex items-center gap-3 px-4 {i % 2 !== 0 ? 'bg-navy-875' : ''} border-b border-navy-700/40 last:border-0">
+									<span class="text-navy-600 font-mono text-xs w-4 text-right shrink-0">{i + 1}</span>
 									<span class="text-sm text-slate-200 flex-1 truncate">{h.team}</span>
-									<span class="text-xs text-slate-500 shrink-0">{h.season} Wk{h.week}</span>
-									<span class="font-mono text-sm font-semibold text-green-400 ml-1">{h.pts.toFixed(2)}</span>
+									<span class="text-[10px] text-navy-600 font-medium uppercase tracking-wider shrink-0">{h.season} Wk{h.week}</span>
+									<span class="font-mono text-sm font-bold text-green-400 ml-1 tabular-nums shrink-0">{h.pts.toFixed(2)}</span>
 								</div>
 							{/each}
 						{/if}
@@ -459,27 +474,30 @@
 				</section>
 
 				<!-- All-time blowouts -->
-				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-[460px]">
-					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40 shrink-0">
-						💥 All-Time Blowouts
+				<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden flex flex-col h-[460px]">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 px-4 py-2.5 bg-navy-900 border-b border-navy-700 shrink-0 flex items-center gap-2">
+						<span class="text-amber-400">◆</span> All-Time Blowouts
 					</h2>
 					<div class="flex-1 flex flex-col min-h-0">
 						{#if atBlowouts.length === 0 && atLoading}
-							<div class="h-32 animate-pulse bg-slate-800/30"></div>
+							<div class="h-32 animate-pulse bg-navy-875"></div>
 						{:else if atBlowouts.length === 0}
-							<p class="px-4 py-3 text-sm text-slate-500">No data yet.</p>
+							<p class="px-4 py-3 text-sm text-navy-500">No data yet.</p>
 						{:else}
 							{#each atBlowouts as g, i}
-								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-white font-medium truncate">{g.winner}</span>
-										<span class="font-mono text-white ml-2 shrink-0">{g.winnerPts.toFixed(2)}</span>
+								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 !== 0 ? 'bg-navy-875' : ''} border-b border-navy-700/40 last:border-0">
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm font-semibold text-white truncate flex-1">{g.winner}</span>
+										<span class="font-mono text-sm font-bold text-white ml-3 shrink-0 tabular-nums">{g.winnerPts.toFixed(2)}</span>
 									</div>
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-slate-400 truncate">{g.loser}</span>
-										<span class="font-mono text-slate-400 ml-2 shrink-0">{g.loserPts.toFixed(2)}</span>
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm text-navy-400 truncate flex-1">{g.loser}</span>
+										<span class="font-mono text-sm text-navy-400 ml-3 shrink-0 tabular-nums">{g.loserPts.toFixed(2)}</span>
 									</div>
-									<p class="text-xs text-slate-600 mt-0.5">{g.season} Wk{g.week} · <span class="text-orange-400">{g.diff}</span></p>
+									<div class="flex items-center gap-2 mt-0.5">
+										<span class="text-[10px] text-navy-600 font-medium uppercase tracking-wider">{g.season} Wk{g.week}</span>
+										<span class="text-[10px] font-bold text-amber-400">+{g.diff}</span>
+									</div>
 								</div>
 							{/each}
 						{/if}
@@ -487,27 +505,30 @@
 				</section>
 
 				<!-- All-time closest games -->
-				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-[460px]">
-					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40 shrink-0">
-						🤏 All-Time Closest Games
+				<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden flex flex-col h-[460px]">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 px-4 py-2.5 bg-navy-900 border-b border-navy-700 shrink-0 flex items-center gap-2">
+						<span class="text-amber-400">◆</span> All-Time Closest Games
 					</h2>
 					<div class="flex-1 flex flex-col min-h-0">
 						{#if atClosest.length === 0 && atLoading}
-							<div class="h-32 animate-pulse bg-slate-800/30"></div>
+							<div class="h-32 animate-pulse bg-navy-875"></div>
 						{:else if atClosest.length === 0}
-							<p class="px-4 py-3 text-sm text-slate-500">No data yet.</p>
+							<p class="px-4 py-3 text-sm text-navy-500">No data yet.</p>
 						{:else}
 							{#each atClosest as g, i}
-								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-white font-medium truncate">{g.winner}</span>
-										<span class="font-mono text-white ml-2 shrink-0">{g.winnerPts.toFixed(2)}</span>
+								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 !== 0 ? 'bg-navy-875' : ''} border-b border-navy-700/40 last:border-0">
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm font-semibold text-white truncate flex-1">{g.winner}</span>
+										<span class="font-mono text-sm font-bold text-white ml-3 shrink-0 tabular-nums">{g.winnerPts.toFixed(2)}</span>
 									</div>
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-slate-400 truncate">{g.loser}</span>
-										<span class="font-mono text-slate-400 ml-2 shrink-0">{g.loserPts.toFixed(2)}</span>
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm text-navy-400 truncate flex-1">{g.loser}</span>
+										<span class="font-mono text-sm text-navy-400 ml-3 shrink-0 tabular-nums">{g.loserPts.toFixed(2)}</span>
 									</div>
-									<p class="text-xs text-slate-600 mt-0.5">{g.season} Wk{g.week} · <span class="text-blue-400">{g.diff}</span></p>
+									<div class="flex items-center gap-2 mt-0.5">
+										<span class="text-[10px] text-navy-600 font-medium uppercase tracking-wider">{g.season} Wk{g.week}</span>
+										<span class="text-[10px] font-bold text-sky-400">&#916; {g.diff}</span>
+									</div>
 								</div>
 							{/each}
 						{/if}
@@ -515,22 +536,22 @@
 				</section>
 
 				<!-- All-time weekly lows -->
-				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-[460px]">
-					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40 shrink-0">
-						🥶 All-Time Low Scores
+				<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden flex flex-col h-[460px]">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 px-4 py-2.5 bg-navy-900 border-b border-navy-700 shrink-0 flex items-center gap-2">
+						<span class="text-amber-400">◆</span> All-Time Low Scores
 					</h2>
 					<div class="flex-1 flex flex-col min-h-0">
 						{#if atLows.length === 0 && atLoading}
-							<div class="h-32 animate-pulse bg-slate-800/30"></div>
+							<div class="h-32 animate-pulse bg-navy-875"></div>
 						{:else if atLows.length === 0}
-							<p class="px-4 py-3 text-sm text-slate-500">No data yet.</p>
+							<p class="px-4 py-3 text-sm text-navy-500">No data yet.</p>
 						{:else}
 							{#each atLows as h, i}
-								<div class="flex-1 flex items-center gap-3 px-4 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
-									<span class="text-slate-600 text-xs w-4">{i + 1}</span>
+								<div class="flex-1 flex items-center gap-3 px-4 {i % 2 !== 0 ? 'bg-navy-875' : ''} border-b border-navy-700/40 last:border-0">
+									<span class="text-navy-600 font-mono text-xs w-4 text-right shrink-0">{i + 1}</span>
 									<span class="text-sm text-slate-200 flex-1 truncate">{h.team}</span>
-									<span class="text-xs text-slate-500 shrink-0">{h.season} Wk{h.week}</span>
-									<span class="font-mono text-sm font-semibold text-red-400 ml-1">{h.pts.toFixed(2)}</span>
+									<span class="text-[10px] text-navy-600 font-medium uppercase tracking-wider shrink-0">{h.season} Wk{h.week}</span>
+									<span class="font-mono text-sm font-bold text-red-400 ml-1 tabular-nums shrink-0">{h.pts.toFixed(2)}</span>
 								</div>
 							{/each}
 						{/if}
@@ -538,27 +559,30 @@
 				</section>
 
 				<!-- All-time highest scoring matchups -->
-				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-[460px]">
-					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40 shrink-0">
-						📈 All-Time Highest Scoring Matchups
+				<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden flex flex-col h-[460px]">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 px-4 py-2.5 bg-navy-900 border-b border-navy-700 shrink-0 flex items-center gap-2">
+						<span class="text-amber-400">◆</span> All-Time Highest Scoring Matchups
 					</h2>
 					<div class="flex-1 flex flex-col min-h-0">
 						{#if atHighCombined.length === 0 && atLoading}
-							<div class="h-32 animate-pulse bg-slate-800/30"></div>
+							<div class="h-32 animate-pulse bg-navy-875"></div>
 						{:else if atHighCombined.length === 0}
-							<p class="px-4 py-3 text-sm text-slate-500">No data yet.</p>
+							<p class="px-4 py-3 text-sm text-navy-500">No data yet.</p>
 						{:else}
 							{#each atHighCombined as g, i}
-								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-white font-medium truncate">{g.winner}</span>
-										<span class="font-mono text-white ml-2 shrink-0">{g.winnerPts.toFixed(2)}</span>
+								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 !== 0 ? 'bg-navy-875' : ''} border-b border-navy-700/40 last:border-0">
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm font-semibold text-white truncate flex-1">{g.winner}</span>
+										<span class="font-mono text-sm font-bold text-white ml-3 shrink-0 tabular-nums">{g.winnerPts.toFixed(2)}</span>
 									</div>
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-slate-400 truncate">{g.loser}</span>
-										<span class="font-mono text-slate-400 ml-2 shrink-0">{g.loserPts.toFixed(2)}</span>
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm text-navy-400 truncate flex-1">{g.loser}</span>
+										<span class="font-mono text-sm text-navy-400 ml-3 shrink-0 tabular-nums">{g.loserPts.toFixed(2)}</span>
 									</div>
-									<p class="text-xs text-slate-600 mt-0.5">{g.season} Wk{g.week} · combined: <span class="text-purple-400">{(g.winnerPts + g.loserPts).toFixed(2)}</span></p>
+									<div class="flex items-center gap-2 mt-0.5">
+										<span class="text-[10px] text-navy-600 font-medium uppercase tracking-wider">{g.season} Wk{g.week}</span>
+										<span class="text-[10px] font-bold text-violet-400">{(g.winnerPts + g.loserPts).toFixed(2)} combined</span>
+									</div>
 								</div>
 							{/each}
 						{/if}
@@ -566,27 +590,30 @@
 				</section>
 
 				<!-- All-time lowest scoring matchups -->
-				<section class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-[460px]">
-					<h2 class="px-4 py-3 text-sm font-semibold text-slate-300 border-b border-slate-800 bg-slate-800/40 shrink-0">
-						🧊 All-Time Lowest Scoring Matchups
+				<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden flex flex-col h-[460px]">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 px-4 py-2.5 bg-navy-900 border-b border-navy-700 shrink-0 flex items-center gap-2">
+						<span class="text-amber-400">◆</span> All-Time Lowest Scoring Matchups
 					</h2>
 					<div class="flex-1 flex flex-col min-h-0">
 						{#if atLowCombined.length === 0 && atLoading}
-							<div class="h-32 animate-pulse bg-slate-800/30"></div>
+							<div class="h-32 animate-pulse bg-navy-875"></div>
 						{:else if atLowCombined.length === 0}
-							<p class="px-4 py-3 text-sm text-slate-500">No data yet.</p>
+							<p class="px-4 py-3 text-sm text-navy-500">No data yet.</p>
 						{:else}
 							{#each atLowCombined as g, i}
-								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 === 0 ? '' : 'bg-slate-800/30'}">
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-white font-medium truncate">{g.winner}</span>
-										<span class="font-mono text-white ml-2 shrink-0">{g.winnerPts.toFixed(2)}</span>
+								<div class="flex-1 flex flex-col justify-center px-4 {i % 2 !== 0 ? 'bg-navy-875' : ''} border-b border-navy-700/40 last:border-0">
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm font-semibold text-white truncate flex-1">{g.winner}</span>
+										<span class="font-mono text-sm font-bold text-white ml-3 shrink-0 tabular-nums">{g.winnerPts.toFixed(2)}</span>
 									</div>
-									<div class="flex justify-between items-baseline text-sm">
-										<span class="text-slate-400 truncate">{g.loser}</span>
-										<span class="font-mono text-slate-400 ml-2 shrink-0">{g.loserPts.toFixed(2)}</span>
+									<div class="flex items-baseline justify-between">
+										<span class="text-sm text-navy-400 truncate flex-1">{g.loser}</span>
+										<span class="font-mono text-sm text-navy-400 ml-3 shrink-0 tabular-nums">{g.loserPts.toFixed(2)}</span>
 									</div>
-									<p class="text-xs text-slate-600 mt-0.5">{g.season} Wk{g.week} · combined: <span class="text-slate-400">{(g.winnerPts + g.loserPts).toFixed(2)}</span></p>
+									<div class="flex items-center gap-2 mt-0.5">
+										<span class="text-[10px] text-navy-600 font-medium uppercase tracking-wider">{g.season} Wk{g.week}</span>
+										<span class="text-[10px] text-slate-500">{(g.winnerPts + g.loserPts).toFixed(2)} combined</span>
+									</div>
 								</div>
 							{/each}
 						{/if}

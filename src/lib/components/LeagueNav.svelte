@@ -117,10 +117,10 @@
 }} />
 
 <!-- ─── Desktop sidebar (lg+) ─────────────────────────────────── -->
-<aside class="hidden lg:flex flex-col fixed inset-y-0 left-0 w-56 bg-slate-900 border-r border-white/[0.07] z-40">
+<aside class="hidden lg:flex flex-col fixed inset-y-0 left-0 w-56 bg-navy-900 border-r border-navy-700 z-40">
 
 	<!-- League header -->
-	<div class="p-4 border-b border-white/[0.07]">
+	<div class="p-4 border-b border-navy-700">
 		<a href="/league/{leagueId}" class="flex items-center gap-2.5 min-w-0 group mb-3">
 			{#if league?.avatar}
 				<img
@@ -146,8 +146,8 @@
 					disabled={!hasHistory}
 					class="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-md text-xs transition-colors
 					       {hasHistory
-					           ? 'text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer'
-					           : 'text-slate-600 cursor-default'}"
+					           ? 'text-slate-400 hover:text-white hover:bg-navy-800 cursor-pointer'
+					           : 'text-navy-500 cursor-default'}"
 					title={hasHistory ? 'Switch season' : 'Only one season available'}
 				>
 					<span class="text-slate-600 font-medium">Season</span>
@@ -160,14 +160,14 @@
 				</button>
 
 				{#if yearOpen && hasHistory}
-					<div class="absolute left-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50 min-w-full">
+					<div class="absolute left-0 top-full mt-1 bg-navy-800 border border-navy-700 rounded-lg shadow-2xl overflow-hidden z-50 min-w-full">
 						{#each seasonChain as entry}
 							<button
 								onclick={() => switchSeason(entry.leagueId)}
 								class="w-full text-left px-3 py-2 text-sm transition-colors
 								       {entry.leagueId === leagueId
 								           ? 'bg-amber-500 text-slate-950 font-bold'
-								           : 'text-slate-300 hover:bg-slate-700'}"
+								           : 'text-slate-300 hover:bg-navy-700'}"
 							>
 								{entry.season}
 							</button>
@@ -194,12 +194,12 @@
 	</nav>
 
 	<!-- Bottom auth -->
-	<div class="p-2 border-t border-white/[0.07] space-y-0.5">
+	<div class="p-2 border-t border-navy-700 space-y-0.5">
 		{#if page.data.user}
 			{#if page.data.user.sleeperUserId}
 				<a
 					href="/settings/profile?leagueId={leagueId}"
-					class="flex items-center px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+					class="flex items-center px-3 py-2 rounded-lg text-xs text-navy-500 hover:text-slate-300 hover:bg-navy-800 transition-colors"
 				>
 					Edit my profile
 				</a>
@@ -207,7 +207,7 @@
 			{#if page.data.user.isAdmin}
 				<a
 					href="/league/{leagueId}/admin"
-					class="flex items-center px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors
+					class="flex items-center px-3 py-2 rounded-lg text-xs text-navy-500 hover:text-slate-300 hover:bg-navy-800 transition-colors
 					       {isActive('admin') ? 'text-amber-400' : ''}"
 				>
 					League admin
@@ -215,20 +215,20 @@
 			{/if}
 			<a
 				href="/"
-				class="flex items-center px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+				class="flex items-center px-3 py-2 rounded-lg text-xs text-navy-500 hover:text-slate-300 hover:bg-navy-800 transition-colors"
 			>
 				Switch league
 			</a>
 			<button
 				onclick={signOut}
-				class="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-red-400 hover:bg-slate-800/60 transition-colors"
+				class="w-full text-left px-3 py-2 rounded-lg text-xs text-navy-500 hover:text-red-400 hover:bg-navy-800/60 transition-colors"
 			>
 				Sign out
 			</button>
 		{:else}
 			<a
 				href="/login"
-				class="flex items-center px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+				class="flex items-center px-3 py-2 rounded-lg text-xs text-navy-500 hover:text-slate-300 hover:bg-navy-800 transition-colors"
 			>
 				Sign in
 			</a>
@@ -237,7 +237,7 @@
 </aside>
 
 <!-- ─── Mobile top nav (<lg) ──────────────────────────────────── -->
-<nav class="lg:hidden bg-slate-900 border-b border-white/[0.07] sticky top-0 z-50">
+<nav class="lg:hidden bg-navy-900 border-b border-navy-700 sticky top-0 z-50">
 	<div class="max-w-7xl mx-auto px-4 flex items-center h-14 gap-3">
 
 		<!-- League name / home link -->
@@ -263,8 +263,8 @@
 					onclick={() => (yearOpen = !yearOpen)}
 					class="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors
 					       {hasHistory
-					           ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer'
-					           : 'bg-slate-800/50 text-slate-500 cursor-default'}"
+					           ? 'bg-navy-800 hover:bg-navy-700 text-slate-300 cursor-pointer'
+					           : 'bg-navy-800/50 text-navy-500 cursor-default'}"
 					disabled={!hasHistory}
 					title={hasHistory ? 'Switch season' : 'Only one season available'}
 				>
@@ -277,14 +277,14 @@
 				</button>
 
 				{#if yearOpen && hasHistory}
-					<div class="absolute left-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden z-50 min-w-[100px]">
+					<div class="absolute left-0 top-full mt-1 bg-navy-800 border border-navy-700 rounded-lg shadow-xl overflow-hidden z-50 min-w-[100px]">
 						{#each seasonChain as entry}
 							<button
 								onclick={() => switchSeason(entry.leagueId)}
 								class="w-full text-left px-4 py-2 text-sm transition-colors
 								       {entry.leagueId === leagueId
 								           ? 'bg-amber-500 text-slate-950 font-bold'
-								           : 'text-slate-300 hover:bg-slate-700'}"
+								           : 'text-slate-300 hover:bg-navy-700'}"
 							>
 								{entry.season}
 							</button>
@@ -331,10 +331,10 @@
 
 	<!-- Mobile dropdown -->
 	{#if menuOpen}
-		<div class="md:hidden bg-slate-900 border-t border-white/[0.07] px-4 py-3 flex flex-col gap-1">
+		<div class="md:hidden bg-navy-900 border-t border-navy-700 px-4 py-3 flex flex-col gap-1">
 			{#if hasHistory}
-				<div class="mb-2 pb-2 border-b border-white/[0.07]">
-					<p class="text-xs text-slate-600 uppercase tracking-wider mb-1.5 px-1">Season</p>
+				<div class="mb-2 pb-2 border-b border-navy-700">
+					<p class="text-[10px] text-navy-500 uppercase tracking-widest mb-1.5 px-1">Season</p>
 					<div class="flex flex-wrap gap-1">
 						{#each seasonChain as entry}
 							<button
@@ -342,7 +342,7 @@
 								class="px-3 py-1 rounded-lg text-xs font-medium transition-colors
 								       {entry.leagueId === leagueId
 								           ? 'bg-amber-500 text-slate-950 font-bold'
-								           : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}"
+								           : 'bg-navy-800 text-slate-300 hover:bg-navy-700'}"
 							>
 								{entry.season}
 							</button>
@@ -364,18 +364,18 @@
 				</a>
 			{/each}
 
-			<div class="border-t border-white/[0.07] mt-2 pt-2 flex flex-wrap gap-4">
+			<div class="border-t border-navy-700 mt-2 pt-2 flex flex-wrap gap-4">
 				{#if page.data.user}
 					{#if page.data.user.sleeperUserId}
-						<a href="/settings/profile?leagueId={leagueId}" onclick={() => (menuOpen = false)} class="text-xs text-slate-500 hover:text-slate-300">Edit profile</a>
+						<a href="/settings/profile?leagueId={leagueId}" onclick={() => (menuOpen = false)} class="text-xs text-navy-500 hover:text-slate-300">Edit profile</a>
 					{/if}
 					{#if page.data.user.isAdmin}
-						<a href="/league/{leagueId}/admin" onclick={() => (menuOpen = false)} class="text-xs text-slate-500 hover:text-slate-300">League admin</a>
+						<a href="/league/{leagueId}/admin" onclick={() => (menuOpen = false)} class="text-xs text-navy-500 hover:text-slate-300">League admin</a>
 					{/if}
-					<a href="/" class="text-xs text-slate-500 hover:text-slate-300">Switch league</a>
-					<button onclick={signOut} class="text-xs text-slate-500 hover:text-red-400">Sign out</button>
+					<a href="/" class="text-xs text-navy-500 hover:text-slate-300">Switch league</a>
+					<button onclick={signOut} class="text-xs text-navy-500 hover:text-red-400">Sign out</button>
 				{:else}
-					<a href="/login" class="text-xs text-slate-500 hover:text-slate-300">Sign in</a>
+					<a href="/login" class="text-xs text-navy-500 hover:text-slate-300">Sign in</a>
 				{/if}
 			</div>
 		</div>

@@ -438,8 +438,8 @@
 	<!-- Header -->
 	<div class="flex items-start justify-between mb-6 flex-wrap gap-3">
 		<div>
-			<h1 class="text-2xl font-extrabold text-white">Power Rankings</h1>
-			<p class="text-slate-500 text-sm mt-0.5">
+			<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Power Rankings</h1>
+			<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">
 				{#if currentWeek === 0}
 					Pre-season · ordered by record
 				{:else if !isCurrentView}
@@ -454,11 +454,11 @@
 
 		<!-- Week navigator -->
 		{#if currentWeek > 0 && !loading}
-			<div class="flex items-center gap-0.5 bg-slate-900 rounded-xl p-1">
+			<div class="flex items-center gap-0.5 bg-navy-850 rounded-lg p-1 border border-navy-700">
 				<button
 					onclick={() => { if (selectedWeek > 1) selectedWeek -= 1; }}
 					disabled={selectedWeek <= 1}
-					class="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
+					class="px-3 py-1.5 rounded text-sm text-navy-500 hover:text-white disabled:opacity-30 transition-colors"
 				>‹</button>
 				<select
 					value={selectedWeek}
@@ -466,7 +466,7 @@
 					class="bg-transparent text-sm font-semibold text-white px-2 py-1.5 focus:outline-none cursor-pointer"
 				>
 					{#each Array.from({ length: currentWeek }, (_, i) => i + 1) as w}
-						<option value={w} class="bg-slate-900">
+						<option value={w} class="bg-navy-850">
 							Week {w}{w === currentWeek ? ' (current)' : ''}
 						</option>
 					{/each}
@@ -474,7 +474,7 @@
 				<button
 					onclick={() => { if (selectedWeek < currentWeek) selectedWeek += 1; }}
 					disabled={selectedWeek >= currentWeek}
-					class="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
+					class="px-3 py-1.5 rounded text-sm text-navy-500 hover:text-white disabled:opacity-30 transition-colors"
 				>›</button>
 			</div>
 		{/if}
@@ -483,25 +483,25 @@
 	{#if loading}
 		<div class="space-y-2">
 			{#each Array(10) as _}
-				<div class="h-14 bg-slate-800 rounded-xl animate-pulse"></div>
+				<div class="h-14 bg-navy-850 rounded-lg animate-pulse"></div>
 			{/each}
 		</div>
 
 	{:else if error}
-		<div class="bg-slate-900 rounded-xl border border-slate-800 p-6 text-center">
-			<p class="text-slate-400">Failed to load power rankings.</p>
-			<p class="text-slate-600 text-sm mt-1">{error}</p>
+		<div class="bg-navy-850 rounded-lg border border-navy-700 p-6 text-center">
+			<p class="text-navy-500">Failed to load power rankings.</p>
+			<p class="text-navy-500 text-sm mt-1">{error}</p>
 		</div>
 
 	{:else if rankings.length === 0}
-		<p class="text-slate-400">No data available yet.</p>
+		<p class="text-navy-500">No data available yet.</p>
 
 	{:else}
 		<!-- Sub-header -->
 		{#if currentWeek > 0}
-			<div class="mb-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+			<div class="mb-4 flex flex-wrap items-center gap-3 text-xs text-navy-500">
 				{#if !isCurrentView}
-					<span class="inline-flex items-center bg-slate-800 text-slate-400 text-xs font-medium px-2.5 py-1 rounded-full ring-1 ring-slate-700">
+					<span class="inline-flex items-center bg-navy-850 text-slate-400 text-xs font-medium px-2.5 py-1 rounded ring-1 ring-navy-700">
 						Historical view
 					</span>
 				{/if}
@@ -517,10 +517,10 @@
 		{/if}
 
 		<!-- Desktop table -->
-		<div class="hidden sm:block overflow-x-auto rounded-xl border border-slate-800">
+		<div class="hidden sm:block overflow-x-auto rounded-lg border border-navy-700">
 			<table class="w-full text-sm">
 				<thead>
-					<tr class="bg-slate-900/80 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-800">
+					<tr class="bg-navy-900 text-navy-500 text-[10px] uppercase tracking-wider border-b border-navy-700">
 						<th class="px-4 py-3 text-left w-8">#</th>
 						<th class="px-3 py-3 text-center w-10">Δ</th>
 						<th class="px-4 py-3 text-left">Team</th>
@@ -534,8 +534,8 @@
 					{#each rankings as row, i}
 						{@const atCutline = playoffLine !== null && i === playoffLine - 1}
 						{@const belowCutline = playoffLine !== null && i >= playoffLine}
-						<tr class="border-t border-slate-800/60 hover:bg-slate-800/40 transition-colors
-						           {i % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900/30'}
+						<tr class="border-t border-navy-700/50 hover:bg-navy-800 transition-colors
+						           {i % 2 !== 0 ? 'bg-navy-875' : ''}
 						           {row.rank === 1 ? 'bg-amber-500/5' : ''}
 						           {belowCutline ? 'opacity-75' : ''}">
 							<td class="px-4 py-3">
@@ -547,14 +547,14 @@
 							<td class="px-4 py-3">
 								<div class="flex items-center gap-3">
 									{#if row.avatar}
-										<img src={row.avatar} alt="" class="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-slate-700" />
+										<img src={row.avatar} alt="" class="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-navy-700" />
 									{:else}
-										<div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0 text-sm">🏈</div>
+										<div class="w-8 h-8 rounded-full bg-navy-800 flex items-center justify-center shrink-0 text-sm">🏈</div>
 									{/if}
 									<div>
 										<p class="font-semibold text-white leading-tight">{row.teamName}</p>
 										{#if row.ownerName && row.ownerName !== row.teamName}
-											<p class="text-xs text-slate-500">{row.ownerName}</p>
+											<p class="text-xs text-navy-500">{row.ownerName}</p>
 										{/if}
 									</div>
 								</div>
@@ -596,7 +596,7 @@
 						<span class="text-xs text-blue-400/80 font-medium">— Playoff line —</span>
 					</div>
 				{/if}
-				<div class="bg-slate-900 rounded-xl border border-slate-800/60 px-4 py-3
+				<div class="bg-navy-850 rounded-lg border border-navy-700 px-4 py-3
 				            {row.rank === 1 ? 'border-amber-500/30 bg-amber-500/5' : ''}
 				            {playoffLine !== null && i >= playoffLine ? 'opacity-75' : ''}">
 					<div class="flex items-center gap-3">
@@ -607,18 +607,18 @@
 						</div>
 
 						{#if row.avatar}
-							<img src={row.avatar} alt="" class="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-slate-700" />
+							<img src={row.avatar} alt="" class="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-navy-700" />
 						{:else}
-							<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center shrink-0">🏈</div>
+							<div class="w-10 h-10 rounded-full bg-navy-800 flex items-center justify-center shrink-0">🏈</div>
 						{/if}
 
 						<div class="flex-1 min-w-0">
 							<p class="font-semibold text-white text-sm truncate">{row.teamName}</p>
-							<p class="text-xs text-slate-500">{row.wins}–{row.losses}{row.ties > 0 ? `–${row.ties}` : ''} · {row.totalPF.toFixed(1)} PF</p>
+							<p class="text-xs text-navy-500 tabular-nums">{row.wins}–{row.losses}{row.ties > 0 ? `–${row.ties}` : ''} · {row.totalPF.toFixed(1)} PF</p>
 						</div>
 
 						<div class="shrink-0 text-right">
-							<p class="font-mono font-bold text-white text-sm">{row.score > 0 ? row.score.toFixed(2) : '—'}</p>
+							<p class="font-mono font-bold text-white text-sm tabular-nums">{row.score > 0 ? row.score.toFixed(2) : '—'}</p>
 							<p class="text-xs {oddsClass(row.playoffOdds)}">{oddsLabel(row.playoffOdds, weeksRemainingFromHere === 0)}</p>
 						</div>
 					</div>
@@ -628,7 +628,7 @@
 
 		<!-- Legend -->
 		{#if currentWeek > 0}
-			<div class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+			<div class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-navy-500">
 				<span>Score = (PF × 2) + (PF × H2H Win%) + (PF × Median Win%)</span>
 				{#if selectedWeek > 0 && weeksRemainingFromHere > 0}
 					<span>·</span>

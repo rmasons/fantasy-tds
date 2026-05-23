@@ -12,10 +12,10 @@ export interface KeeperPlayerData {
 	draftRound: number | null;
 	draftSeason: string | null;
 	baseOverride: number | null;
-	baseCost: number | null;
+	baseCost: number;
 	yearsKept: number;
 	yearsKeptOverridden: boolean;
-	keeperCost: number | null;
+	keeperCost: number;
 }
 
 export interface KeeperRosterData {
@@ -37,7 +37,7 @@ function roundToBaseCost(round: number): number {
 
 function calcKeeperCost(baseCost: number, yearsKept: number): number {
 	const effective = baseCost < 1 ? 5 : baseCost;
-	return Math.ceil(effective * (1 + 0.2 * yearsKept));
+	return Math.ceil(effective * (1 + (0.2 * (yearsKept + 1))));
 }
 
 async function sleeperGet(path: string): Promise<any> {
@@ -192,9 +192,9 @@ export async function getKeeperData(leagueId: string): Promise<{
 				? baseOverride
 				: draftRound !== null
 					? roundToBaseCost(draftRound)
-					: null;
+					: 5; // undrafted (FAAB/waiver) — floor cost
 
-			const keeperCost = baseCost !== null ? calcKeeperCost(baseCost, yearsKept) : null;
+			const keeperCost = calcKeeperCost(baseCost, yearsKept);
 
 			players.push({
 				playerId,

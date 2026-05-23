@@ -53,12 +53,12 @@
 </script>
 
 <div class="max-w-2xl">
-	<h1 class="text-2xl font-extrabold text-white mb-1">League Admin</h1>
-	<p class="text-sm text-slate-500 mb-8">Tools for commissioners. Changes affect all league members.</p>
+	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-1">League Admin</h1>
+	<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mb-8">Tools for commissioners. Changes affect all league members.</p>
 
 	<!-- ── Draft Cache ── -->
-	<section class="bg-slate-900 rounded-xl border border-slate-800 p-6 mb-6">
-		<h2 class="text-base font-bold text-white mb-1">Draft Cache</h2>
+	<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
+		<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1 flex items-center gap-2"><span class="text-amber-400">◆</span>Draft Cache</h2>
 		<p class="text-sm text-slate-400 mb-4">
 			Pre-populate the draft pick cache so the Drafts page loads instantly
 			without hitting the Sleeper API. Walks the full season history.
@@ -86,23 +86,23 @@
 
 		{#if done && seedResults.length > 0}
 			<div class="mt-4">
-				<p class="text-xs text-slate-500 mb-3">
+				<p class="text-xs text-navy-500 mb-3">
 					{newCount} newly cached · {cachedCount} already cached
 					{#if errorCount > 0}· <span class="text-red-400">{errorCount} error(s)</span>{/if}
 				</p>
-				<div class="rounded-lg border border-slate-800 overflow-hidden">
+				<div class="rounded-lg border border-navy-700 overflow-hidden">
 					<table class="w-full text-sm">
 						<thead>
-							<tr class="bg-slate-800/60 text-left">
-								<th class="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">Season</th>
-								<th class="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">Type</th>
-								<th class="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide text-right">Picks</th>
-								<th class="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">Status</th>
+							<tr class="bg-navy-900 text-left">
+								<th class="px-4 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider">Season</th>
+								<th class="px-4 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider">Type</th>
+								<th class="px-4 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider text-right">Picks</th>
+								<th class="px-4 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider">Status</th>
 							</tr>
 						</thead>
-						<tbody class="divide-y divide-slate-800/60">
+						<tbody class="divide-y divide-navy-700/60">
 							{#each seedResults as r}
-								<tr class="hover:bg-slate-800/30">
+								<tr class="hover:bg-navy-800">
 									<td class="px-4 py-2.5 text-slate-300 font-medium">{r.season}</td>
 									<td class="px-4 py-2.5 text-slate-400 capitalize">{r.type}</td>
 									<td class="px-4 py-2.5 text-slate-400 text-right font-mono">{r.picks > 0 ? r.picks : '—'}</td>
