@@ -28,7 +28,7 @@
 	let loading = $state(true);
 	let error = $state('');
 
-	let rosterInfoMap = new Map<number, RosterInfo>();
+	let rosterInfoMap = $state(new Map<number, RosterInfo>());
 	let players: Record<string, SlimPlayer> = {};
 
 	$effect(() => {

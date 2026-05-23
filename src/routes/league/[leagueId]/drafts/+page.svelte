@@ -36,7 +36,7 @@
 	let loading = $state(true);
 	let error = $state('');
 
-	let rosterNameMap = new Map<number, string>();
+	let rosterNameMap = $state(new Map<number, string>());
 
 	$effect(() => {
 		const leagueId = data.leagueId;
