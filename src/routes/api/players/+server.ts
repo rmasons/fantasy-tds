@@ -52,17 +52,20 @@ async function getPlayers(): Promise<Record<string, SlimPlayer>> {
 				return memCache!;
 			}
 		}
-	} catch {
-		// cache miss — fall through to Sleeper
+	} catch (e) {
+		console.warn('[players] Firestore read failed, falling back to Sleeper:', e);
 	}
 
 	// 3. Sleeper API (first open of a new day)
 	const slim = await fetchAndSlimFromSleeper();
 
 	// Store as a JSON string to avoid per-field overhead for thousands of player keys
+	const json_str = JSON.stringify(slim);
+	console.log(`[players] Cache payload size: ${(json_str.length / 1024).toFixed(1)} KB`);
 	try {
-		await docRef.set({ data: JSON.stringify(slim), cachedDate: date });
+		await docRef.set({ data: json_str, cachedDate: date });
 	} catch (e) {
+		// Non-fatal — still serve the data even if the cache write fails
 		console.error('[players] Failed to write to Firestore:', e);
 	}
 
