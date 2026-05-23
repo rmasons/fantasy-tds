@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import {
 	getKeeperData,
 	setPlayerOverride,
+	resetPlayerOverride,
 	importPlayers,
 	invalidateDraftCache,
 } from '$lib/server/keepers';
@@ -38,6 +39,17 @@ export const PATCH: RequestHandler = async ({ url, request, locals }) => {
 	if (!Object.keys(patch).length) throw error(400, 'Nothing to update');
 
 	await setPlayerOverride(leagueId, body.playerId, patch);
+	return json({ ok: true });
+};
+
+// Reset a player back to auto-calculated values (used when a player is dropped)
+export const DELETE: RequestHandler = async ({ url, locals }) => {
+	if (!locals.user) throw error(401, 'Unauthorized');
+	const leagueId = validateLeagueId(url.searchParams.get('leagueId'));
+	const playerId = url.searchParams.get('playerId');
+	if (!playerId) throw error(400, 'Missing playerId');
+
+	await resetPlayerOverride(leagueId, playerId);
 	return json({ ok: true });
 };
 

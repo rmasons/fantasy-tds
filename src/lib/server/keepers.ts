@@ -230,6 +230,15 @@ export async function importPlayers(
 	await batch.commit();
 }
 
+export function resetPlayerOverride(leagueId: string, playerId: string) {
+	return adminDb
+		.collection('keeperData')
+		.doc(leagueId)
+		.collection('players')
+		.doc(playerId)
+		.delete();
+}
+
 export function invalidateDraftCache(leagueId: string) {
 	return adminDb.collection('cache').doc(`keeperDrafts_${leagueId}`).delete();
 }

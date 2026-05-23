@@ -123,6 +123,24 @@
 		}
 	}
 
+	async function resetPlayer(playerId: string) {
+		saving = true;
+		saveError = '';
+		try {
+			const res = await fetch(
+				`/api/keepers?leagueId=${encodeURIComponent(data.leagueId)}&playerId=${encodeURIComponent(playerId)}`,
+				{ method: 'DELETE' },
+			);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			editingId = null;
+			await load();
+		} catch (e: any) {
+			saveError = e.message;
+		} finally {
+			saving = false;
+		}
+	}
+
 	// ── Import ─────────────────────────────────────────────────────────────
 	async function runImport() {
 		importing = true;
@@ -300,6 +318,16 @@
 												Cancel
 											</button>
 										</div>
+										{#if player.yearsKeptOverridden || player.baseOverride !== null}
+											<button
+												onclick={() => resetPlayer(player.playerId)}
+												disabled={saving}
+												class="w-full py-1 text-xs text-slate-500 hover:text-red-400 disabled:opacity-40 transition-colors"
+												title="Clear all overrides — use when player is dropped to the draft pool"
+											>
+												Reset to auto (player was dropped)
+											</button>
+										{/if}
 									</div>
 								{:else}
 									<!-- Normal row -->
