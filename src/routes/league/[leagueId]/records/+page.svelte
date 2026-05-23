@@ -103,8 +103,8 @@
 					.sort((a, b) => b.fpts - a.fpts);
 
 				let completedWeeks = 0;
-				if (nfl.season_type === 'regular') completedWeeks = Math.max(0, nfl.display_week - 1);
-				else if (nfl.season_type === 'post') completedWeeks = playoffStart - 1;
+				if (nfl.season_type === 'regular' && league.status !== 'complete') completedWeeks = Math.max(0, nfl.display_week - 1);
+				else if (nfl.season_type === 'post' || league.status === 'complete') completedWeeks = playoffStart - 1;
 
 				if (completedWeeks === 0) { loading = false; return; }
 
