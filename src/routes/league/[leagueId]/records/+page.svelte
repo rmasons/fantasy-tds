@@ -1,32 +1,15 @@
 <script lang="ts">
 	import type { LayoutData } from '../$types';
-	import { fetchLeagueCore, fetchNflState, fetchMatchups as fetchWeekMatchups, buildRosterInfoMap, combineFpts, avatarUrl, type RosterInfo } from '$lib/sleeper';
+	import type { SeasonRecords, RecordGame, RecordScore } from '$lib/types';
 
 	let { data } = $props<{ data: LayoutData }>();
 
-	interface GameResult {
-		season: string;
-		week: number;
-		winner: string;
-		loser: string;
-		winnerPts: number;
-		loserPts: number;
-		diff: number;
-	}
-
-	interface WeekHigh {
-		season: string;
-		week: number;
-		team: string;
-		pts: number;
-	}
-
 	// ─── Season tab state ────────────────────────────────────────────────────────
-	let blowouts = $state<GameResult[]>([]);
-	let closest = $state<GameResult[]>([]);
-	let weekHighs = $state<WeekHigh[]>([]);
-	let weekLows = $state<WeekHigh[]>([]);
-	let highCombined = $state<GameResult[]>([]);
+	let blowouts = $state<RecordGame[]>([]);
+	let closest = $state<RecordGame[]>([]);
+	let weekHighs = $state<RecordScore[]>([]);
+	let weekLows = $state<RecordScore[]>([]);
+	let highCombined = $state<RecordGame[]>([]);
 	let seasonLeaders = $state<{ team: string; avatar: string | null; fpts: number }[]>([]);
 	let season = $state('');
 	let loading = $state(true);
@@ -51,14 +34,12 @@
 	let atStatus = $state('');
 	let atError = $state('');
 	let atManagers = $state<AllTimeStat[]>([]);
-	let atBlowouts = $state<GameResult[]>([]);
-	let atClosest = $state<GameResult[]>([]);
-	let atHighs = $state<WeekHigh[]>([]);
-	let atLows = $state<WeekHigh[]>([]);
-	let atHighCombined = $state<GameResult[]>([]);
-	let atLowCombined = $state<GameResult[]>([]);
-
-	let teamName = (id: number, m: Map<number, RosterInfo>) => m.get(id)?.teamName ?? `Roster ${id}`;
+	let atBlowouts = $state<RecordGame[]>([]);
+	let atClosest = $state<RecordGame[]>([]);
+	let atHighs = $state<RecordScore[]>([]);
+	let atLows = $state<RecordScore[]>([]);
+	let atHighCombined = $state<RecordGame[]>([]);
+	let atLowCombined = $state<RecordGame[]>([]);
 
 	$effect(() => {
 		const leagueId = data.leagueId;
@@ -85,96 +66,23 @@
 
 		(async () => {
 			try {
-				const [{ league, rosters, users }, nfl] = await Promise.all([
-					fetchLeagueCore(leagueId),
-					fetchNflState(),
-				]);
+				const res = await fetch(`/api/records/${leagueId}`);
+				if (!res.ok) throw new Error(`Failed to load records: ${res.status}`);
+				const result = await res.json() as SeasonRecords;
 
 				if (data.leagueId !== leagueId) return;
 
-				season = league.season;
-				const playoffStart: number = league.settings.playoff_week_start ?? 15;
+				season = result.season;
 
-				const rosterInfo = buildRosterInfoMap(rosters, users);
-
-				seasonLeaders = rosters
-					.map((r) => {
-						const info = rosterInfo.get(r.roster_id)!;
-						return {
-							team: info.teamName,
-							avatar: info.avatar,
-							fpts: combineFpts(r.settings.fpts, r.settings.fpts_decimal),
-						};
-					})
+				seasonLeaders = result.rosterSummaries
+					.map(r => ({ team: r.teamName, avatar: r.avatar, fpts: r.fpts }))
 					.sort((a, b) => b.fpts - a.fpts);
 
-				let completedWeeks = 0;
-				if (nfl.season_type === 'regular' && league.status !== 'complete') completedWeeks = Math.max(0, nfl.display_week - 1);
-				else if (nfl.season_type === 'post' || league.status === 'complete') completedWeeks = playoffStart - 1;
-
-				if (completedWeeks === 0) { loading = false; return; }
-
-				const weekNums = Array.from({ length: completedWeeks }, (_, i) => i + 1);
-				const weekData: any[][] = await Promise.all(
-					weekNums.map((w) => fetchWeekMatchups(leagueId, w))
-				);
-
-				if (data.leagueId !== leagueId) return;
-
-				const allBlowouts: GameResult[] = [];
-				const allClosest: GameResult[] = [];
-				const allHighs: WeekHigh[] = [];
-				const allLows: WeekHigh[] = [];
-
-				for (let wi = 0; wi < weekData.length; wi++) {
-					const week = wi + 1;
-					const matchups: Record<number, any[]> = {};
-
-					for (const m of weekData[wi]) {
-						if (!matchups[m.matchup_id]) matchups[m.matchup_id] = [];
-						matchups[m.matchup_id].push(m);
-					}
-
-					for (const pair of Object.values(matchups)) {
-						if (pair.length !== 2) continue;
-						const [a, b] = pair;
-						const aPts = a.points ?? 0;
-						const bPts = b.points ?? 0;
-						if (aPts === 0 && bPts === 0) continue;
-
-						const [winner, loser, winPts, losPts] =
-							aPts >= bPts
-								? [a.roster_id, b.roster_id, aPts, bPts]
-								: [b.roster_id, a.roster_id, bPts, aPts];
-
-						const result: GameResult = {
-							season,
-							week,
-							winner: teamName(winner, rosterInfo),
-							loser: teamName(loser, rosterInfo),
-							winnerPts: winPts,
-							loserPts: losPts,
-							diff: +(winPts - losPts).toFixed(2)
-						};
-						allBlowouts.push(result);
-						allClosest.push(result);
-					}
-
-					const weekScores = weekData[wi]
-						.filter((m: any) => (m.points ?? 0) > 0)
-						.map((m: any) => ({ team: teamName(m.roster_id, rosterInfo), pts: m.points ?? 0 }));
-					if (weekScores.length) {
-						weekScores.sort((a: any, b: any) => b.pts - a.pts);
-						allHighs.push({ season, week, team: weekScores[0].team, pts: weekScores[0].pts });
-						allLows.push({ season, week, team: weekScores[weekScores.length - 1].team, pts: weekScores[weekScores.length - 1].pts });
-					}
-				}
-
-				blowouts = allBlowouts.sort((a, b) => b.diff - a.diff).slice(0, 5);
-				closest = allClosest.sort((a, b) => a.diff - b.diff).slice(0, 5);
-				weekHighs = allHighs.sort((a, b) => b.pts - a.pts).slice(0, 10);
-				weekLows = allLows.sort((a, b) => a.pts - b.pts).slice(0, 10);
-				highCombined = [...allBlowouts].sort((a, b) => (b.winnerPts + b.loserPts) - (a.winnerPts + a.loserPts)).slice(0, 5);
+				blowouts = [...result.gameResults].sort((a, b) => b.diff - a.diff).slice(0, 5);
+				closest = [...result.gameResults].sort((a, b) => a.diff - b.diff).slice(0, 5);
+				weekHighs = [...result.weekHighs].sort((a, b) => b.pts - a.pts).slice(0, 10);
+				weekLows = [...result.weekLows].sort((a, b) => a.pts - b.pts).slice(0, 10);
+				highCombined = [...result.gameResults].sort((a, b) => (b.winnerPts + b.loserPts) - (a.winnerPts + a.loserPts)).slice(0, 5);
 			} catch (e: any) {
 				if (data.leagueId !== leagueId) return;
 				error = e.message;
@@ -193,104 +101,48 @@
 
 		try {
 			const managerMap = new Map<string, AllTimeStat>();
-			const allGameResults: GameResult[] = [];
-			const allWeekHighs: WeekHigh[] = [];
-			const allWeekLows: WeekHigh[] = [];
+			const allGameResults: RecordGame[] = [];
+			const allWeekHighs: RecordScore[] = [];
+			const allWeekLows: RecordScore[] = [];
 
 			let curId: string | null = leagueId;
 
 			while (curId && curId !== '0') {
-				const { league: leagueData, rosters, users } = await fetchLeagueCore(curId);
+				const res = await fetch(`/api/records/${curId}`);
+				if (!res.ok) throw new Error(`Failed to load season: ${res.status}`);
+				const result = await res.json() as SeasonRecords;
 
 				if (data.leagueId !== leagueId) return;
 
-				const yr: string = leagueData.season;
-				atStatus = `Loading ${yr}…`;
-				const playoffStart: number = leagueData.settings?.playoff_week_start ?? 15;
+				atStatus = `Loading ${result.season}…`;
 
-				const rosterInfo = buildRosterInfoMap(rosters, users);
-
-				for (const r of rosters) {
-					const info = rosterInfo.get(r.roster_id)!;
-					const f = combineFpts(r.settings?.fpts, r.settings?.fpts_decimal);
-					const fa = combineFpts(r.settings?.fpts_against, r.settings?.fpts_against_decimal);
-					const existing = managerMap.get(r.owner_id);
-
+				for (const r of result.rosterSummaries) {
+					const existing = managerMap.get(r.ownerId);
 					if (existing) {
-						existing.wins += r.settings?.wins ?? 0;
-						existing.losses += r.settings?.losses ?? 0;
-						existing.ties += r.settings?.ties ?? 0;
-						existing.fpts += f;
-						existing.fptsAgainst += fa;
+						existing.wins += r.wins;
+						existing.losses += r.losses;
+						existing.ties += r.ties;
+						existing.fpts += r.fpts;
+						existing.fptsAgainst += r.fptsAgainst;
 						existing.seasons += 1;
 					} else {
-						managerMap.set(r.owner_id, {
-							userId: r.owner_id,
-							displayName: info.ownerName ?? info.teamName,
-							avatar: info.avatar,
-							wins: r.settings?.wins ?? 0,
-							losses: r.settings?.losses ?? 0,
-							ties: r.settings?.ties ?? 0,
-							fpts: f,
-							fptsAgainst: fa,
+						managerMap.set(r.ownerId, {
+							userId: r.ownerId,
+							displayName: r.ownerName ?? r.teamName,
+							avatar: r.avatar,
+							wins: r.wins,
+							losses: r.losses,
+							ties: r.ties,
+							fpts: r.fpts,
+							fptsAgainst: r.fptsAgainst,
 							seasons: 1,
 						});
 					}
 				}
 
-				// Fetch all regular-season weeks for this season
-				const numWeeks = playoffStart - 1;
-				if (numWeeks > 0) {
-					const weekNums = Array.from({ length: numWeeks }, (_, i) => i + 1);
-					const weekData: any[][] = await Promise.all(
-						weekNums.map(w => fetchWeekMatchups(curId!, w))
-					);
-
-					for (let wi = 0; wi < weekData.length; wi++) {
-						const week = wi + 1;
-						const matchupsThisWeek: Record<number, any[]> = {};
-
-						for (const m of weekData[wi]) {
-							if (!matchupsThisWeek[m.matchup_id]) matchupsThisWeek[m.matchup_id] = [];
-							matchupsThisWeek[m.matchup_id].push(m);
-						}
-
-						for (const pair of Object.values(matchupsThisWeek)) {
-							if (pair.length !== 2) continue;
-							const [a, b] = pair;
-							const aPts = a.points ?? 0;
-							const bPts = b.points ?? 0;
-							if (aPts === 0 && bPts === 0) continue;
-
-							const [winRoster, losRoster, winPts, losPts] =
-								aPts >= bPts
-									? [a.roster_id, b.roster_id, aPts, bPts]
-									: [b.roster_id, a.roster_id, bPts, aPts];
-
-							allGameResults.push({
-								season: yr,
-								week,
-								winner: rosterInfo.get(winRoster)?.teamName ?? `Roster ${winRoster}`,
-								loser: rosterInfo.get(losRoster)?.teamName ?? `Roster ${losRoster}`,
-								winnerPts: winPts,
-								loserPts: losPts,
-								diff: +(winPts - losPts).toFixed(2),
-							});
-						}
-
-						const weekScores = weekData[wi]
-							.filter((m: any) => (m.points ?? 0) > 0)
-							.map((m: any) => ({
-								team: rosterInfo.get(m.roster_id)?.teamName ?? `Roster ${m.roster_id}`,
-								pts: m.points ?? 0,
-							}));
-						if (weekScores.length) {
-							weekScores.sort((a: any, b: any) => b.pts - a.pts);
-							allWeekHighs.push({ season: yr, week, team: weekScores[0].team, pts: weekScores[0].pts });
-							allWeekLows.push({ season: yr, week, team: weekScores[weekScores.length - 1].team, pts: weekScores[weekScores.length - 1].pts });
-						}
-					}
-				}
+				allGameResults.push(...result.gameResults);
+				allWeekHighs.push(...result.weekHighs);
+				allWeekLows.push(...result.weekLows);
 
 				// Reactively stream in results as each season finishes
 				atManagers = Array.from(managerMap.values()).sort((a, b) => {
@@ -307,7 +159,7 @@
 				atHighCombined = [...allGameResults].sort((a, b) => (b.winnerPts + b.loserPts) - (a.winnerPts + a.loserPts)).slice(0, 5);
 				atLowCombined = [...allGameResults].sort((a, b) => (a.winnerPts + a.loserPts) - (b.winnerPts + b.loserPts)).slice(0, 5);
 
-				curId = leagueData.previous_league_id ?? null;
+				curId = result.previousLeagueId;
 			}
 
 			if (data.leagueId !== leagueId) return;

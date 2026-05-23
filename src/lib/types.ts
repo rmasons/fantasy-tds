@@ -109,3 +109,44 @@ export interface ManagerLeagueProfile {
 	joinedYear?: number;
 	updatedAt?: number;
 }
+
+export interface RosterSummary {
+	ownerId: string;
+	teamName: string;
+	ownerName: string | null;
+	avatar: string | null;
+	wins: number;
+	losses: number;
+	ties: number;
+	fpts: number;
+	fptsAgainst: number;
+}
+
+export interface RecordGame {
+	season: string;
+	week: number;
+	winner: string;
+	loser: string;
+	winnerPts: number;
+	loserPts: number;
+	diff: number;
+}
+
+export interface RecordScore {
+	season: string;
+	week: number;
+	team: string;
+	pts: number;
+}
+
+export interface SeasonRecords {
+	leagueId: string;
+	season: string;
+	status: string;
+	previousLeagueId: string | null;
+	playoffWeekStart: number;
+	rosterSummaries: RosterSummary[];
+	gameResults: RecordGame[];
+	weekHighs: RecordScore[];
+	weekLows: RecordScore[];
+}
