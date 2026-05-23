@@ -29,7 +29,7 @@
 	let error = $state('');
 
 	let rosterInfoMap = $state(new Map<number, RosterInfo>());
-	let players: Record<string, SlimPlayer> = {};
+	let players = $state<Record<string, SlimPlayer>>({});
 
 	$effect(() => {
 		const leagueId = data.leagueId;
