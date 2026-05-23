@@ -115,7 +115,7 @@
 					fetch(`/api/profiles?ids=${ownerIds.join(',')}`)
 						.then(r => r.json())
 						.then(p => { if (data.leagueId === leagueId) profiles = p; })
-						.catch(() => {});
+						.catch(e => console.warn('[awards] profiles fetch failed:', e));
 				}
 			} catch (e: any) {
 				if (data.leagueId !== leagueId) return;

@@ -28,6 +28,7 @@
 			if (window.innerWidth >= 1024) colCount = 3;
 			else if (window.innerWidth >= 640) colCount = 2;
 			else colCount = 1;
+			expandedRow = null;
 		}
 		updateCols();
 		window.addEventListener('resize', updateCols);

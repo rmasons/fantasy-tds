@@ -32,7 +32,7 @@ interface DraftPick { round: number; season: string }
 interface KeeperOverride { yearsKept?: number; baseOverride?: number | null }
 
 function roundToBaseCost(round: number): number {
-	return 80 - 5 * round; // R1=$75, R2=$70 …
+	return Math.max(5, 80 - 5 * round); // R1=$75, R2=$70 …
 }
 
 function calcKeeperCost(baseCost: number, yearsKept: number): number {
@@ -41,7 +41,7 @@ function calcKeeperCost(baseCost: number, yearsKept: number): number {
 }
 
 async function sleeperGet(path: string): Promise<any> {
-	const res = await fetch(`https://api.sleeper.app/v1${path}`);
+	const res = await fetch(`https://api.sleeper.app/v1${path}`, { signal: AbortSignal.timeout(5000) });
 	if (!res.ok) throw new Error(`Sleeper ${path} → ${res.status}`);
 	return res.json();
 }
@@ -107,6 +107,18 @@ async function getCachedDraftHistory(leagueId: string): Promise<Map<string, Draf
 	return history;
 }
 
+let playersCacheData: Record<string, { name: string; pos: string; team: string }> | null = null;
+let playersCacheExpiry = 0;
+const PLAYERS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+async function getPlayersCache(): Promise<Record<string, { name: string; pos: string; team: string }>> {
+	if (playersCacheData && Date.now() < playersCacheExpiry) return playersCacheData;
+	const doc = await adminDb.collection('cache').doc('players_nfl').get();
+	playersCacheData = doc.exists ? JSON.parse(doc.data()!.data) : {};
+	playersCacheExpiry = Date.now() + PLAYERS_CACHE_TTL_MS;
+	return playersCacheData;
+}
+
 const POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 function posRank(pos: string) {
 	const i = POS_ORDER.indexOf(pos);
@@ -139,17 +151,14 @@ export async function getKeeperData(leagueId: string): Promise<{
 		});
 	}
 
-	const [draftHistory, overridesSnap, playersCacheDoc] = await Promise.all([
+	const [draftHistory, overridesSnap, playersCache] = await Promise.all([
 		getCachedDraftHistory(leagueId),
 		adminDb.collection('keeperData').doc(leagueId).collection('players').get(),
-		adminDb.collection('cache').doc('players_nfl').get(),
+		getPlayersCache(),
 	]);
 
 	const overrides = new Map<string, KeeperOverride>();
 	overridesSnap.forEach(doc => overrides.set(doc.id, doc.data() as KeeperOverride));
-
-	const playersCache: Record<string, { name: string; pos: string; team: string }> =
-		playersCacheDoc.exists ? JSON.parse(playersCacheDoc.data()!.data) : {};
 
 	const rosters: KeeperRosterData[] = [];
 
@@ -171,7 +180,7 @@ export async function getKeeperData(leagueId: string): Promise<{
 			const yearsKept = yearsKeptOverridden
 				? ov!.yearsKept!
 				: draftInfo
-					? parseInt(planningYear) - parseInt(draftInfo.season)
+					? parseInt(planningYear, 10) - parseInt(draftInfo.season, 10)
 					: 0;
 
 			const draftRound = draftInfo?.round ?? null;

@@ -14,6 +14,12 @@ function validateLeagueId(id: string | null): string {
 	return id;
 }
 
+function validatePlayerId(id: string | null): string {
+	if (!id) throw error(400, 'Missing playerId');
+	if (!/^\w{1,30}$/.test(id)) throw error(400, 'Invalid playerId');
+	return id;
+}
+
 export const GET: RequestHandler = async ({ url, locals }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');
 	const leagueId = validateLeagueId(url.searchParams.get('leagueId'));
@@ -27,27 +33,26 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 
 // Update a single player's yearsKept / baseOverride
 export const PATCH: RequestHandler = async ({ url, request, locals }) => {
-	if (!locals.user) throw error(401, 'Unauthorized');
+	if (!locals.user?.isAdmin) throw error(403, 'Forbidden');
 	const leagueId = validateLeagueId(url.searchParams.get('leagueId'));
 
 	const body = await request.json().catch(() => null);
-	if (!body?.playerId) throw error(400, 'Missing playerId');
+	const playerId = validatePlayerId(body?.playerId ?? null);
 
 	const patch: { yearsKept?: number; baseOverride?: number | null } = {};
 	if (typeof body.yearsKept === 'number') patch.yearsKept = body.yearsKept;
 	if ('baseOverride' in body) patch.baseOverride = body.baseOverride ?? null;
 	if (!Object.keys(patch).length) throw error(400, 'Nothing to update');
 
-	await setPlayerOverride(leagueId, body.playerId, patch);
+	await setPlayerOverride(leagueId, playerId, patch);
 	return json({ ok: true });
 };
 
 // Reset a player back to auto-calculated values (used when a player is dropped)
 export const DELETE: RequestHandler = async ({ url, locals }) => {
-	if (!locals.user) throw error(401, 'Unauthorized');
+	if (!locals.user?.isAdmin) throw error(403, 'Forbidden');
 	const leagueId = validateLeagueId(url.searchParams.get('leagueId'));
-	const playerId = url.searchParams.get('playerId');
-	if (!playerId) throw error(400, 'Missing playerId');
+	const playerId = validatePlayerId(url.searchParams.get('playerId'));
 
 	await resetPlayerOverride(leagueId, playerId);
 	return json({ ok: true });
@@ -55,7 +60,7 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
 
 // Bulk import pre-Sleeper keepers
 export const POST: RequestHandler = async ({ url, request, locals }) => {
-	if (!locals.user) throw error(401, 'Unauthorized');
+	if (!locals.user?.isAdmin) throw error(403, 'Forbidden');
 	const leagueId = validateLeagueId(url.searchParams.get('leagueId'));
 
 	const body = await request.json().catch(() => null);
@@ -69,7 +74,10 @@ export const POST: RequestHandler = async ({ url, request, locals }) => {
 	if (!Array.isArray(body?.players)) throw error(400, 'Expected { players: [...] }');
 
 	const entries = (body.players as any[]).filter(
-		e => typeof e.playerId === 'string' && e.playerId,
+		e =>
+			typeof e.playerId === 'string' && /^\w{1,30}$/.test(e.playerId) &&
+			(e.baseCost === undefined || e.baseCost === null || typeof e.baseCost === 'number') &&
+			(e.yearsKept === undefined || (Number.isInteger(e.yearsKept) && e.yearsKept >= 0)),
 	);
 	if (!entries.length) throw error(400, 'No valid entries');
 

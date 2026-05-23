@@ -192,10 +192,11 @@
 	async function refreshDraftCache() {
 		refreshing = true;
 		try {
-			await fetch(
+			const res = await fetch(
 				`/api/keepers?leagueId=${encodeURIComponent(data.leagueId)}&action=invalidate-cache`,
 				{ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
 			);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			await load();
 		} finally {
 			refreshing = false;
@@ -220,7 +221,7 @@
 		</div>
 
 		<div class="flex items-center gap-2 flex-wrap">
-			{#if data.user}
+			{#if data.user?.isAdmin}
 				<label class="flex items-center gap-2 text-sm text-slate-400 cursor-pointer select-none">
 					<input
 						type="checkbox"
@@ -301,6 +302,7 @@
 			{#each rosters as roster}
 				{@const total = rosterTotal(roster)}
 				{@const count = rosterKeeperCount(roster)}
+				{@const faabLeft = rosterFaabAfter(roster)}
 				{@const isMyRoster = roster.ownerUserId === data.user?.sleeperUserId}
 				<div class="bg-slate-900 rounded-xl border {isMyRoster ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-slate-800/60'} overflow-hidden flex flex-col">
 					<!-- Roster header -->
@@ -323,8 +325,8 @@
 									{count}/{maxKeepers}
 								</span>
 							{/if}
-								<span class="text-xs font-semibold {rosterFaabAfter(roster) < 0 ? 'text-red-400' : count > 0 ? 'text-green-400' : 'text-slate-500'}">
-								${rosterFaabAfter(roster)}
+								<span class="text-xs font-semibold {faabLeft < 0 ? 'text-red-400' : count > 0 ? 'text-green-400' : 'text-slate-500'}">
+								${faabLeft}
 							</span>
 						</div>
 					</div>
@@ -443,7 +445,6 @@
 
 					<!-- Roster footer total -->
 					{#if count > 0}
-						{@const faabLeft = rosterFaabAfter(roster)}
 						<div class="px-4 py-2.5 border-t border-slate-800/60 bg-slate-900/60 flex items-center justify-between">
 							<span class="text-xs text-slate-500">
 								{count}{maxKeepers > 0 ? `/${maxKeepers}` : ''} keeper{count !== 1 ? 's' : ''} · <span class="text-amber-400">${total}</span>
