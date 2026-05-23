@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { adminDb } from '$lib/firebase/admin';
 import { fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
+import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 import type { SeasonRecords, RosterSummary, RecordGame, RecordScore } from '$lib/types';
 
 function today(): string {
@@ -16,7 +17,15 @@ async function buildRecords(leagueId: string): Promise<SeasonRecords> {
 
 	const season = league.season;
 	const playoffWeekStart: number = league.settings.playoff_week_start ?? 15;
-	const rosterInfo = buildRosterInfoMap(rosters, users);
+
+	const ownerIds = rosters.map(r => r.owner_id).filter(Boolean);
+	const profiles = await getManagerProfilesBatch(ownerIds);
+	const nameOverrides = new Map<string, string>();
+	for (const [uid, p] of profiles) {
+		if (p.displayName) nameOverrides.set(uid, p.displayName);
+	}
+
+	const rosterInfo = buildRosterInfoMap(rosters, users, nameOverrides);
 
 	const rosterSummaries: RosterSummary[] = rosters.map(r => {
 		const info = rosterInfo.get(r.roster_id)!;

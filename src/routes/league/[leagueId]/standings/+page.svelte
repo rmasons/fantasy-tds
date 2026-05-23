@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { StandingRow } from '$lib/types';
-	import { fetchLeagueCore, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
+	import { fetchLeagueCore, buildRosterInfoMap, fetchDisplayNameOverrides, combineFpts } from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -25,7 +25,8 @@
 
 				season = league.season;
 
-				const rosterInfo = buildRosterInfoMap(rosters, users);
+				const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+				const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
 
 				const rows: StandingRow[] = rosters.map((roster) => {
 					const info = rosterInfo.get(roster.roster_id)!;

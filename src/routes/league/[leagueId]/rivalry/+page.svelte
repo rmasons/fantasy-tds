@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { fetchRosters, fetchUsers, fetchLeague, fetchMatchups as fetchWeekMatchups, buildRosterInfoMap } from '$lib/sleeper';
+	import { fetchRosters, fetchUsers, fetchLeague, fetchMatchups as fetchWeekMatchups, buildRosterInfoMap, fetchDisplayNameOverrides } from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -52,7 +52,8 @@
 
 				if (data.leagueId !== leagueId) return;
 
-				const rosterInfo = buildRosterInfoMap(rosters, users);
+				const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+				const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
 				managers = rosters
 					.filter(r => r.owner_id)
 					.map(r => {

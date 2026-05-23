@@ -36,10 +36,14 @@ export function combineFpts(fpts: number = 0, fptsDecimal: number = 0): number {
  * Build a roster_id → display-info map from raw rosters + users.
  * This is the most-repeated join in the codebase: every page that shows
  * team names, avatars, or owners goes through this.
+ *
+ * Pass nameOverrides (sleeperUserId → preferred name) to substitute
+ * Sleeper usernames with manager-chosen display names.
  */
 export function buildRosterInfoMap(
 	rosters: SleeperRoster[],
-	users: SleeperLeagueUser[]
+	users: SleeperLeagueUser[],
+	nameOverrides?: Map<string, string>
 ): Map<number, RosterInfo> {
 	const userMap = new Map(users.map((u) => [u.user_id, u]));
 	const map = new Map<number, RosterInfo>();
@@ -47,12 +51,28 @@ export function buildRosterInfoMap(
 		const u = userMap.get(r.owner_id);
 		map.set(r.roster_id, {
 			teamName: u?.metadata?.team_name ?? u?.display_name ?? `Team ${r.roster_id}`,
-			ownerName: u?.display_name ?? null,
+			ownerName: nameOverrides?.get(r.owner_id) ?? u?.display_name ?? null,
 			avatar: avatarUrl(u?.metadata?.avatar ?? u?.avatar),
 			ownerId: r.owner_id,
 		});
 	}
 	return map;
+}
+
+/**
+ * Fetch preferred display name overrides for a set of Sleeper user IDs.
+ * Falls back to an empty map on any error so callers never need to guard.
+ */
+export async function fetchDisplayNameOverrides(userIds: string[]): Promise<Map<string, string>> {
+	if (!userIds.length) return new Map();
+	try {
+		const res = await fetch(`/api/profile/display-names?userIds=${userIds.join(',')}`);
+		if (!res.ok) return new Map();
+		const { overrides } = await res.json();
+		return new Map(Object.entries(overrides as Record<string, string>));
+	} catch {
+		return new Map();
+	}
 }
 
 // ── Internal fetch helper ─────────────────────────────────────────────────────

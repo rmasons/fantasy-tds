@@ -230,8 +230,8 @@
 				<div class="flex items-start justify-between gap-3">
 					<div class="min-w-0">
 						<h1 class="text-2xl font-bold text-white">{manager.teamName}</h1>
-						{#if profile?.firstName || profile?.lastName}
-							<p class="text-slate-200 text-sm font-medium">{[profile.firstName, profile.lastName].filter(Boolean).join(' ')}</p>
+						{#if profile?.displayName || profile?.firstName || profile?.lastName}
+							<p class="text-slate-200 text-sm font-medium">{profile?.displayName || [profile?.firstName, profile?.lastName].filter(Boolean).join(' ')}</p>
 						{/if}
 						<p class="text-slate-400 text-sm">{manager.displayName}</p>
 					</div>

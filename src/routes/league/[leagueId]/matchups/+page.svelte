@@ -3,7 +3,7 @@
 	import type { RosterInfo } from '$lib/sleeper';
 	import {
 		fetchLeagueCore, fetchNflState, fetchMatchups as fetchWeekMatchups,
-		fetchWinnersBracket, fetchLosersBracket, buildRosterInfoMap
+		fetchWinnersBracket, fetchLosersBracket, buildRosterInfoMap, fetchDisplayNameOverrides
 	} from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
@@ -81,7 +81,8 @@
 				playoffType = league.settings?.playoff_round_type ?? 0;
 				regularSeasonLength = playoffStart - 1;
 
-				userMap = buildRosterInfoMap(rosters, users);
+				const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+				userMap = buildRosterInfoMap(rosters, users, overrides);
 
 				const playoffTeams = league.settings?.playoff_teams ?? 4;
 				const numRounds = Math.ceil(Math.log2(Math.max(playoffTeams, 2)));

@@ -1,5 +1,6 @@
 import { adminDb } from '$lib/firebase/admin';
 import { avatarUrl } from '$lib/sleeper';
+import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 
 export interface KeeperPlayerData {
 	playerId: string;
@@ -145,19 +146,23 @@ export async function getKeeperData(leagueId: string): Promise<{
 	const faabBudget: number = league.settings?.waiver_budget ?? 100;
 	const maxKeepers: number = league.settings?.num_keepers ?? 0;
 
-	const userMap = new Map<string, { name: string; avatar: string | null }>();
-	for (const u of (usersRaw ?? [])) {
-		userMap.set(u.user_id, {
-			name: u.metadata?.team_name || u.display_name || u.username || u.user_id,
-			avatar: avatarUrl(u.metadata?.avatar ?? u.avatar),
-		});
-	}
+	const sleeperUserIds: string[] = (usersRaw ?? []).map((u: any) => u.user_id).filter(Boolean);
 
-	const [draftHistory, overridesSnap, playersCache] = await Promise.all([
+	const [draftHistory, overridesSnap, playersCache, managerProfiles] = await Promise.all([
 		getCachedDraftHistory(leagueId),
 		adminDb.collection('keeperData').doc(leagueId).collection('players').get(),
 		getPlayersCache(),
+		getManagerProfilesBatch(sleeperUserIds),
 	]);
+
+	const userMap = new Map<string, { name: string; avatar: string | null }>();
+	for (const u of (usersRaw ?? [])) {
+		const displayName = managerProfiles.get(u.user_id)?.displayName;
+		userMap.set(u.user_id, {
+			name: displayName || u.metadata?.team_name || u.display_name || u.username || u.user_id,
+			avatar: avatarUrl(u.metadata?.avatar ?? u.avatar),
+		});
+	}
 
 	const overrides = new Map<string, KeeperOverride>();
 	overridesSnap.forEach(doc => overrides.set(doc.id, doc.data() as KeeperOverride));

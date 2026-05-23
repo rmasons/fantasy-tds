@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { LayoutData } from '../$types';
 	import type { SlimPlayer } from '$lib/types';
-	import { fetchLeagueCore, buildRosterInfoMap } from '$lib/sleeper';
+	import { fetchLeagueCore, buildRosterInfoMap, fetchDisplayNameOverrides } from '$lib/sleeper';
 
 	let { data } = $props<{ data: LayoutData }>();
 
@@ -73,7 +73,8 @@
 				if (data.leagueId !== leagueId) return;
 
 				const starterSlots: string[] = (league as any).roster_positions ?? [];
-				const rosterInfo = buildRosterInfoMap(rosters, users);
+				const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+				const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
 
 				teams = rosters.map((r) => {
 					const info = rosterInfo.get(r.roster_id)!;

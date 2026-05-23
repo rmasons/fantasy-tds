@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { LayoutData } from '../$types';
 	import type { SlimPlayer } from '$lib/types';
-	import { fetchLeagueCore, fetchNflState, fetchTransactions as fetchWeekTransactions, buildRosterInfoMap, type RosterInfo } from '$lib/sleeper';
+	import { fetchLeagueCore, fetchNflState, fetchTransactions as fetchWeekTransactions, buildRosterInfoMap, fetchDisplayNameOverrides, type RosterInfo } from '$lib/sleeper';
 
 	let { data } = $props<{ data: LayoutData }>();
 
@@ -50,7 +50,8 @@
 				if (data.leagueId !== leagueId) return;
 
 				players = playersData;
-				rosterInfoMap = buildRosterInfoMap(rosters, users);
+				const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+				rosterInfoMap = buildRosterInfoMap(rosters, users, overrides);
 
 				let week = nfl.season_type === 'regular' ? nfl.week : nfl.season_type === 'post' ? 18 : 1;
 				week = Math.max(week, 1);

@@ -21,6 +21,7 @@
 	const navLinks = [
 		{ href: 'standings',       label: 'Standings'       },
 		{ href: 'matchups',        label: 'Matchups'        },
+		{ href: 'playoff-bracket', label: 'Playoff Bracket' },
 		{ href: 'power-rankings',  label: 'Power Rankings'  },
 		{ href: 'rosters',         label: 'Rosters'         },
 		{ href: 'records',         label: 'Records'         },

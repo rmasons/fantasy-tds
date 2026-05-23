@@ -95,6 +95,7 @@ export interface StandingRow {
 
 export interface ManagerProfile {
 	sleeperUserId: string;
+	displayName?: string;     // max 50 chars — shown across the app instead of Sleeper username
 	firstName?: string;       // max 50 chars
 	lastName?: string;        // max 50 chars
 	email?: string;           // written automatically on first login

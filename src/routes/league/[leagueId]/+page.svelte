@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { SleeperLeague, SleeperNflState } from '$lib/types';
-	import { fetchLeague, fetchNflState, fetchUsers, fetchRosters, fetchWinnersBracket, buildRosterInfoMap } from '$lib/sleeper';
+	import { fetchLeague, fetchNflState, fetchUsers, fetchRosters, fetchWinnersBracket, buildRosterInfoMap, fetchDisplayNameOverrides } from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -44,7 +44,8 @@
 			if (data.leagueId !== forLeagueId) return;
 			if (!Array.isArray(winners) || winners.length === 0) return;
 
-			const rosterInfo = buildRosterInfoMap(rosters, users);
+			const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+			const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
 
 			const maxRound = Math.max(...(winners as any[]).map((m: any) => m.r));
 			const finalsMatch = (winners as any[]).find((m: any) => m.r === maxRound && m.t1_from?.w != null);

@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import type { ManagerProfile, ManagerLeagueProfile } from '$lib/types';
 
 export const PROFILE_MAX_LENGTHS: Record<string, number> = {
+	displayName: 50,
 	firstName: 50,
 	lastName: 50,
 	bio: 280,

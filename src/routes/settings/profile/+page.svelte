@@ -5,6 +5,7 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	// Global field state — seeded from saved values
+	let displayName = $state(data.globalProfile?.displayName ?? '');
 	let firstName = $state(data.globalProfile?.firstName ?? '');
 	let lastName = $state(data.globalProfile?.lastName ?? '');
 	let bio = $state(data.globalProfile?.bio ?? '');
@@ -79,6 +80,25 @@
 			>
 				<section class="bg-slate-900 rounded-xl border border-slate-800 p-6 space-y-5">
 					<h2 class="text-base font-semibold text-slate-200">About Me</h2>
+
+					<!-- Display Name -->
+					<div>
+						<label for="displayName" class="block text-sm font-medium text-slate-300 mb-1.5">
+							Preferred Display Name
+						</label>
+						<input
+							id="displayName"
+							name="displayName"
+							type="text"
+							maxlength="50"
+							bind:value={displayName}
+							placeholder="How you want to appear across the app"
+							class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+						/>
+						<p class="text-xs text-slate-600 mt-1">
+							Overrides your Sleeper username everywhere names appear. Leave blank to use your Sleeper username.
+						</p>
+					</div>
 
 					<!-- Name -->
 					<div class="grid sm:grid-cols-2 gap-4">

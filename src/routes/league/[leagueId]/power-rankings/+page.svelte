@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { LayoutData } from '../$types';
-	import { fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
+	import { fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap, fetchDisplayNameOverrides, combineFpts } from '$lib/sleeper';
 
 	let { data } = $props<{ data: LayoutData }>();
 
@@ -192,7 +192,8 @@
 				const remaining = Math.max(0, playoffStart - 1 - completedWeeks);
 				weeksRemaining = remaining;
 
-				const rosterInfo = buildRosterInfoMap(rosters, users);
+				const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+				const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
 				rosterBaseData = rosters.map((r) => {
 					const info = rosterInfo.get(r.roster_id)!;
 					return {
