@@ -33,9 +33,16 @@ export async function seedLeagueChain(startLeagueId: string): Promise<SeedDraftR
 
 		let drafts: any[] = [];
 		try {
-			drafts = (await sleeperGet(`/league/${currentId}/drafts`)) ?? [];
+			const [fetchedDrafts, rosters, users] = await Promise.all([
+				sleeperGet(`/league/${currentId}/drafts`),
+				sleeperGet(`/league/${currentId}/rosters`),
+				sleeperGet(`/league/${currentId}/users`),
+			]);
+			drafts = fetchedDrafts ?? [];
+			const rosterInfo = buildRosterInfo(rosters ?? [], users ?? []);
 			await adminDb.collection('draftListCache').doc(currentId).set({
 				drafts,
+				rosterInfo,
 				cachedAt: new Date().toISOString(),
 			});
 		} catch (e: any) {
@@ -108,20 +115,44 @@ export async function getCachedDraftPicks(draftId: string): Promise<any[]> {
 
 const DRAFT_LIST_TTL_MS = 24 * 60 * 60 * 1000; // 24 h — new drafts are rare
 
-export async function getCachedDraftList(leagueId: string): Promise<any[]> {
+export interface DraftListPayload {
+	drafts: any[];
+	rosterInfo: Record<string, string>; // rosterId → teamName
+}
+
+function buildRosterInfo(rosters: any[], users: any[]): Record<string, string> {
+	const userMap = new Map(users.map((u: any) => [u.user_id, u]));
+	const out: Record<string, string> = {};
+	for (const r of rosters) {
+		const u: any = userMap.get(r.owner_id);
+		out[String(r.roster_id)] =
+			u?.metadata?.team_name ?? u?.display_name ?? `Team ${r.roster_id}`;
+	}
+	return out;
+}
+
+export async function getCachedDraftList(leagueId: string): Promise<DraftListPayload> {
 	const ref = adminDb.collection('draftListCache').doc(leagueId);
 	try {
 		const doc = await ref.get();
 		if (doc.exists) {
 			const d = doc.data()!;
-			if (Date.now() - new Date(d.cachedAt).getTime() < DRAFT_LIST_TTL_MS) {
-				return d.drafts as any[];
+			if (
+				d.rosterInfo &&
+				Date.now() - new Date(d.cachedAt).getTime() < DRAFT_LIST_TTL_MS
+			) {
+				return { drafts: d.drafts as any[], rosterInfo: d.rosterInfo as Record<string, string> };
 			}
 		}
 	} catch { /* cache miss */ }
 
-	const drafts = await sleeperGet(`/league/${leagueId}/drafts`);
-	ref.set({ drafts, cachedAt: new Date().toISOString() })
+	const [drafts, rosters, users] = await Promise.all([
+		sleeperGet(`/league/${leagueId}/drafts`),
+		sleeperGet(`/league/${leagueId}/rosters`),
+		sleeperGet(`/league/${leagueId}/users`),
+	]);
+	const rosterInfo = buildRosterInfo(rosters ?? [], users ?? []);
+	ref.set({ drafts, rosterInfo, cachedAt: new Date().toISOString() })
 		.catch(e => console.error('[drafts] Failed to cache draft list for', leagueId, ':', e));
-	return drafts;
+	return { drafts, rosterInfo };
 }

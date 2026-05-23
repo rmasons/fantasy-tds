@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { LayoutData } from '../$types';
 	import type { SlimPlayer } from '$lib/types';
-	import { fetchLeagueCore, buildRosterInfoMap } from '$lib/sleeper';
 
 	let { data } = $props<{ data: LayoutData }>();
 
@@ -53,8 +52,7 @@
 
 		(async () => {
 			try {
-				const [{ rosters, users }, { drafts: draftList }, rawPlayers] = await Promise.all([
-					fetchLeagueCore(leagueId),
+				const [{ drafts: draftList, rosterInfo }, rawPlayers] = await Promise.all([
 					fetch(`/api/drafts?leagueId=${encodeURIComponent(leagueId)}`).then(r => {
 						if (!r.ok) throw new Error(`HTTP ${r.status}`);
 						return r.json();
@@ -66,9 +64,9 @@
 
 				playersMap = rawPlayers;
 
-				const rosterInfo = buildRosterInfoMap(rosters, users);
-				const names = new Map<number, string>();
-				for (const [id, info] of rosterInfo) names.set(id, info.teamName);
+				const names = new Map<number, string>(
+					Object.entries(rosterInfo as Record<string, string>).map(([k, v]) => [Number(k), v])
+				);
 
 				draftsMeta = draftList
 					.filter((d: any) => d.status === 'complete')
