@@ -25,6 +25,7 @@ export interface SleeperLeague {
 	status: string;
 	total_rosters: number;
 	previous_league_id: string | null;
+	roster_positions?: string[]; // e.g. ['QB', 'WR', 'RB', 'TE', 'FLEX', 'K', 'DEF', 'BN', ...]
 	settings: {
 		type: number; // 0=redraft, 2=dynasty
 		playoff_week_start?: number;

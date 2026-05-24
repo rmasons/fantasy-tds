@@ -16,6 +16,8 @@ export interface RawMatchup {
 	matchup_id: number;
 	points: number;
 	starters: string[];
+	players?: string[];
+	players_points?: Record<string, number>;
 }
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
