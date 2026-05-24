@@ -391,7 +391,7 @@
 
 					const bestUniq = [...byRid.entries()].reduce<{ rid: number; cnt: number } | null>((b, [rid, { uniq }]) =>
 						!b || uniq.size > b.cnt ? { rid, cnt: uniq.size } : b, null);
-					sup('ten_years_i', '👶', '10 Years Old, Part I', 'Most Unique Rookies Started',
+					sup('18', '🔞', 'Please be 18', 'Most Unique Rookies Started',
 						bestUniq ? toEntry(bestUniq.rid, `${bestUniq.cnt} unique rookies`) : null, bestUniq?.rid);
 
 					const bestStarts = [...byRid.entries()].reduce<{ rid: number; starts: number; uniq: number } | null>(
@@ -547,21 +547,23 @@
 			{#each superlatives as s (s.key)}
 				{#if s.entry}
 					<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden flex flex-col">
-						<!-- Video (full-bleed, graceful fallback if file missing) -->
+						<!-- Video (centered, graceful fallback if file missing) -->
 						{#if !failedVideos.has(s.key)}
-							<video
-								src="/superlatives/{s.key}.mp4"
-								autoplay
-								loop
-								muted
-								playsinline
-								class="w-full h-40 object-cover"
-								onerror={() => { failedVideos = new Set([...failedVideos, s.key]); }}
-							></video>
+							<div class="flex items-center justify-center bg-navy-900 overflow-hidden h-40">
+								<video
+									src="/superlatives/{s.key}.mp4"
+									autoplay
+									loop
+									muted
+									playsinline
+									class="h-full w-full object-contain"
+									onerror={() => { failedVideos = new Set([...failedVideos, s.key]); }}
+								></video>
+							</div>
 						{/if}
 
 						<!-- Card content -->
-						<div class="p-4 flex flex-col gap-3 flex-1">
+						<div class="p-4 flex flex-col gap-2 flex-1">
 							<!-- Award name + description -->
 							<div>
 								<div class="flex items-start gap-1.5">
@@ -571,23 +573,23 @@
 								<p class="text-[10px] text-navy-500 uppercase tracking-widest mt-1 leading-snug ml-6">{s.desc}</p>
 							</div>
 
-							<!-- Stat value -->
-							<div class="text-xl font-black tabular-nums text-white font-mono leading-none">
-								{s.entry.stat}
-							</div>
-
-							<!-- Winner -->
-							<div class="flex items-center gap-2 min-w-0 mt-auto">
-								{#if s.entry.avatar}
-									<img src={s.entry.avatar} alt="" class="w-7 h-7 rounded-full shrink-0 object-cover" />
-								{:else}
-									<div class="w-7 h-7 rounded-full bg-navy-800 shrink-0 flex items-center justify-center text-xs">🏈</div>
-								{/if}
-								<div class="min-w-0">
-									<p class="text-sm font-semibold text-white truncate leading-tight">{s.entry.teamName}</p>
-									{#if s.entry.sub}
-										<p class="text-xs text-slate-500 truncate">{s.entry.sub}</p>
+							<!-- Stat + winner pinned to bottom -->
+							<div class="mt-auto flex flex-col gap-2 pt-2">
+								<div class="text-xl font-black tabular-nums text-white font-mono leading-none">
+									{s.entry.stat}
+								</div>
+								<div class="flex items-center gap-2 min-w-0">
+									{#if s.entry.avatar}
+										<img src={s.entry.avatar} alt="" class="w-7 h-7 rounded-full shrink-0 object-cover" />
+									{:else}
+										<div class="w-7 h-7 rounded-full bg-navy-800 shrink-0 flex items-center justify-center text-xs">🏈</div>
 									{/if}
+									<div class="min-w-0">
+										<p class="text-sm font-semibold text-white truncate leading-tight">{s.entry.teamName}</p>
+										{#if s.entry.sub}
+											<p class="text-xs text-slate-500 truncate">{s.entry.sub}</p>
+										{/if}
+									</div>
 								</div>
 							</div>
 						</div>
