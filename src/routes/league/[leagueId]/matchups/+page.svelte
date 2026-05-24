@@ -33,6 +33,12 @@
 		t2: BracketSide;
 		label: string;
 	}
+	interface SeasonBracket {
+		season: string;
+		leagueId: string;
+		winnersRounds: BracketMatch[][];
+		losersRounds: BracketMatch[][];
+	}
 
 	let allMatchups = $state<Record<number, Matchup[]>>({});
 	let selectedWeek = $state(1);
@@ -44,14 +50,16 @@
 	let season = $state('');
 
 	let view = $state<'weekly' | 'bracket'>('weekly');
-	let winnersRounds = $state<BracketMatch[][]>([]);
-	let losersRounds = $state<BracketMatch[][]>([]);
+	let bracketSeasons = $state<SeasonBracket[]>([]);
+	let bracketSelectedIdx = $state(0);
 	let bracketLoading = $state(false);
 	let bracketLoaded = $state(false);
+	let bracketLoadingStatus = $state('');
 	let playoffStart = $state(15);
-	let playoffType = $state(0);
 
 	let userMap = new Map<number, RosterInfo>();
+	let savedOverrides: Record<string, string> = {};
+	let bracketStartLeagueId = '';
 
 	$effect(() => {
 		const leagueId = data.leagueId;
@@ -63,9 +71,12 @@
 		season = '';
 		view = 'weekly';
 		bracketLoaded = false;
-		winnersRounds = [];
-		losersRounds = [];
+		bracketSeasons = [];
+		bracketSelectedIdx = 0;
+		bracketLoadingStatus = '';
 		userMap = new Map();
+		savedOverrides = {};
+		bracketStartLeagueId = '';
 
 		(async () => {
 			try {
@@ -78,15 +89,24 @@
 
 				season = league.season;
 				playoffStart = league.settings?.playoff_week_start ?? 15;
-				playoffType = league.settings?.playoff_round_type ?? 0;
+				const pType = league.settings?.playoff_round_type ?? 0;
 				regularSeasonLength = playoffStart - 1;
 
+				const prevId = league.previous_league_id ?? '';
+				if (league.status === 'pre_draft' || league.status === 'drafting') {
+					bracketStartLeagueId = (prevId && prevId !== '0') ? prevId : '';
+				} else {
+					bracketStartLeagueId = leagueId;
+				}
+
 				const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+				if (data.leagueId !== leagueId) return;
+				savedOverrides = overrides;
 				userMap = buildRosterInfoMap(rosters, users, overrides);
 
 				const playoffTeams = league.settings?.playoff_teams ?? 4;
 				const numRounds = Math.ceil(Math.log2(Math.max(playoffTeams, 2)));
-				const weeksPerRound = playoffType === 2 ? 2 : 1;
+				const weeksPerRound = pType === 2 ? 2 : 1;
 				const lastPlayoffWeek = playoffStart + numRounds * weeksPerRound - 1;
 
 				let week = 1;
@@ -136,86 +156,124 @@
 		}
 	}
 
+	function roundLabel(r: number, maxR: number, entry: any, losers: boolean): string {
+		if (losers) return r === maxR ? 'Toilet Bowl' : `Round ${r}`;
+		if (r === maxR) return (entry.t1_from?.w != null) ? 'Championship' : '3rd Place';
+		if (r === maxR - 1) return 'Semifinals';
+		return `Round ${r}`;
+	}
+
 	async function loadBracket() {
 		if (bracketLoaded) { view = 'bracket'; return; }
+		if (!bracketStartLeagueId) { view = 'bracket'; return; }
+
 		bracketLoading = true;
+		bracketLoadingStatus = 'Fetching league history…';
+		const leagueId = data.leagueId;
+
 		try {
-			const playoffWeeks = Array.from({ length: 18 - playoffStart + 1 }, (_, i) => playoffStart + i);
+			let curId: string | null = bracketStartLeagueId;
 
-			const [winnersData, losersData, ...weekDataArr]: [any[], any[], ...any[][]] = await Promise.all([
-				fetchWinnersBracket(data.leagueId),
-				fetchLosersBracket(data.leagueId),
-				...playoffWeeks.map(w => fetchWeekMatchups(data.leagueId, w))
-			]);
+			while (curId && curId !== '0') {
+				const lid = curId;
+				if (data.leagueId !== leagueId) return;
 
-			const weekPoints = new Map<number, Map<number, number>>();
-			for (let i = 0; i < weekDataArr.length; i++) {
-				const rp = new Map<number, number>();
-				for (const m of weekDataArr[i] ?? []) rp.set(m.roster_id, m.points ?? 0);
-				weekPoints.set(playoffWeeks[i], rp);
-			}
+				const [{ league, rosters, users }, winnersData, losersData] = await Promise.all([
+					fetchLeagueCore(lid),
+					fetchWinnersBracket(lid),
+					fetchLosersBracket(lid),
+				]);
 
-			function getPoints(rosterId: number | null, round: number): number | null {
-				if (!rosterId) return null;
-				const week = playoffStart + round - 1;
-				const pts = weekPoints.get(week)?.get(rosterId) ?? null;
-				if (pts === null) return null;
-				if (playoffType === 2) {
-					const wk2 = weekPoints.get(week + 1)?.get(rosterId) ?? 0;
-					return pts + wk2;
+				if (data.leagueId !== leagueId) return;
+				bracketLoadingStatus = `Loading ${league.season}…`;
+
+				const rosterInfo = buildRosterInfoMap(rosters, users, savedOverrides);
+				const pStart = league.settings?.playoff_week_start ?? 15;
+				const pType = league.settings?.playoff_round_type ?? 0;
+				const pTeams = league.settings?.playoff_teams ?? 4;
+				const nRounds = Math.ceil(Math.log2(Math.max(pTeams, 2)));
+				const wpr = pType === 2 ? 2 : 1;
+
+				const playoffWeeks: number[] = [];
+				for (let r = 0; r < nRounds; r++) {
+					for (let w = 0; w < wpr; w++) {
+						playoffWeeks.push(pStart + r * wpr + w);
+					}
 				}
-				return pts;
-			}
 
-			function teamSide(rosterId: number | null, winnerId: number | null, round: number): BracketSide {
-				const info = rosterId ? (userMap.get(rosterId) ?? { teamName: `Team ${rosterId}`, ownerName: null, avatar: null }) : null;
-				return {
-					rosterId,
-					teamName: info?.teamName ?? null,
-					avatar: info?.avatar ?? null,
-					points: rosterId ? getPoints(rosterId, round) : null,
-					won: !!rosterId && rosterId === winnerId,
-					bye: !rosterId,
-				};
-			}
+				const weekDataArr = await Promise.all(
+					playoffWeeks.map(w => fetchWeekMatchups(lid, w).catch(() => []))
+				);
+				if (data.leagueId !== leagueId) return;
 
-			function roundLabel(r: number, maxR: number, entry: any, losers: boolean): string {
-				if (losers) return r === maxR ? 'Toilet Bowl' : `Round ${r}`;
-				if (r === maxR) return (entry.t1_from?.w != null) ? 'Championship' : '3rd Place';
-				if (r === maxR - 1) return 'Semifinals';
-				return `Round ${r}`;
-			}
-
-			function processBracket(raw: any[], losers: boolean): BracketMatch[][] {
-				if (!raw?.length) return [];
-				const maxR = raw[raw.length - 1].r;
-				const byRound: BracketMatch[][] = [];
-				for (let r = 1; r <= maxR; r++) {
-					byRound.push(
-						raw.filter(e => e.r === r).map(e => ({
-							round: r,
-							matchId: e.m,
-							t1: teamSide(e.t1 ?? null, e.w ?? null, r),
-							t2: teamSide(e.t2 ?? null, e.w ?? null, r),
-							label: roundLabel(r, maxR, e, losers),
-						}))
-					);
+				const weekPoints = new Map<number, Map<number, number>>();
+				for (let i = 0; i < playoffWeeks.length; i++) {
+					const rp = new Map<number, number>();
+					for (const m of weekDataArr[i] ?? []) rp.set(m.roster_id, m.points ?? 0);
+					weekPoints.set(playoffWeeks[i], rp);
 				}
-				return byRound;
+
+				function getPoints(rosterId: number, round: number): number | null {
+					const week = pStart + (round - 1);
+					const pts = weekPoints.get(week)?.get(rosterId) ?? null;
+					if (pts === null) return null;
+					if (pType === 2) return pts + (weekPoints.get(week + 1)?.get(rosterId) ?? 0);
+					return pts;
+				}
+
+				function teamSide(rosterId: number | null, winnerId: number | null, round: number): BracketSide {
+					const info = rosterId ? rosterInfo.get(rosterId) : null;
+					return {
+						rosterId,
+						teamName: info?.teamName ?? (rosterId ? `Team ${rosterId}` : null),
+						avatar: info?.avatar ?? null,
+						points: rosterId ? getPoints(rosterId, round) : null,
+						won: !!rosterId && rosterId === winnerId,
+						bye: !rosterId,
+					};
+				}
+
+				function processBracket(raw: any[], losers: boolean): BracketMatch[][] {
+					if (!raw?.length) return [];
+					const maxR = Math.max(...raw.map((m: any) => m.r));
+					const byRound: BracketMatch[][] = [];
+					for (let r = 1; r <= maxR; r++) {
+						byRound.push(
+							raw.filter((e: any) => e.r === r).map((e: any) => ({
+								round: r,
+								matchId: e.m,
+								t1: teamSide(e.t1 ?? null, e.w ?? null, r),
+								t2: teamSide(e.t2 ?? null, e.w ?? null, r),
+								label: roundLabel(r, maxR, e, losers),
+							}))
+						);
+					}
+					return byRound;
+				}
+
+				const winnersRounds = processBracket(winnersData, false);
+				const losersRounds = processBracket(losersData, true);
+
+				if (winnersRounds.length > 0) {
+					bracketSeasons = [...bracketSeasons, { season: league.season, leagueId: lid, winnersRounds, losersRounds }];
+				}
+
+				curId = league.previous_league_id ?? null;
 			}
 
-			winnersRounds = processBracket(winnersData, false);
-			losersRounds = processBracket(losersData, true);
 			bracketLoaded = true;
 		} catch (e: any) {
+			if (data.leagueId !== leagueId) return;
 			error = e.message;
 		} finally {
+			if (data.leagueId !== leagueId) return;
 			bracketLoading = false;
 		}
 		view = 'bracket';
 	}
 
 	const weekMatchups = $derived(allMatchups[selectedWeek] ?? []);
+	const bracketSeason = $derived(bracketSeasons[bracketSelectedIdx]);
 
 	function weekLabel(week: number): string {
 		return week <= regularSeasonLength
@@ -352,84 +410,103 @@
 
 	<!-- ── BRACKET VIEW ────────────────────────────────── -->
 	{:else if view === 'bracket'}
-		{#if bracketLoading}
+		{#if bracketLoading && bracketSeasons.length === 0}
 			<div class="space-y-3">
-				{#each Array(4) as _}
-					<div class="h-16 bg-navy-850 rounded-lg animate-pulse"></div>
+				{#each Array(3) as _}
+					<div class="h-12 bg-navy-850 rounded-lg animate-pulse"></div>
 				{/each}
+				<p class="text-navy-500 text-sm">{bracketLoadingStatus}</p>
 			</div>
-		{:else if winnersRounds.length === 0 && losersRounds.length === 0}
+		{:else if bracketSeasons.length === 0}
 			<p class="text-navy-500">No bracket data available for this season.</p>
 		{:else}
-			{#snippet bracketSection(rounds: BracketMatch[][], title: string, finalIcon: string, accent: string)}
-				{#if rounds.length > 0}
-					<div class="mb-10">
-						<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-4 flex items-center gap-2"><span class="text-amber-400">◆</span>{title}</h2>
-						<div class="overflow-x-auto pb-3">
-							<div class="flex gap-4 items-start min-w-max">
-								{#each rounds as roundMatches, ri}
-									{@const isChampionRound = ri === rounds.length - 1}
-									<div class="flex flex-col gap-3" style="min-width: 190px; max-width: 230px;">
-										<p class="text-[10px] text-navy-500 uppercase tracking-wider text-center font-semibold">
-											{roundMatches[0]?.label ?? `Round ${ri + 1}`}
-										</p>
-										{#each roundMatches as match}
-											<div class="rounded-lg overflow-hidden border
-											            {isChampionRound
-											                ? 'border-amber-500/40'
-											                : 'border-navy-700'}">
-												{#each [match.t1, match.t2] as side, si}
-													{#if side.bye}
-														<div class="flex items-center gap-2 px-3 py-2.5
-														            {si === 0 ? 'border-b border-navy-700' : ''}
-														            bg-navy-850 text-navy-500 text-xs italic">
-															BYE
-														</div>
-													{:else}
-														<div class="flex items-center gap-2 px-3 py-2.5
-														            {si === 0 ? 'border-b border-navy-700' : ''}
-														            {side.won
-														                ? isChampionRound
-														                    ? 'bg-amber-950/60'
-														                    : 'bg-navy-800'
-														                : 'bg-navy-850'}">
-															{#if side.avatar}
-																<img src={side.avatar} alt="" class="w-7 h-7 rounded-full object-cover shrink-0
-																            {side.won ? 'ring-2 ring-white/30' : 'opacity-60'}" />
-															{:else}
-																<div class="w-7 h-7 rounded-full bg-navy-800 flex items-center justify-center text-sm shrink-0
-																            {side.won ? '' : 'opacity-50'}">🏈</div>
-															{/if}
-															<span class="text-xs font-semibold truncate flex-1 leading-tight
-															             {side.won
-															                 ? isChampionRound ? 'text-amber-200' : 'text-white'
-															                 : 'text-navy-500'}">
-																{side.teamName ?? '—'}
-															</span>
-															{#if side.won && isChampionRound}
-																<span class="text-sm shrink-0">{finalIcon}</span>
-															{/if}
-															{#if side.points !== null}
-																<span class="font-mono text-xs shrink-0 tabular-nums
-																             {side.won ? 'text-white' : 'text-navy-500'}">
-																	{side.points.toFixed(1)}
+			<!-- Season tabs -->
+			<div class="flex mb-6 border-b border-navy-700 flex-wrap">
+				{#each bracketSeasons as s, i}
+					<button
+						onclick={() => (bracketSelectedIdx = i)}
+						class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+						       {bracketSelectedIdx === i ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
+					>
+						{s.season}
+					</button>
+				{/each}
+				{#if bracketLoading}
+					<span class="px-4 py-2.5 text-xs text-navy-500 italic self-center">{bracketLoadingStatus}</span>
+				{/if}
+			</div>
+
+			{#if bracketSeason}
+				{#snippet bracketSection(rounds: BracketMatch[][], title: string, finalIcon: string)}
+					{#if rounds.length > 0}
+						<div class="mb-10">
+							<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-4 flex items-center gap-2"><span class="text-amber-400">◆</span>{title}</h2>
+							<div class="overflow-x-auto pb-3">
+								<div class="flex gap-4 items-start min-w-max">
+									{#each rounds as roundMatches, ri}
+										{@const isChampionRound = ri === rounds.length - 1}
+										<div class="flex flex-col gap-3" style="min-width: 190px; max-width: 230px;">
+											<p class="text-[10px] text-navy-500 uppercase tracking-wider text-center font-semibold">
+												{roundMatches[0]?.label ?? `Round ${ri + 1}`}
+											</p>
+											{#each roundMatches as match}
+												<div class="rounded-lg overflow-hidden border
+												            {isChampionRound
+												                ? 'border-amber-500/40'
+												                : 'border-navy-700'}">
+													{#each [match.t1, match.t2] as side, si}
+														{#if side.bye}
+															<div class="flex items-center gap-2 px-3 py-2.5
+															            {si === 0 ? 'border-b border-navy-700' : ''}
+															            bg-navy-850 text-navy-500 text-xs italic">
+																BYE
+															</div>
+														{:else}
+															<div class="flex items-center gap-2 px-3 py-2.5
+															            {si === 0 ? 'border-b border-navy-700' : ''}
+															            {side.won
+															                ? isChampionRound
+															                    ? 'bg-amber-950/60'
+															                    : 'bg-navy-800'
+															                : 'bg-navy-850'}">
+																{#if side.avatar}
+																	<img src={side.avatar} alt="" class="w-7 h-7 rounded-full object-cover shrink-0
+																	            {side.won ? 'ring-2 ring-white/30' : 'opacity-60'}" />
+																{:else}
+																	<div class="w-7 h-7 rounded-full bg-navy-800 flex items-center justify-center text-sm shrink-0
+																	            {side.won ? '' : 'opacity-50'}">🏈</div>
+																{/if}
+																<span class="text-xs font-semibold truncate flex-1 leading-tight
+																             {side.won
+																                 ? isChampionRound ? 'text-amber-200' : 'text-white'
+																                 : 'text-navy-500'}">
+																	{side.teamName ?? '—'}
 																</span>
-															{/if}
-														</div>
-													{/if}
-												{/each}
-											</div>
-										{/each}
-									</div>
-								{/each}
+																{#if side.won && isChampionRound}
+																	<span class="text-sm shrink-0">{finalIcon}</span>
+																{/if}
+																{#if side.points !== null}
+																	<span class="font-mono text-xs shrink-0 tabular-nums
+																	             {side.won ? 'text-white' : 'text-navy-500'}">
+																		{side.points.toFixed(1)}
+																	</span>
+																{/if}
+															</div>
+														{/if}
+													{/each}
+												</div>
+											{/each}
+										</div>
+									{/each}
+								</div>
 							</div>
 						</div>
-					</div>
-				{/if}
-			{/snippet}
+					{/if}
+				{/snippet}
 
-			{@render bracketSection(winnersRounds, 'Championship Bracket', '🏆', 'amber')}
-			{@render bracketSection(losersRounds, 'Toilet Bowl Bracket', '🚽', 'slate')}
+				{@render bracketSection(bracketSeason.winnersRounds, 'Championship Bracket', '🏆')}
+				{@render bracketSection(bracketSeason.losersRounds, 'Toilet Bowl Bracket', '🚽')}
+			{/if}
 		{/if}
 	{/if}
 </div>

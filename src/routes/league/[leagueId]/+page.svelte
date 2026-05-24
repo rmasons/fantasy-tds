@@ -179,7 +179,6 @@
 	const allNavItems = [
 		{ href: 'standings',       label: 'Standings',        icon: '🏆' },
 		{ href: 'matchups',        label: 'Matchups',         icon: '⚔️' },
-		{ href: 'playoff-bracket', label: 'Playoff Bracket',  icon: '🎖️' },
 		{ href: 'power-rankings',  label: 'Power Rankings',   icon: '📈' },
 		{ href: 'rosters',         label: 'Rosters',          icon: '📋' },
 		{ href: 'records',         label: 'Records',          icon: '📊' },
@@ -373,7 +372,7 @@
 					Full →
 				</a>
 			</div>
-			{#each standingsMini as row}
+			{#each standingsMini.slice(0, league?.settings?.playoff_teams ?? standingsMini.length) as row}
 				<div class="flex items-center gap-3 px-4 py-2.5 border-b border-navy-700/40 last:border-b-0 hover:bg-navy-800/30 transition-colors">
 					<span class="text-[11px] font-mono w-4 text-center shrink-0
 					             {row.rank === 1 ? 'text-amber-400 font-bold' : row.rank <= 3 ? 'text-slate-300' : 'text-navy-600'}">
