@@ -1,11 +1,21 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { fetchLeague, fetchRosters, fetchUsers, fetchWinnersBracket, fetchLosersBracket, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
+	import { fetchLeague, fetchRosters, fetchUsers, fetchWinnersBracket, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
 	import type { ManagerProfile, ManagerLeagueProfile } from '$lib/types';
 
 	let { data } = $props<{ data: PageData }>();
 
 	type PlayoffFinish = 'champion' | 'runner-up' | '3rd' | 'playoffs' | null;
+
+	// Sleeper bracket match shape: https://docs.sleeper.com/#get-winners-bracket-for-a-league
+	interface BracketMatch {
+		r: number;
+		t1: number | null;
+		t2: number | null;
+		w: number | null;
+		t1_from?: { w?: number; l?: number };
+		t2_from?: { w?: number; l?: number };
+	}
 
 	interface SeasonStat {
 		season: string;
@@ -37,8 +47,7 @@
 
 	function getPlayoffFinish(
 		rosterId: number,
-		winners: any[],
-		losers: any[]
+		winners: BracketMatch[]
 	): PlayoffFinish {
 		if (!winners?.length) return null;
 		const appearsInWinners = winners.some(e => e.t1 === rosterId || e.t2 === rosterId);
@@ -54,7 +63,9 @@
 		const finalMatch = winners.find(e => e.r === maxR && (e.t1 === rosterId || e.t2 === rosterId));
 		if (!finalMatch) return 'playoffs';
 
-		// Distinguish championship from 3rd-place match via t1_from.w
+		// Sleeper places both the championship and the 3rd-place game in the final round of
+		// the winners bracket. The championship match has t1_from.w populated (the slot was
+		// seeded by winning the semi); the 3rd-place match has t1_from.l (seeded by losing).
 		const isChampionship = finalMatch.t1_from?.w != null;
 		if (!isChampionship) return finalMatch.w === rosterId ? '3rd' : 'playoffs';
 		return finalMatch.w === rosterId ? 'champion' : 'runner-up';
@@ -79,12 +90,11 @@
 						const result: SeasonStat[] = [];
 
 						while (curId && curId !== '0') {
-							const [leagueData, users, rosters, winnersData, losersData] = await Promise.all([
+							const [leagueData, users, rosters, winnersData] = await Promise.all([
 								fetchLeague(curId),
 								fetchUsers(curId),
 								fetchRosters(curId),
 								fetchWinnersBracket(curId).catch(() => []),
-								fetchLosersBracket(curId).catch(() => []),
 							]);
 
 							if (data.leagueId !== leagueId || data.userId !== userId) return;
@@ -113,7 +123,7 @@
 									fpts: combineFpts(roster.settings?.fpts, roster.settings?.fpts_decimal),
 									fptsAgainst: combineFpts(roster.settings?.fpts_against, roster.settings?.fpts_against_decimal),
 									rosterId: roster.roster_id,
-									playoffFinish: getPlayoffFinish(roster.roster_id, winnersData, losersData),
+									playoffFinish: getPlayoffFinish(roster.roster_id, winnersData),
 								});
 							}
 
@@ -166,6 +176,11 @@
 	const mostPointsSeason = $derived(
 		seasons.length === 0 ? null :
 		seasons.reduce((best, s) => s.fpts > best.fpts ? s : best, seasons[0])
+	);
+
+	// Only show Most Points card when it's a different season than Best Record.
+	const distinctMostPointsSeason = $derived(
+		mostPointsSeason === bestSeason ? null : mostPointsSeason
 	);
 
 	// ── Profile helpers ────────────────────────────────────────────────────
@@ -363,13 +378,13 @@
 					<p class="text-[10px] text-navy-500 uppercase tracking-widest mt-0.5">Playoff Seasons</p>
 				</div>
 				<div class="bg-navy-850 rounded-xl border border-navy-700 px-4 py-3 text-center">
-					<p class="text-2xl font-black text-white tabular-nums">{winPct}<span class="text-base font-bold text-navy-500">%</span></p>
+					<p class="text-2xl font-black text-white tabular-nums">{winPct}{#if careerGames > 0}<span class="text-base font-bold text-navy-500">%</span>{/if}</p>
 					<p class="text-[10px] text-navy-500 uppercase tracking-widest mt-0.5">Win Rate</p>
 				</div>
 			</div>
 
 			<!-- Best season / most points callouts -->
-			{#if bestSeason || mostPointsSeason}
+			{#if bestSeason || distinctMostPointsSeason}
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
 					{#if bestSeason}
 						{@const bGames = bestSeason.wins + bestSeason.losses + bestSeason.ties}
@@ -387,12 +402,12 @@
 							{/if}
 						</div>
 					{/if}
-					{#if mostPointsSeason}
+					{#if distinctMostPointsSeason}
 						<div class="bg-navy-850 rounded-xl border border-navy-700 px-4 py-3 flex items-center justify-between gap-3">
 							<div>
 								<p class="text-[10px] text-navy-500 uppercase tracking-widest mb-0.5">Most Points</p>
-								<p class="text-white font-bold tabular-nums">{mostPointsSeason.fpts.toFixed(1)} <span class="text-slate-500 font-normal text-sm">pts</span></p>
-								<p class="text-slate-500 text-xs">{mostPointsSeason.season} · {mostPointsSeason.teamName}</p>
+								<p class="text-white font-bold tabular-nums">{distinctMostPointsSeason.fpts.toFixed(1)} <span class="text-slate-500 font-normal text-sm">pts</span></p>
+								<p class="text-slate-500 text-xs">{distinctMostPointsSeason.season} · {distinctMostPointsSeason.teamName}</p>
 							</div>
 							<span class="text-3xl shrink-0">📈</span>
 						</div>
