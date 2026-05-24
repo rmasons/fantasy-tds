@@ -128,7 +128,7 @@
 					} else {
 						managerMap.set(r.ownerId, {
 							userId: r.ownerId,
-							displayName: r.ownerName ?? r.teamName,
+							displayName: r.teamName ?? r.ownerName,
 							avatar: r.avatar,
 							wins: r.wins,
 							losses: r.losses,
