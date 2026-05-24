@@ -27,6 +27,7 @@
 		{ href: 'transactions',    label: 'Transactions'    },
 		{ href: 'drafts',          label: 'Drafts'          },
 		{ href: 'awards',          label: 'Awards'          },
+		{ href: 'superlatives',    label: 'Superlatives'    },
 		{ href: 'managers',        label: 'Managers'        },
 		{ href: 'rivalry',         label: 'Rivalry'         },
 		{ href: 'blog',            label: 'Blog'            },
