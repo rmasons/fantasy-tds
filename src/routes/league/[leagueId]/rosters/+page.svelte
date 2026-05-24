@@ -25,10 +25,11 @@
 
 	onMount(() => {
 		function updateCols() {
-			if (window.innerWidth >= 1024) colCount = 3;
-			else if (window.innerWidth >= 640) colCount = 2;
-			else colCount = 1;
-			expandedRow = null;
+			const next = window.innerWidth >= 1024 ? 3 : window.innerWidth >= 640 ? 2 : 1;
+			if (next !== colCount) {
+				colCount = next;
+				expandedRow = null;
+			}
 		}
 		updateCols();
 		window.addEventListener('resize', updateCols);
