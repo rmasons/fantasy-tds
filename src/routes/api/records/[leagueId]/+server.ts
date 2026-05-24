@@ -85,6 +85,8 @@ async function buildRecords(leagueId: string): Promise<SeasonRecords> {
 					week,
 					winner: rosterInfo.get(winRoster)?.teamName ?? `Roster ${winRoster}`,
 					loser: rosterInfo.get(losRoster)?.teamName ?? `Roster ${losRoster}`,
+					winnerId: rosterInfo.get(winRoster)?.ownerId,
+					loserId: rosterInfo.get(losRoster)?.ownerId,
 					winnerPts: winPts,
 					loserPts: losPts,
 					diff: +(winPts - losPts).toFixed(2),
@@ -95,13 +97,16 @@ async function buildRecords(leagueId: string): Promise<SeasonRecords> {
 				.filter(m => (m.points ?? 0) > 0)
 				.map(m => ({
 					team: rosterInfo.get(m.roster_id)?.teamName ?? `Roster ${m.roster_id}`,
+					ownerId: rosterInfo.get(m.roster_id)?.ownerId,
 					pts: m.points,
 				}));
 
 			if (weekScores.length) {
 				weekScores.sort((a, b) => b.pts - a.pts);
-				weekHighs.push({ season, week, team: weekScores[0].team, pts: weekScores[0].pts });
-				weekLows.push({ season, week, team: weekScores[weekScores.length - 1].team, pts: weekScores[weekScores.length - 1].pts });
+				const high = weekScores[0];
+				const low  = weekScores[weekScores.length - 1];
+				weekHighs.push({ season, week, team: high.team, pts: high.pts, ownerId: high.ownerId });
+				weekLows.push({ season, week, team: low.team, pts: low.pts, ownerId: low.ownerId });
 			}
 		}
 	}
@@ -123,27 +128,53 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	if (!locals.user) return json({ error: 'Unauthorized' }, { status: 401 });
 
 	const { leagueId } = params;
-	const docRef = adminDb.collection('cache').doc(`records_v2_${leagueId}`);
+	const docRef = adminDb.collection('cache').doc(`records_v3_${leagueId}`);
+
+	let records: SeasonRecords | null = null;
 
 	try {
 		const doc = await docRef.get();
 		if (doc.exists) {
 			const data = doc.data()!;
 			if (data.status === 'complete' || data.cachedDate === today()) {
-				const { cachedDate: _, ...records } = data;
-				return json(records);
+				const { cachedDate: _, ...cached } = data;
+				records = cached as SeasonRecords;
 			}
 		}
 	} catch {
 		// cache miss — fall through to Sleeper
 	}
 
-	const records = await buildRecords(leagueId);
+	if (!records) {
+		records = await buildRecords(leagueId);
+		try {
+			await docRef.set({ ...records, cachedDate: today() });
+		} catch (e) {
+			console.error('[records] Failed to write cache:', e);
+		}
+	}
 
-	try {
-		await docRef.set({ ...records, cachedDate: today() });
-	} catch (e) {
-		console.error('[records] Failed to write cache:', e);
+	// Re-apply current display name overrides on every response so profile
+	// changes are reflected immediately even for permanently-cached complete seasons.
+	const ownerIds = records.rosterSummaries.map(s => s.ownerId).filter(Boolean);
+	if (ownerIds.length) {
+		const profiles = await getManagerProfilesBatch(ownerIds);
+		const overrides = new Map<string, string>();
+		for (const [uid, p] of profiles) {
+			if (p.displayName) overrides.set(uid, p.displayName);
+		}
+		if (overrides.size) {
+			for (const s of records.rosterSummaries) {
+				if (overrides.has(s.ownerId)) s.teamName = overrides.get(s.ownerId)!;
+			}
+			for (const g of records.gameResults) {
+				if (g.winnerId && overrides.has(g.winnerId)) g.winner = overrides.get(g.winnerId)!;
+				if (g.loserId && overrides.has(g.loserId)) g.loser = overrides.get(g.loserId)!;
+			}
+			for (const h of [...records.weekHighs, ...records.weekLows]) {
+				if (h.ownerId && overrides.has(h.ownerId)) h.team = overrides.get(h.ownerId)!;
+			}
+		}
 	}
 
 	return json(records);

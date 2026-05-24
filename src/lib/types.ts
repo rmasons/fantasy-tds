@@ -134,6 +134,8 @@ export interface RecordGame {
 	winnerPts: number;
 	loserPts: number;
 	diff: number;
+	winnerId?: string;
+	loserId?: string;
 }
 
 export interface RecordScore {
@@ -141,6 +143,7 @@ export interface RecordScore {
 	week: number;
 	team: string;
 	pts: number;
+	ownerId?: string;
 }
 
 export interface SeasonRecords {
