@@ -133,7 +133,7 @@
 		return (
 			pos === 'QB'  ? 'text-red-400'    :
 			pos === 'RB'  ? 'text-green-400'  :
-			pos === 'WR'  ? 'text-blue-400'   :
+			pos === 'WR'  ? 'text-slate-300'   :
 			pos === 'TE'  ? 'text-amber-400'  :
 			pos === 'K'   ? 'text-slate-400'  :
 			pos === 'DEF' ? 'text-purple-400' :
@@ -597,7 +597,7 @@
 		onclick={(e) => { if (e.target === e.currentTarget) showImport = false; }}
 		onkeydown={(e) => { if (e.key === 'Escape') showImport = false; }}
 	>
-		<div class="bg-navy-850 border border-navy-700 rounded-xl w-full max-w-lg shadow-2xl p-6">
+		<div class="bg-navy-850 border border-navy-700 rounded-xl w-full max-w-lg p-6">
 			<h2 class="text-lg font-bold text-white mb-1">Import pre-Sleeper keepers</h2>
 			<p class="text-sm text-slate-400 mb-4">
 				Paste a JSON array. Each entry needs a Sleeper <code class="text-amber-400">playerId</code>

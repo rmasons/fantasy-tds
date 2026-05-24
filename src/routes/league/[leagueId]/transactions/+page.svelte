@@ -111,7 +111,7 @@
 	const typeLabel: Record<string, string> = { trade: 'Trade', waiver: 'Waiver', free_agent: 'Free Agent' };
 	const typeBadge: Record<string, string> = {
 		trade: 'bg-purple-900/60 text-purple-300',
-		waiver: 'bg-blue-900/60 text-blue-300',
+		waiver: 'bg-slate-800 text-slate-300',
 		free_agent: 'bg-green-900/60 text-green-300'
 	};
 

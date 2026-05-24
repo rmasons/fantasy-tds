@@ -184,7 +184,7 @@
 							<img
 								src={podium.champion.avatar}
 								alt=""
-								class="relative w-28 h-28 rounded-full object-cover border-4 border-amber-400 shadow-2xl shadow-amber-900/50"
+								class="relative w-28 h-28 rounded-full object-cover border-4 border-amber-400"
 							/>
 						{:else}
 							<div class="relative w-28 h-28 rounded-full bg-slate-700 border-4 border-amber-400 flex items-center justify-center text-5xl">
@@ -206,7 +206,7 @@
 				<!-- Gold ribbon label -->
 				<div class="flex items-center justify-center mb-6">
 					<div class="relative">
-						<div class="bg-gradient-to-r from-amber-600 to-amber-500 text-amber-950 text-sm font-black uppercase tracking-widest px-8 py-2 rounded-sm shadow-lg">
+						<div class="bg-gradient-to-r from-amber-600 to-amber-500 text-amber-950 text-sm font-black uppercase tracking-widest px-8 py-2 rounded-sm">
 							Champion's Cup
 						</div>
 						<!-- Ribbon tails -->
@@ -222,7 +222,7 @@
 						<div class="flex flex-col items-center gap-2">
 							<div class="relative">
 								{#if podium.second.avatar}
-									<img src={podium.second.avatar} alt="" class="w-16 h-16 rounded-full object-cover border-2 border-slate-400 shadow-md" />
+									<img src={podium.second.avatar} alt="" class="w-16 h-16 rounded-full object-cover border-2 border-slate-400" />
 								{:else}
 									<div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-2xl border-2 border-slate-400">🏈</div>
 								{/if}
@@ -232,7 +232,7 @@
 								<p class="text-sm font-semibold text-slate-300 max-w-[100px] truncate">{realName(podium.second)}</p>
 								<p class="text-xs text-slate-500 max-w-[100px] truncate">{podium.second.teamName}</p>
 							</div>
-							<div class="w-24 h-16 bg-gradient-to-b from-slate-500 to-slate-600 rounded-t-md flex items-center justify-center shadow-inner">
+							<div class="w-24 h-16 bg-gradient-to-b from-slate-500 to-slate-600 rounded-t-md flex items-center justify-center">
 								<span class="text-2xl font-black text-slate-200">2</span>
 							</div>
 						</div>
@@ -244,7 +244,7 @@
 						<div class="relative">
 							<div class="absolute inset-0 rounded-full blur-xl bg-amber-400/20 scale-150"></div>
 							{#if podium.champion.avatar}
-								<img src={podium.champion.avatar} alt="" class="relative w-24 h-24 rounded-full object-cover border-4 border-amber-400 shadow-2xl shadow-amber-900/40" />
+								<img src={podium.champion.avatar} alt="" class="relative w-24 h-24 rounded-full object-cover border-4 border-amber-400" />
 							{:else}
 								<div class="relative w-24 h-24 rounded-full bg-slate-700 flex items-center justify-center text-4xl border-4 border-amber-400">🏈</div>
 							{/if}
@@ -253,7 +253,7 @@
 							<p class="text-base font-bold text-white max-w-[130px] truncate">{realName(podium.champion)}</p>
 							<p class="text-sm text-slate-400 max-w-[130px] truncate">{podium.champion.teamName}</p>
 						</div>
-						<div class="w-28 h-24 bg-gradient-to-b from-amber-600/40 to-amber-800/30 border border-amber-500/40 rounded-t-md flex items-center justify-center shadow-inner">
+						<div class="w-28 h-24 bg-gradient-to-b from-amber-600/40 to-amber-800/30 border border-amber-500/40 rounded-t-md flex items-center justify-center">
 							<span class="text-3xl font-black text-amber-400">1</span>
 						</div>
 					</div>
@@ -263,7 +263,7 @@
 						<div class="flex flex-col items-center gap-2">
 							<div class="relative">
 								{#if podium.third.avatar}
-									<img src={podium.third.avatar} alt="" class="w-14 h-14 rounded-full object-cover border-2 border-amber-700 shadow-md" />
+									<img src={podium.third.avatar} alt="" class="w-14 h-14 rounded-full object-cover border-2 border-amber-700" />
 								{:else}
 									<div class="w-14 h-14 rounded-full bg-slate-700 flex items-center justify-center text-xl border-2 border-amber-700">🏈</div>
 								{/if}

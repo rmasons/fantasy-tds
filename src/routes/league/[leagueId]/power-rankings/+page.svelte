@@ -577,9 +577,9 @@
 						</tr>
 						<!-- Playoff cutline -->
 						{#if atCutline && selectedWeek > 0 && weeksRemainingFromHere > 0}
-							<tr class="border-t border-blue-500/40">
-								<td colspan="99" class="px-4 py-1 bg-blue-500/5">
-									<span class="text-xs text-blue-400/70 font-medium">— Playoff line —</span>
+							<tr class="border-t border-amber-500/40">
+								<td colspan="99" class="px-4 py-1 bg-amber-500/5">
+									<span class="text-xs text-amber-400/70 font-medium">— Playoff line —</span>
 								</td>
 							</tr>
 						{/if}
@@ -593,8 +593,8 @@
 			{#each rankings as row, i}
 				{@const atCutline = playoffLine !== null && i === playoffLine && selectedWeek > 0 && weeksRemainingFromHere > 0}
 				{#if atCutline}
-					<div class="px-4 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30">
-						<span class="text-xs text-blue-400/80 font-medium">— Playoff line —</span>
+					<div class="px-4 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
+						<span class="text-xs text-amber-400/80 font-medium">— Playoff line —</span>
 					</div>
 				{/if}
 				<div class="bg-navy-850 rounded-lg border border-navy-700 px-4 py-3

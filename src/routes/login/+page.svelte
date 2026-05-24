@@ -32,15 +32,15 @@
 
 <div class="min-h-screen flex items-center justify-center bg-slate-950 px-4">
 	<!-- Background gradient -->
-	<div class="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-transparent to-violet-600/5 pointer-events-none"></div>
+	<div class="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-orange-500/5 pointer-events-none"></div>
 
 	<div class="relative w-full max-w-sm">
 		<!-- Card -->
-		<div class="bg-slate-900 rounded-2xl p-8 shadow-2xl border border-slate-800/60 text-center">
+		<div class="bg-slate-900 rounded-2xl p-8 border border-white/[0.07] text-center">
 			<!-- Top accent -->
-			<div class="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent rounded-full"></div>
+			<div class="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-amber-400/40 to-transparent rounded-full"></div>
 
-			<div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center text-2xl mx-auto mb-5 shadow-lg shadow-blue-900/30">
+			<div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-2xl mx-auto mb-5">
 				🏈
 			</div>
 
@@ -63,7 +63,7 @@
 					onclick={signInWithGoogle}
 					class="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl
 					       bg-white hover:bg-slate-100 text-slate-800 font-semibold text-sm
-					       transition-colors shadow-md"
+					       transition-colors"
 				>
 					<svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
 						<path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

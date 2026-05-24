@@ -74,16 +74,16 @@
 
 <div class="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
 	<!-- Background gradient -->
-	<div class="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-transparent to-violet-600/5 pointer-events-none"></div>
+	<div class="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-orange-500/5 pointer-events-none"></div>
 
 	<div class="relative w-full max-w-lg">
 
 		{#if !data.user?.sleeperUserId}
 			<!-- Link Sleeper account -->
-			<div class="bg-slate-900 rounded-2xl p-8 shadow-2xl border border-slate-800/60">
-				<div class="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent rounded-full"></div>
+			<div class="bg-slate-900 rounded-2xl p-8 border border-white/[0.07]">
+				<div class="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-amber-400/40 to-transparent rounded-full"></div>
 
-				<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center text-xl mb-5 shadow-lg shadow-blue-900/30">
+				<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-xl mb-5">
 					🏈
 				</div>
 
@@ -102,8 +102,8 @@
 						bind:value={sleeperUsername}
 						placeholder="your_sleeper_username"
 						required
-						class="w-full px-4 py-2.5 rounded-xl bg-slate-800 text-white border border-slate-700
-						       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+						class="w-full px-4 py-2.5 rounded-xl bg-slate-800 text-white border border-white/[0.07]
+						       focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent
 						       placeholder:text-slate-600 mb-4 transition-colors"
 					/>
 					{#if linkError}
@@ -112,9 +112,9 @@
 					<button
 						type="submit"
 						disabled={linkStatus === 'loading'}
-						class="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500
-						       hover:from-blue-500 hover:to-blue-400 disabled:opacity-50
-						       text-white font-semibold transition-all shadow-md shadow-blue-900/30"
+						class="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500
+						       hover:from-amber-400 hover:to-orange-400 disabled:opacity-50
+						       text-slate-950 font-bold transition-all"
 					>
 						{linkStatus === 'loading' ? 'Looking up…' : 'Connect Sleeper'}
 					</button>
@@ -123,18 +123,18 @@
 
 		{:else if leaguesLoading}
 			<div class="text-center">
-				<div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+				<div class="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
 				<p class="text-slate-400 text-sm">Loading your leagues…</p>
 			</div>
 
 		{:else if leagues.length === 0}
-			<div class="bg-slate-900 rounded-2xl p-8 shadow-xl border border-slate-800/60 text-center">
+			<div class="bg-slate-900 rounded-2xl p-8 border border-white/[0.07] text-center">
 				<p class="text-slate-300">No NFL leagues found for <strong class="text-white">{data.user.sleeperUsername}</strong> this season.</p>
 			</div>
 
 		{:else}
 			<!-- League picker -->
-			<div class="bg-slate-900 rounded-2xl p-6 shadow-2xl border border-slate-800/60">
+			<div class="bg-slate-900 rounded-2xl p-6 border border-white/[0.07]">
 				<h1 class="text-xl font-extrabold mb-0.5">Select a league</h1>
 				<p class="text-slate-400 text-sm mb-5">
 					Welcome back, <strong class="text-white">{data.user.sleeperUsername}</strong>.
@@ -146,22 +146,22 @@
 							<button
 								onclick={() => selectLeague(league.league_id)}
 								class="w-full flex items-center gap-4 p-4 rounded-xl bg-slate-800
-								       hover:bg-slate-700 border border-slate-700/50 hover:border-slate-600
+								       hover:bg-slate-800/80 border border-white/[0.07] hover:border-amber-500/30
 								       transition-all text-left group"
 							>
 								{#if league.avatar}
 									<img
 										src="https://sleepercdn.com/avatars/thumbs/{league.avatar}"
 										alt=""
-										class="w-11 h-11 rounded-full object-cover flex-shrink-0 ring-2 ring-slate-600 group-hover:ring-blue-500 transition-all"
+										class="w-11 h-11 rounded-full object-cover flex-shrink-0 ring-2 ring-white/10 group-hover:ring-amber-400/50 transition-all"
 									/>
 								{:else}
-									<div class="w-11 h-11 rounded-full bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center flex-shrink-0 text-lg">
+									<div class="w-11 h-11 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center flex-shrink-0 text-lg">
 										🏈
 									</div>
 								{/if}
 								<div>
-									<p class="font-semibold text-white group-hover:text-blue-300 transition-colors">{league.name}</p>
+									<p class="font-semibold text-white group-hover:text-amber-300 transition-colors">{league.name}</p>
 									<p class="text-sm text-slate-500">
 										{league.season} · {league.total_rosters} teams ·
 										{league.settings.type === 2 ? 'Dynasty' : 'Redraft'}

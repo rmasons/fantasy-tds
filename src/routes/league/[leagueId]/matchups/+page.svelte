@@ -376,7 +376,7 @@
 										{#each roundMatches as match}
 											<div class="rounded-lg overflow-hidden border
 											            {isChampionRound
-											                ? 'border-amber-500/40 shadow-lg shadow-amber-900/20'
+											                ? 'border-amber-500/40'
 											                : 'border-navy-700'}">
 												{#each [match.t1, match.t2] as side, si}
 													{#if side.bye}

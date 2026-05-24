@@ -9,7 +9,7 @@
 	<LeagueNav leagueId={data.leagueId} />
 	<!-- lg: offset for fixed sidebar; mobile: offset for sticky top nav -->
 	<div class="lg:pl-56 pt-14 lg:pt-0">
-		<main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
+		<main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 lg:py-8 pb-20 lg:pb-8">
 			{@render children()}
 		</main>
 	</div>

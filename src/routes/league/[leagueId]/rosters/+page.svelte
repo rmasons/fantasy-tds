@@ -110,7 +110,7 @@
 	const posColor: Record<string, string> = {
 		QB: 'bg-red-900/60 text-red-300',
 		RB: 'bg-green-900/60 text-green-300',
-		WR: 'bg-blue-900/60 text-blue-300',
+		WR: 'bg-slate-800 text-slate-300',
 		TE: 'bg-yellow-900/60 text-yellow-300',
 		K: 'bg-purple-900/60 text-purple-300',
 		DEF: 'bg-orange-900/60 text-orange-300'

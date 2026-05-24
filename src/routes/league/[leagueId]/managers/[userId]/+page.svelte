@@ -390,7 +390,7 @@
 								href="https://x.com/{profile.twitterHandle}"
 								target="_blank"
 								rel="noopener noreferrer"
-								class="text-blue-400 hover:text-blue-300 transition-colors"
+								class="text-amber-400 hover:text-amber-300 transition-colors"
 							>@{profile.twitterHandle}</a>
 						</div>
 					{/if}

@@ -63,7 +63,7 @@
 			case 'hyperlink': {
 				const uri = node.data?.uri ?? '';
 				const safeHref = /^https?:\/\//i.test(uri) ? uri : '#';
-				return `<a href="${safeHref}" class="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">${children}</a>`;
+				return `<a href="${safeHref}" class="text-amber-400 hover:underline" target="_blank" rel="noopener noreferrer">${children}</a>`;
 			}
 			case 'hr': return `<hr style="margin:1.5rem 0;border-color:#334155" />`;
 			case 'blockquote': return `<blockquote style="border-left:4px solid #475569;padding-left:1rem;font-style:italic;color:#94a3b8;margin:1rem 0">${children}</blockquote>`;

@@ -369,7 +369,7 @@
 									</div>
 									<div class="flex items-center gap-2 mt-0.5">
 										<span class="text-[10px] text-navy-600 font-medium uppercase tracking-wider">Wk {g.week}</span>
-										<span class="text-[10px] font-bold text-violet-400">{(g.winnerPts + g.loserPts).toFixed(2)} combined</span>
+										<span class="text-[10px] font-bold text-amber-400/70">{(g.winnerPts + g.loserPts).toFixed(2)} combined</span>
 									</div>
 								</div>
 							{/each}
@@ -581,7 +581,7 @@
 									</div>
 									<div class="flex items-center gap-2 mt-0.5">
 										<span class="text-[10px] text-navy-600 font-medium uppercase tracking-wider">{g.season} Wk{g.week}</span>
-										<span class="text-[10px] font-bold text-violet-400">{(g.winnerPts + g.loserPts).toFixed(2)} combined</span>
+										<span class="text-[10px] font-bold text-amber-400/70">{(g.winnerPts + g.loserPts).toFixed(2)} combined</span>
 									</div>
 								</div>
 							{/each}

@@ -98,6 +98,16 @@
 			: navLinks.filter(l => l.href !== 'blog' || hasBlog)
 	);
 
+	const bottomTabDefs = [
+		{ href: 'standings', label: 'Standings', emoji: '🏆' },
+		{ href: 'matchups',  label: 'Matchups',  emoji: '⚔️' },
+		{ href: 'records',   label: 'Records',   emoji: '📊' },
+		{ href: 'rosters',   label: 'Rosters',   emoji: '📋' },
+	];
+	const bottomTabs = $derived(
+		bottomTabDefs.filter(t => visibleLinks.some(l => l.href === t.href))
+	);
+
 	const currentSeason = $derived(
 		seasonChain.find(e => e.leagueId === leagueId)?.season ?? league?.season ?? null
 	);
@@ -127,14 +137,14 @@
 				<img
 					src="https://sleepercdn.com/avatars/thumbs/{league.avatar}"
 					alt=""
-					class="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-slate-700 group-hover:ring-blue-500 transition-all"
+					class="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-white/10 group-hover:ring-amber-400/50 transition-all"
 				/>
 			{:else}
 				<div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shrink-0 text-sm">
 					🏈
 				</div>
 			{/if}
-			<span class="font-bold text-white text-sm truncate leading-tight group-hover:text-blue-400 transition-colors">
+			<span class="font-bold text-white text-sm truncate leading-tight group-hover:text-amber-300 transition-colors">
 				{league?.name ?? '…'}
 			</span>
 		</a>
@@ -161,7 +171,7 @@
 				</button>
 
 				{#if yearOpen && hasHistory}
-					<div class="absolute left-0 top-full mt-1 bg-navy-800 border border-navy-700 rounded-lg shadow-2xl overflow-hidden z-50 min-w-full">
+					<div class="absolute left-0 top-full mt-1 bg-navy-800 border border-navy-700 rounded-lg overflow-hidden z-50 min-w-full">
 						{#each seasonChain as entry}
 							<button
 								onclick={() => switchSeason(entry.leagueId)}
@@ -252,7 +262,7 @@
 			{:else}
 				<span class="text-lg">🏈</span>
 			{/if}
-			<span class="font-semibold text-white text-sm hidden sm:block truncate max-w-[140px]">
+			<span class="font-semibold text-white text-sm truncate max-w-[140px]">
 				{league?.name ?? '…'}
 			</span>
 		</a>
@@ -278,7 +288,7 @@
 				</button>
 
 				{#if yearOpen && hasHistory}
-					<div class="absolute left-0 top-full mt-1 bg-navy-800 border border-navy-700 rounded-lg shadow-xl overflow-hidden z-50 min-w-[100px]">
+					<div class="absolute left-0 top-full mt-1 bg-navy-800 border border-navy-700 rounded-lg overflow-hidden z-50 min-w-[100px]">
 						{#each seasonChain as entry}
 							<button
 								onclick={() => switchSeason(entry.leagueId)}
@@ -319,20 +329,12 @@
 				</a>
 			{/if}
 
-			<!-- Hamburger -->
-			<button
-				onclick={() => (menuOpen = !menuOpen)}
-				class="md:hidden p-1.5 rounded text-slate-400 hover:text-white"
-				aria-label="Toggle menu"
-			>
-				{#if menuOpen}✕{:else}☰{/if}
-			</button>
 		</div>
 	</div>
 
 	<!-- Mobile dropdown -->
 	{#if menuOpen}
-		<div class="md:hidden bg-navy-900 border-t border-navy-700 px-4 py-3 flex flex-col gap-1">
+		<div class="lg:hidden bg-navy-900 border-t border-navy-700 px-4 py-3 flex flex-col gap-1">
 			{#if hasHistory}
 				<div class="mb-2 pb-2 border-b border-navy-700">
 					<p class="text-[10px] text-navy-500 uppercase tracking-widest mb-1.5 px-1">Season</p>
@@ -382,3 +384,36 @@
 		</div>
 	{/if}
 </nav>
+
+<!-- ─── Bottom tab bar (mobile <lg) ─────────────────────────── -->
+{#if bottomTabs.length > 0}
+	<nav
+		class="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-navy-900 border-t border-white/[0.07]"
+		style="padding-bottom: env(safe-area-inset-bottom)"
+	>
+		<div class="grid h-14" style="grid-template-columns: repeat({bottomTabs.length + 1}, 1fr)">
+			{#each bottomTabs as tab}
+				<a
+					href="/league/{leagueId}/{tab.href}"
+					class="flex flex-col items-center justify-center gap-0.5 transition-colors
+					       {isActive(tab.href)
+					           ? 'text-amber-400'
+					           : 'text-navy-500 hover:text-slate-300'}"
+				>
+					<span class="text-xl leading-none">{tab.emoji}</span>
+					<span class="text-[9px] font-bold uppercase tracking-wider">{tab.label}</span>
+				</a>
+			{/each}
+			<!-- More button opens the full nav drawer -->
+			<button
+				onclick={() => (menuOpen = !menuOpen)}
+				class="flex flex-col items-center justify-center gap-0.5 transition-colors
+				       {menuOpen ? 'text-amber-400' : 'text-navy-500 hover:text-slate-300'}"
+				aria-label="More navigation"
+			>
+				<span class="text-xl leading-none">☰</span>
+				<span class="text-[9px] font-bold uppercase tracking-wider">More</span>
+			</button>
+		</div>
+	</nav>
+{/if}

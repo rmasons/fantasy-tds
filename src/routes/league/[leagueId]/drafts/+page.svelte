@@ -111,7 +111,7 @@
 	const posColor: Record<string, string> = {
 		QB: 'border-l-red-500',
 		RB: 'border-l-green-500',
-		WR: 'border-l-blue-500',
+		WR: 'border-l-slate-400',
 		TE: 'border-l-yellow-500',
 		K: 'border-l-purple-500',
 		DEF: 'border-l-orange-500'
