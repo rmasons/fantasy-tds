@@ -396,7 +396,7 @@
 
 					const bestStarts = [...byRid.entries()].reduce<{ rid: number; starts: number; uniq: number } | null>(
 						(b, [rid, { starts, uniq }]) => !b || starts > b.starts ? { rid, starts, uniq: uniq.size } : b, null);
-					sup('ten_years_ii', '🏈', '10 Years Old, Part II', 'Most Total Rookie Starts',
+					sup('ten_years_ii', '🏈', '10 Years Old', 'Most Total Rookie Starts',
 						bestStarts ? toEntry(bestStarts.rid, `${bestStarts.starts} starts`, `${bestStarts.uniq} unique rookies`) : null,
 						bestStarts?.rid);
 				}
