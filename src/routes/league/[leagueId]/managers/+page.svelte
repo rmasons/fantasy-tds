@@ -110,13 +110,13 @@
 						<div class="w-12 h-12 rounded-full bg-navy-800 flex items-center justify-center text-xl shrink-0 mt-0.5">🏈</div>
 					{/if}
 					<div class="min-w-0 flex-1">
-						<p class="font-semibold text-white truncate">{mgr.teamName}</p>
-						<p class="text-xs text-navy-500 truncate">{realName || mgr.displayName}</p>
-						<div class="flex items-center gap-3 mt-1">
+						<p class="font-semibold text-white leading-snug line-clamp-2">{mgr.teamName}</p>
+						<p class="text-xs text-navy-500 truncate mt-0.5">{realName || mgr.displayName}</p>
+						<div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
 							<span class="text-xs text-slate-400 tabular-nums">
 								{mgr.wins}–{mgr.losses}{mgr.ties ? `–${mgr.ties}` : ''}
 							</span>
-							<span class="text-xs text-navy-500 tabular-nums">{mgr.fpts.toFixed(2)} pts</span>
+							<span class="text-xs text-navy-500 tabular-nums">{mgr.fpts.toFixed(1)} pts</span>
 						</div>
 						{#if profile?.bio}
 							<p class="text-xs text-navy-500 mt-1.5 line-clamp-2 leading-relaxed">{profile.bio}</p>
