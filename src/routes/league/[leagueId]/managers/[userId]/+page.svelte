@@ -266,7 +266,7 @@
 
 	// ── Finish label helpers ───────────────────────────────────────────────
 	function finishLabel(f: PlayoffFinish): string {
-		if (f === 'champion')   return '🏆 Champion';
+		if (f === 'champion')   return '🏆 Champ';
 		if (f === 'runner-up')  return '🥈 Runner-Up';
 		if (f === '3rd')        return '🥉 3rd Place';
 		if (f === 'playoffs')   return 'Playoffs';
@@ -323,7 +323,7 @@
 				<div class="flex-1 min-w-0">
 					<div class="flex items-start justify-between gap-3">
 						<div class="min-w-0">
-							<h1 class="text-2xl font-bold text-white leading-tight truncate">{manager.teamName}</h1>
+							<h1 class="text-2xl font-bold text-white leading-tight">{manager.teamName}</h1>
 							{#if profile?.firstName || profile?.lastName}
 								<p class="text-slate-300 text-sm font-medium">{[profile?.firstName, profile?.lastName].filter(Boolean).join(' ')}</p>
 							{/if}
@@ -581,7 +581,7 @@
 							<tr class="border-b border-navy-700/50 hover:bg-navy-800 transition-colors">
 								<td class="px-4 py-3 font-mono text-navy-500 tabular-nums">{s.season}</td>
 								<td class="px-4 py-3 text-slate-400 truncate max-w-[140px] hidden sm:table-cell">{s.teamName}</td>
-								<td class="px-4 py-3 text-right text-slate-300 tabular-nums">
+								<td class="px-4 py-3 text-right text-slate-300 tabular-nums whitespace-nowrap">
 									{s.wins}–{s.losses}{s.ties ? `–${s.ties}` : ''}
 								</td>
 								<td class="px-4 py-3 text-right text-slate-400 tabular-nums">{s.fpts.toFixed(1)}</td>
@@ -596,7 +596,7 @@
 						<tfoot>
 							<tr class="border-t border-navy-700 bg-navy-900">
 								<td class="px-4 py-3 text-navy-500 text-xs uppercase font-medium tracking-wider" colspan="2">Career</td>
-								<td class="px-4 py-3 text-right font-semibold text-slate-300 tabular-nums">
+								<td class="px-4 py-3 text-right font-semibold text-slate-300 tabular-nums whitespace-nowrap">
 									{careerWins}–{careerLosses}{careerTies ? `–${careerTies}` : ''}
 								</td>
 								<td class="px-4 py-3 text-right font-semibold text-slate-400 tabular-nums">{careerFpts.toFixed(1)}</td>
