@@ -8,7 +8,7 @@
 		fetchTransactions,
 		buildRosterInfoMap,
 		fetchDisplayNameOverrides,
-		type RosterInfo,
+		combineFpts,
 	} from '$lib/sleeper';
 
 	let { data } = $props<{ data: LayoutData }>();
@@ -66,6 +66,7 @@
 
 				const rosterInfoMap = buildRosterInfoMap(rosters, users, overrides);
 				const playoffStart: number = league.settings?.playoff_week_start ?? 15;
+				const playoffTeamCount: number = (league.settings as any)?.playoff_teams ?? 4;
 
 				const maxRegWeek = nfl.season_type === 'regular'
 					? Math.min(nfl.week, playoffStart - 1)
@@ -87,16 +88,23 @@
 
 				loadingStatus = 'Computing superlatives…';
 
-				// ── Entry builder ─────────────────────────────────────────────
+				// ── Helpers ───────────────────────────────────────────────────
 				function toEntry(rid: number, stat: string, sub?: string): SupEntry {
 					const i = rosterInfoMap.get(rid);
-					return {
-						teamName: i?.teamName ?? `Team ${rid}`,
-						avatar: i?.avatar ?? null,
-						stat,
-						sub,
-					};
+					return { teamName: i?.teamName ?? `Team ${rid}`, avatar: i?.avatar ?? null, stat, sub };
 				}
+
+				function recordStr(wins: number, losses: number, ties: number): string {
+					return ties > 0 ? `${wins}–${losses}–${ties}` : `${wins}–${losses}`;
+				}
+
+				// ── Rosters sorted by regular season standing ─────────────────
+				const rostersByRecord = [...rosters].sort((a, b) => {
+					const wA = a.settings.wins ?? 0, wB = b.settings.wins ?? 0;
+					if (wA !== wB) return wB - wA;
+					return combineFpts(b.settings.fpts ?? 0, b.settings.fpts_decimal ?? 0)
+						- combineFpts(a.settings.fpts ?? 0, a.settings.fpts_decimal ?? 0);
+				});
 
 				// ── Weekly scores + matchup pairs ─────────────────────────────
 				interface WeekScore {
@@ -174,29 +182,45 @@
 					}
 				}
 
-				// ── Compute each superlative ──────────────────────────────────
+				// ── Superlative builder (tracks winner rids for CONFUSED) ─────
 				const sups: Superlative[] = [];
-				function sup(key: string, emoji: string, title: string, desc: string, entry: SupEntry | null) {
+				const winnerRids = new Set<number>();
+
+				function sup(key: string, emoji: string, title: string, desc: string, entry: SupEntry | null, winnerRid?: number) {
 					sups.push({ key, emoji, title, desc, entry });
+					if (winnerRid !== undefined) winnerRids.add(winnerRid);
 				}
 
-				// Big Red — Biggest Blowout Win
+				// ── 1. Big Hairy American Winning Machine — Regular Season Winner
+				{
+					const r = rostersByRecord[0];
+					if (r) {
+						const w = r.settings.wins ?? 0, l = r.settings.losses ?? 0, t = r.settings.ties ?? 0;
+						sup('big_hairy', '🏈', 'Big Hairy American Winning Machine', 'Regular Season Champion',
+							toEntry(r.roster_id, recordStr(w, l, t)), r.roster_id);
+					} else {
+						sup('big_hairy', '🏈', 'Big Hairy American Winning Machine', 'Regular Season Champion', null);
+					}
+				}
+
+				// ── 2. Big Red — Biggest Blowout Win
 				{
 					const best = pairs.reduce<Pair | null>((b, p) => !b || p.margin > b.margin ? p : b, null);
 					sup('big_red', '💥', 'Big Red', 'Biggest Blowout Win', best
 						? toEntry(best.winRid, `+${best.margin.toFixed(2)} pts`,
 							`Wk ${best.week} vs ${rosterInfoMap.get(best.loseRid)?.teamName ?? `Team ${best.loseRid}`}`)
-						: null);
+						: null, best?.winRid);
 				}
 
-				// Break It, Pepe Le Pew — Highest Score in a Loss
+				// ── 3. Break It, Pepe Le Pew — Highest Score in a Loss
 				{
 					const best = pairs.reduce<Pair | null>((b, p) => !b || p.losePts > b.losePts ? p : b, null);
 					sup('pepe', '💔', 'Break It, Pepe Le Pew', 'Highest Score in a Loss',
-						best ? toEntry(best.loseRid, best.losePts.toFixed(2) + ' pts', `Week ${best.week}`) : null);
+						best ? toEntry(best.loseRid, best.losePts.toFixed(2) + ' pts', `Week ${best.week}`) : null,
+						best?.loseRid);
 				}
 
-				// Chubby — Highest Avg Margin of Victory
+				// ── 4. Chubby — Highest Average Margin of Victory
 				{
 					const m = new Map<number, { sum: number; n: number }>();
 					for (const p of pairs) {
@@ -208,10 +232,10 @@
 						return !b || avg > b.avg ? { rid, avg } : b;
 					}, null);
 					sup('chubby', '💪', 'Chubby', 'Highest Average Margin of Victory',
-						best ? toEntry(best.rid, `+${best.avg.toFixed(2)} avg margin`) : null);
+						best ? toEntry(best.rid, `+${best.avg.toFixed(2)} avg margin`) : null, best?.rid);
 				}
 
-				// Drive with Your Heart — Most Efficient Manager
+				// ── 5. Drive with Your Heart — Most Efficient Manager
 				{
 					const rosterPositions: string[] = league.roster_positions ?? [];
 					const posCounts: Record<string, number> = {};
@@ -268,17 +292,18 @@
 						}, null);
 					}
 					sup('drive_heart', '🏹', 'Drive with Your Heart', 'Most Efficient Manager',
-						best ? toEntry(best.rid, (best.eff * 100).toFixed(2) + '%') : null);
+						best ? toEntry(best.rid, (best.eff * 100).toFixed(2) + '%') : null, best?.rid);
 				}
 
-				// Hakuna Matata, Bitches — Highest Single-Week Score
+				// ── 6. Hakuna Matata, Bitches — Highest Single-Week Score
 				{
 					const best = weekScores.reduce<WeekScore | null>((b, s) => !b || s.pts > b.pts ? s : b, null);
 					sup('hakuna', '⚡', 'Hakuna Matata, Bitches', 'Highest Single-Week Score',
-						best ? toEntry(best.rid, best.pts.toFixed(2) + ' pts', `Week ${best.week}`) : null);
+						best ? toEntry(best.rid, best.pts.toFixed(2) + ' pts', `Week ${best.week}`) : null,
+						best?.rid);
 				}
 
-				// Hard as a Diamond in an Ice Storm — Most Points Against
+				// ── 7. Hard as a Diamond in an Ice Storm — Most Points Against
 				{
 					const m = new Map<number, number>();
 					for (const p of pairs) {
@@ -288,10 +313,10 @@
 					const best = [...m.entries()].reduce<{ rid: number; pts: number } | null>((b, [rid, pts]) =>
 						!b || pts > b.pts ? { rid, pts } : b, null);
 					sup('hard_diamond', '💎', 'Hard as a Diamond in an Ice Storm', 'Most Points Against',
-						best ? toEntry(best.rid, best.pts.toFixed(1) + ' pts against') : null);
+						best ? toEntry(best.rid, best.pts.toFixed(1) + ' pts against') : null, best?.rid);
 				}
 
-				// I got it at Target. It's on Sale. — Best Waiver / FA Add
+				// ── 8. I got it at Target — Best Waiver / FA Add
 				{
 					let best: { rosterId: number; playerId: string; pts: number; starts: number } | null = null;
 					for (const [, add] of waiverAdds) {
@@ -304,10 +329,11 @@
 					}
 					sup('target', '🛒', "I got it at Target. It's on Sale.", 'Best Waiver Wire / FA Add',
 						best ? toEntry(best.rosterId, best.pts.toFixed(2) + ' pts',
-							`${playersData[best.playerId]?.name ?? best.playerId} · ${best.starts} starts`) : null);
+							`${playersData[best.playerId]?.name ?? best.playerId} · ${best.starts} starts`) : null,
+						best?.rosterId);
 				}
 
-				// I Piss Excellence — Highest Average Weekly Score
+				// ── 9. I Piss Excellence — Highest Average Weekly Score
 				{
 					const m = new Map<number, { sum: number; n: number }>();
 					for (const s of weekScores) {
@@ -321,10 +347,10 @@
 						return !b || avg > b.avg ? { rid, avg } : b;
 					}, null);
 					sup('piss_excellence', '👑', 'I Piss Excellence', 'Highest Average Weekly Score',
-						best ? toEntry(best.rid, best.avg.toFixed(2) + ' avg pts') : null);
+						best ? toEntry(best.rid, best.avg.toFixed(2) + ' avg pts') : null, best?.rid);
 				}
 
-				// I'm on Fire! — Longest Win Streak
+				// ── 10. I'm on Fire! — Longest Win Streak
 				{
 					let best: { rid: number; streak: number } | null = null;
 					for (const r of rosters) {
@@ -333,54 +359,71 @@
 						if (!best || streak > best.streak) best = { rid: r.roster_id, streak };
 					}
 					sup('on_fire', '🔥', "I'm on Fire!", 'Longest Win Streak',
-						best && best.streak > 0 ? toEntry(best.rid, `${best.streak} straight wins`) : null);
+						best && best.streak > 0 ? toEntry(best.rid, `${best.streak} straight wins`) : null,
+						best?.rid);
 				}
 
-				// 10 Years Old, Part I — Most Unique Rookies Started
+				// ── 11. It's Not Always Bad to Be in Last Place — Regular Season Last Place
 				{
-					const m = new Map<number, Set<string>>();
-					for (const s of weekScores) {
-						for (const pid of s.starters) {
-							if ((playersData[pid]?.yearsExp ?? -1) !== 0) continue;
-							if (!m.has(s.rid)) m.set(s.rid, new Set());
-							m.get(s.rid)!.add(pid);
-						}
+					const r = rostersByRecord[rostersByRecord.length - 1];
+					if (r) {
+						const w = r.settings.wins ?? 0, l = r.settings.losses ?? 0, t = r.settings.ties ?? 0;
+						sup('last_place', '🚽', "It's Not Always Bad to Be in Last Place", 'Regular Season Last Place',
+							toEntry(r.roster_id, recordStr(w, l, t)), r.roster_id);
+					} else {
+						sup('last_place', '🚽', "It's Not Always Bad to Be in Last Place", 'Regular Season Last Place', null);
 					}
-					const best = [...m.entries()].reduce<{ rid: number; cnt: number } | null>((b, [rid, set]) =>
-						!b || set.size > b.cnt ? { rid, cnt: set.size } : b, null);
-					sup('ten_years_i', '👶', '10 Years Old, Part I', 'Most Unique Rookies Started',
-						best ? toEntry(best.rid, `${best.cnt} unique rookies`) : null);
 				}
 
-				// 10 Years Old, Part II — Most Total Rookie Starts
+				// ── 12 + 13. 10 Years Old — Rookie Starts
 				{
-					const m = new Map<number, { starts: number; uniq: Set<string> }>();
+					const byRid = new Map<number, { starts: number; uniq: Set<string> }>();
 					for (const s of weekScores) {
 						for (const pid of s.starters) {
 							if ((playersData[pid]?.yearsExp ?? -1) !== 0) continue;
-							const c = m.get(s.rid) ?? { starts: 0, uniq: new Set<string>() };
+							const c = byRid.get(s.rid) ?? { starts: 0, uniq: new Set<string>() };
 							c.starts++;
 							c.uniq.add(pid);
-							m.set(s.rid, c);
+							byRid.set(s.rid, c);
 						}
 					}
-					const best = [...m.entries()].reduce<{ rid: number; starts: number; uniq: number } | null>(
+
+					const bestUniq = [...byRid.entries()].reduce<{ rid: number; cnt: number } | null>((b, [rid, { uniq }]) =>
+						!b || uniq.size > b.cnt ? { rid, cnt: uniq.size } : b, null);
+					sup('ten_years_i', '👶', '10 Years Old, Part I', 'Most Unique Rookies Started',
+						bestUniq ? toEntry(bestUniq.rid, `${bestUniq.cnt} unique rookies`) : null, bestUniq?.rid);
+
+					const bestStarts = [...byRid.entries()].reduce<{ rid: number; starts: number; uniq: number } | null>(
 						(b, [rid, { starts, uniq }]) => !b || starts > b.starts ? { rid, starts, uniq: uniq.size } : b, null);
 					sup('ten_years_ii', '🏈', '10 Years Old, Part II', 'Most Total Rookie Starts',
-						best ? toEntry(best.rid, `${best.starts} starts`, `${best.uniq} unique rookies`) : null);
+						bestStarts ? toEntry(bestStarts.rid, `${bestStarts.starts} starts`, `${bestStarts.uniq} unique rookies`) : null,
+						bestStarts?.rid);
 				}
 
-				// Spider Monkey — Most Points For
+				// ── 14. See You When You're Grown — Best Record to Miss Playoffs
+				{
+					const nonPlayoff = rostersByRecord.slice(playoffTeamCount);
+					const r = nonPlayoff[0];
+					if (r) {
+						const w = r.settings.wins ?? 0, l = r.settings.losses ?? 0, t = r.settings.ties ?? 0;
+						sup('see_you_grown', '🌱', "See You When You're Grown", 'Best Record to Miss Playoffs',
+							toEntry(r.roster_id, recordStr(w, l, t)), r.roster_id);
+					} else {
+						sup('see_you_grown', '🌱', "See You When You're Grown", 'Best Record to Miss Playoffs', null);
+					}
+				}
+
+				// ── 15. Spider Monkey — Most Points For
 				{
 					const m = new Map<number, number>();
 					for (const s of weekScores) m.set(s.rid, (m.get(s.rid) ?? 0) + s.pts);
 					const best = [...m.entries()].reduce<{ rid: number; pts: number } | null>((b, [rid, pts]) =>
 						!b || pts > b.pts ? { rid, pts } : b, null);
 					sup('spider_monkey', '🐒', 'Spider Monkey', 'Most Points For',
-						best ? toEntry(best.rid, best.pts.toFixed(1) + ' total pts') : null);
+						best ? toEntry(best.rid, best.pts.toFixed(1) + ' total pts') : null, best?.rid);
 				}
 
-				// Magic Man — Lowest Average Margin of Victory
+				// ── 16. Magic Man — Lowest Average Margin of Victory
 				{
 					const m = new Map<number, { sum: number; n: number }>();
 					for (const p of pairs) {
@@ -392,10 +435,10 @@
 						return !b || avg < b.avg ? { rid, avg } : b;
 					}, null);
 					sup('magic_man', '🎩', 'Magic Man', 'Lowest Average Margin of Victory',
-						worst ? toEntry(worst.rid, `+${worst.avg.toFixed(2)} avg margin`) : null);
+						worst ? toEntry(worst.rid, `+${worst.avg.toFixed(2)} avg margin`) : null, worst?.rid);
 				}
 
-				// This is not Good — Longest Losing Streak
+				// ── 17. This is not Good — Longest Losing Streak
 				{
 					let best: { rid: number; streak: number } | null = null;
 					for (const r of rosters) {
@@ -404,19 +447,20 @@
 						if (!best || streak > best.streak) best = { rid: r.roster_id, streak };
 					}
 					sup('not_good', '❄️', 'This is not Good', 'Longest Losing Streak',
-						best && best.streak > 0 ? toEntry(best.rid, `${best.streak} straight losses`) : null);
+						best && best.streak > 0 ? toEntry(best.rid, `${best.streak} straight losses`) : null,
+						best?.rid);
 				}
 
-				// Too Drunk to Taste This Chicken — Biggest Blowout Loss
+				// ── 18. Too Drunk to Taste This Chicken — Biggest Blowout Loss
 				{
 					const worst = pairs.reduce<Pair | null>((b, p) => !b || p.margin > b.margin ? p : b, null);
 					sup('too_drunk', '🍗', 'Too Drunk to Taste This Chicken', 'Biggest Blowout Loss', worst
 						? toEntry(worst.loseRid, `−${worst.margin.toFixed(2)} pts`,
 							`Wk ${worst.week} vs ${rosterInfoMap.get(worst.winRid)?.teamName ?? `Team ${worst.winRid}`}`)
-						: null);
+						: null, worst?.loseRid);
 				}
 
-				// He was a Man — Most Experienced Starting Lineup
+				// ── 19. He was a Man — Most Experienced Starting Lineup
 				{
 					const m = new Map<number, { sum: number; n: number }>();
 					for (const s of weekScores) {
@@ -432,15 +476,34 @@
 						return !b || avg > b.avg ? { rid, avg } : b;
 					}, null);
 					sup('he_was_man', '🧓', 'He was a Man', 'Most Experienced Starting Lineup',
-						best ? toEntry(best.rid, best.avg.toFixed(2) + ' avg yrs exp') : null);
+						best ? toEntry(best.rid, best.avg.toFixed(2) + ' avg yrs exp') : null, best?.rid);
 				}
 
-				// Break Us Like Wild Horses — Lowest Single-Week Score
+				// ── 20. Break Us Like Wild Horses — Lowest Single-Week Score
 				{
 					const worst = weekScores.filter(s => s.pts > 0)
 						.reduce<WeekScore | null>((b, s) => !b || s.pts < b.pts ? s : b, null);
 					sup('wild_horses', '🐎', 'Break Us Like Wild Horses', 'Lowest Single-Week Score',
-						worst ? toEntry(worst.rid, worst.pts.toFixed(2) + ' pts', `Week ${worst.week}`) : null);
+						worst ? toEntry(worst.rid, worst.pts.toFixed(2) + ' pts', `Week ${worst.week}`) : null,
+						worst?.rid);
+				}
+
+				// ── 21. Confused By Your Tactics — Best Performer Without a Superlative
+				{
+					const nonWinners = rosters
+						.filter(r => !winnerRids.has(r.roster_id))
+						.sort((a, b) =>
+							combineFpts(b.settings.fpts ?? 0, b.settings.fpts_decimal ?? 0)
+							- combineFpts(a.settings.fpts ?? 0, a.settings.fpts_decimal ?? 0));
+					const r = nonWinners[0];
+					if (r) {
+						const pf = combineFpts(r.settings.fpts ?? 0, r.settings.fpts_decimal ?? 0);
+						const w = r.settings.wins ?? 0, l = r.settings.losses ?? 0, t = r.settings.ties ?? 0;
+						sup('confused', '🤔', 'Confused By Your Tactics', 'Best Performer Without a Superlative',
+							toEntry(r.roster_id, pf.toFixed(1) + ' pts for', recordStr(w, l, t)));
+					} else {
+						sup('confused', '🤔', 'Confused By Your Tactics', 'Best Performer Without a Superlative', null);
+					}
 				}
 
 				superlatives = sups;
