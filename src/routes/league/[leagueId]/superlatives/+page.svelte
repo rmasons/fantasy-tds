@@ -543,20 +543,20 @@
 			<p class="text-navy-500 text-sm mt-1">Check back once the season is underway.</p>
 		</div>
 	{:else}
-		<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+		<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 gap-3">
 			{#each superlatives as s (s.key)}
 				{#if s.entry}
-					<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden flex flex-col">
-						<!-- Video (centered, graceful fallback if file missing) -->
+					<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden flex flex-col lg:flex-row">
+						<!-- Video: stacked on mobile/tablet, thumbnail panel on desktop -->
 						{#if !failedVideos.has(s.key)}
-							<div class="flex items-center justify-center bg-navy-900 overflow-hidden h-40">
+							<div class="flex items-center justify-center bg-navy-900 overflow-hidden h-40 lg:h-auto lg:w-52 lg:shrink-0">
 								<video
 									src="/superlatives/{s.key}.mp4"
 									autoplay
 									loop
 									muted
 									playsinline
-									class="h-full w-full object-contain"
+									class="h-full w-full object-contain lg:object-cover"
 									onerror={() => { failedVideos = new Set([...failedVideos, s.key]); }}
 								></video>
 							</div>
