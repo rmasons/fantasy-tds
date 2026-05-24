@@ -94,19 +94,27 @@
 	});
 
 	const allNavItems = [
-		{ href: 'standings',      label: 'Standings',       icon: '🏆' },
-		{ href: 'matchups',       label: 'Matchups',        icon: '⚔️' },
-		{ href: 'power-rankings', label: 'Power Rankings',  icon: '📈' },
-		{ href: 'rosters',        label: 'Rosters',         icon: '📋' },
-		{ href: 'records',        label: 'Records',         icon: '📊' },
-		{ href: 'transactions',   label: 'Transactions',    icon: '🔄' },
-		{ href: 'drafts',         label: 'Drafts',          icon: '🎯' },
-		{ href: 'awards',         label: 'Awards',          icon: '🥇' },
-		{ href: 'managers',       label: 'Managers',        icon: '👤' },
-		{ href: 'rivalry',        label: 'Rivalry',         icon: '⚡' },
-		{ href: 'blog',           label: 'Blog',            icon: '📝' },
+		{ href: 'standings',       label: 'Standings',        icon: '🏆' },
+		{ href: 'matchups',        label: 'Matchups',         icon: '⚔️' },
+		{ href: 'playoff-bracket', label: 'Playoff Bracket',  icon: '🎖️' },
+		{ href: 'power-rankings',  label: 'Power Rankings',   icon: '📈' },
+		{ href: 'rosters',         label: 'Rosters',          icon: '📋' },
+		{ href: 'records',         label: 'Records',          icon: '📊' },
+		{ href: 'transactions',    label: 'Transactions',     icon: '🔄' },
+		{ href: 'drafts',          label: 'Drafts',           icon: '🎯' },
+		{ href: 'awards',          label: 'Awards',           icon: '🥇' },
+		{ href: 'managers',        label: 'Managers',         icon: '👤' },
+		{ href: 'rivalry',         label: 'Rivalry',          icon: '⚡' },
+		{ href: 'keepers',         label: 'Keepers',          icon: '🔒' },
+		{ href: 'blog',            label: 'Blog',             icon: '📝' },
 	];
-	const navItems = $derived(allNavItems.filter(n => n.href !== 'blog' || data.hasBlog));
+	const navItems = $derived.by(() => {
+		const enabled = data.enabledNavItems;
+		const base = enabled && enabled.length > 0
+			? enabled.map(href => allNavItems.find(n => n.href === href)).filter(Boolean) as typeof allNavItems
+			: allNavItems;
+		return base.filter(n => n.href !== 'blog' || data.hasBlog);
+	});
 </script>
 
 {#if loading}

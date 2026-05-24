@@ -42,7 +42,9 @@
       "Bash(python3 -m json.tool)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('season:', d['season'], '| previous_league_id:', d.get\\('previous_league_id'\\)\\)\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('name:', d['name'], '| season:', d['season'], '| previous_league_id:', d.get\\('previous_league_id'\\)\\)\")",
-      "Bash(xargs sed -i '' -e 's/\\\\[#080d1a\\\\]/navy-950/g' -e 's/\\\\[#0a1220\\\\]/navy-900/g' -e 's/\\\\[#0b1120\\\\]/navy-875/g' -e 's/\\\\[#0d1526\\\\]/navy-850/g' -e 's/\\\\[#111d35\\\\]/navy-800/g' -e 's/\\\\[#1a2744\\\\]/navy-700/g' -e 's/\\\\[#2a3f60\\\\]/navy-600/g' -e 's/\\\\[#3a5080\\\\]/navy-500/g' -e 's/\\\\[#3a4f70\\\\]/navy-500/g' -e 's/\\\\[#5a7090\\\\]/navy-400/g')"
+      "Bash(xargs sed -i '' -e 's/\\\\[#080d1a\\\\]/navy-950/g' -e 's/\\\\[#0a1220\\\\]/navy-900/g' -e 's/\\\\[#0b1120\\\\]/navy-875/g' -e 's/\\\\[#0d1526\\\\]/navy-850/g' -e 's/\\\\[#111d35\\\\]/navy-800/g' -e 's/\\\\[#1a2744\\\\]/navy-700/g' -e 's/\\\\[#2a3f60\\\\]/navy-600/g' -e 's/\\\\[#3a5080\\\\]/navy-500/g' -e 's/\\\\[#3a4f70\\\\]/navy-500/g' -e 's/\\\\[#5a7090\\\\]/navy-400/g')",
+      "Bash(xargs ls)",
+      "Skill(interface-design:audit)"
     ]
   }
 }

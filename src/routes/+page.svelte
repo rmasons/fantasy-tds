@@ -29,10 +29,23 @@
 		window.location.reload();
 	}
 
+	let cachedNflSeason: string | null = null;
+	async function getNflSeason(): Promise<string> {
+		if (cachedNflSeason) return cachedNflSeason;
+		try {
+			const res = await fetch('https://api.sleeper.app/v1/state/nfl');
+			const state = res.ok ? await res.json() : null;
+			cachedNflSeason = state?.season ?? String(new Date().getFullYear());
+		} catch {
+			cachedNflSeason = String(new Date().getFullYear());
+		}
+		return cachedNflSeason;
+	}
+
 	async function loadLeagues() {
 		if (!data.user?.sleeperUserId) return;
 		leaguesLoading = true;
-		const season = new Date().getFullYear();
+		const season = await getNflSeason();
 		const res = await fetch(
 			`https://api.sleeper.app/v1/user/${data.user.sleeperUserId}/leagues/nfl/${season}`
 		);

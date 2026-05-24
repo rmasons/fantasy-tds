@@ -21,9 +21,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	await upsertUserProfile(decoded.uid, {
 		uid: decoded.uid,
 		email: decoded.email ?? '',
-		sleeperUserId: null,
-		sleeperUsername: null,
-		lastLeagueId: null
 	});
 
 	const sessionCookie = await createSessionCookie(idToken);

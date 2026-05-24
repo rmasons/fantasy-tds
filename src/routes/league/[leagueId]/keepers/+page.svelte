@@ -76,7 +76,23 @@
 		}
 	}
 
-	onMount(load);
+	let expandedRosterId = $state<number | null>(null);
+
+	onMount(async () => {
+		await load();
+		if (data.user?.sleeperUserId) {
+			const mine = rosters.find(r => r.ownerUserId === data.user!.sleeperUserId);
+			if (mine) expandedRosterId = mine.rosterId;
+		}
+	});
+
+	function toggle(rosterId: number) {
+		expandedRosterId = expandedRosterId === rosterId ? null : rosterId;
+	}
+
+	function isExpanded(rosterId: number): boolean {
+		return expandedRosterId === rosterId;
+	}
 
 	// ── Derived totals ─────────────────────────────────────────────────────
 	function rosterTotal(roster: KeeperRosterData): number {
@@ -358,218 +374,212 @@
 	{:else}
 		<!-- ── Roster grid ── -->
 		<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-			{#each rosters as roster}
+			{#each rosters as roster (roster.rosterId)}
 				{@const total = rosterTotal(roster)}
 				{@const count = rosterKeeperCount(roster)}
 				{@const faabLeft = rosterFaabAfter(roster)}
 				{@const isMyRoster = roster.ownerUserId === data.user?.sleeperUserId}
 				{@const mySelection = selections[roster.ownerUserId]}
-				<div class="bg-navy-850 rounded-lg border {isMyRoster ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-navy-700'} overflow-hidden flex flex-col">
+				<div class="bg-navy-850 rounded-lg border {isMyRoster ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-navy-700'} overflow-hidden">
 					<!-- Roster header -->
-					<div class="flex items-center gap-2.5 px-4 py-3 border-b border-navy-700 bg-navy-900">
+					<button
+						onclick={() => toggle(roster.rosterId)}
+						class="w-full flex items-center gap-2.5 px-4 py-3 bg-navy-900 hover:bg-navy-800 transition-colors text-left
+						       {isExpanded(roster.rosterId) ? 'border-b border-navy-700' : ''}"
+					>
 						{#if roster.ownerAvatar}
-							<img
-								src={roster.ownerAvatar}
-								alt=""
-								class="w-7 h-7 rounded-full object-cover ring-1 ring-slate-700 shrink-0"
-							/>
+							<img src={roster.ownerAvatar} alt="" class="w-7 h-7 rounded-full object-cover ring-1 ring-slate-700 shrink-0" />
 						{:else}
-							<div class="w-7 h-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-xs shrink-0">
-								🏈
-							</div>
+							<div class="w-7 h-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-xs shrink-0">🏈</div>
 						{/if}
 						<span class="font-semibold text-white text-sm truncate flex-1">{roster.ownerName}</span>
-						{#if mySelection && !isMyRoster}
-							<span class="text-xs text-green-400 font-semibold shrink-0">✓ {mySelection.playerIds.length} set</span>
-						{:else}
-							<div class="flex flex-col items-end shrink-0 text-right gap-0.5">
-								{#if isMyRoster && maxKeepers > 0}
-									<span class="text-xs {count >= maxKeepers ? 'text-amber-400 font-bold' : 'text-slate-500'}">
-										{count}/{maxKeepers}
-									</span>
-								{/if}
-								{#if isMyRoster}
-									<span class="text-xs font-semibold {faabLeft < 0 ? 'text-red-400' : count > 0 ? 'text-green-400' : 'text-slate-500'}">
-										${faabLeft}
-									</span>
-								{/if}
-							</div>
-						{/if}
-					</div>
+						<div class="flex items-center gap-2 shrink-0">
+							{#if mySelection}
+								<span class="text-xs text-green-400 font-semibold">✓ {mySelection.playerIds.length}</span>
+							{:else if isMyRoster}
+								<span class="text-xs {count > 0 ? 'text-amber-400 font-semibold' : 'text-slate-500'}">
+									{count > 0 ? `${count} sel.` : 'pick keepers'}
+								</span>
+							{:else}
+								<span class="text-xs text-slate-600">pending</span>
+							{/if}
+							<span class="text-navy-500 text-xs ml-1">{isExpanded(roster.rosterId) ? '▲' : '▼'}</span>
+						</div>
+					</button>
 
-					<!-- Player rows -->
-					<div class="flex-1 divide-y divide-navy-700/40">
-						{#each roster.players as player}
-							{@const isEditing = isCommish && editingId === player.playerId}
-							<div class="px-3 py-2 {checked[player.playerId] ? 'bg-amber-500/5' : ''}">
-								{#if isEditing}
-									<!-- Inline edit form -->
-									<div class="space-y-2">
-										<div class="flex items-center gap-1.5">
-											<span class="text-xs font-semibold {posColor(player.pos)} w-6 shrink-0">{player.pos}</span>
-											<span class="text-sm text-white font-medium truncate">{player.name}</span>
-										</div>
-										<div class="flex gap-2">
-											<div class="flex-1">
-												<label for="edit-years-{player.playerId}" class="text-xs text-slate-500 block mb-0.5">Years kept</label>
-												<input
-													id="edit-years-{player.playerId}"
-													type="number"
-													min="0"
-													bind:value={editYears}
-													class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-amber-400"
-												/>
+					{#if isExpanded(roster.rosterId)}
+						<!-- Player rows -->
+						<div class="divide-y divide-navy-700/40">
+							{#each roster.players as player}
+								{@const isEditing = isCommish && editingId === player.playerId}
+								<div class="px-3 py-2 {checked[player.playerId] ? 'bg-amber-500/5' : ''}">
+									{#if isEditing}
+										<!-- Inline edit form -->
+										<div class="space-y-2">
+											<div class="flex items-center gap-1.5">
+												<span class="text-xs font-semibold {posColor(player.pos)} w-6 shrink-0">{player.pos}</span>
+												<span class="text-sm text-white font-medium truncate">{player.name}</span>
 											</div>
-											<div class="flex-1">
-												<label for="edit-base-{player.playerId}" class="text-xs text-slate-500 block mb-0.5">Base override ($)</label>
-												<input
-													id="edit-base-{player.playerId}"
-													type="number"
-													min="0"
-													placeholder="auto"
-													bind:value={editBase}
-													class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-amber-400 placeholder:text-slate-600"
-												/>
+											<div class="flex gap-2">
+												<div class="flex-1">
+													<label for="edit-years-{player.playerId}" class="text-xs text-slate-500 block mb-0.5">Years kept</label>
+													<input
+														id="edit-years-{player.playerId}"
+														type="number"
+														min="0"
+														bind:value={editYears}
+														class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-amber-400"
+													/>
+												</div>
+												<div class="flex-1">
+													<label for="edit-base-{player.playerId}" class="text-xs text-slate-500 block mb-0.5">Base override ($)</label>
+													<input
+														id="edit-base-{player.playerId}"
+														type="number"
+														min="0"
+														placeholder="auto"
+														bind:value={editBase}
+														class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-amber-400 placeholder:text-slate-600"
+													/>
+												</div>
 											</div>
-										</div>
-										{#if saveError}
-											<p class="text-xs text-red-400">{saveError}</p>
-										{/if}
-										<div class="flex gap-2">
-											<button
-												onclick={() => saveEdit(player.playerId)}
-												disabled={saving}
-												class="flex-1 py-1 text-xs font-semibold bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-900 rounded transition-colors"
-											>
-												{saving ? 'Saving…' : 'Save'}
-											</button>
-											<button
-												onclick={cancelEdit}
-												class="flex-1 py-1 text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-200 rounded transition-colors"
-											>
-												Cancel
-											</button>
-										</div>
-										{#if player.yearsKeptOverridden || player.baseOverride !== null}
-											<button
-												onclick={() => resetPlayer(player.playerId)}
-												disabled={saving}
-												class="w-full py-1 text-xs text-slate-500 hover:text-red-400 disabled:opacity-40 transition-colors"
-												title="Clear all overrides — use when player is dropped to the draft pool"
-											>
-												Reset to auto (player was dropped)
-											</button>
-										{/if}
-									</div>
-								{:else}
-									<!-- Normal row -->
-									{@const playerSubmitted = isCommish && mySelection?.playerIds.includes(player.playerId)}
-									<div class="flex items-center gap-2">
-										{#if isMyRoster}
-											<input
-												type="checkbox"
-												bind:checked={checked[player.playerId]}
-												disabled={!checked[player.playerId] && atKeeperLimit(roster)}
-												class="accent-amber-400 w-3.5 h-3.5 shrink-0 rounded cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-											/>
-										{:else if isCommish && playerSubmitted}
-											<svg class="w-3.5 h-3.5 shrink-0 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-												<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-											</svg>
-										{:else}
-											<span class="w-3.5 h-3.5 shrink-0"></span>
-										{/if}
-										<span class="text-xs font-semibold {posColor(player.pos)} w-6 shrink-0">{player.pos}</span>
-										<span class="text-sm {playerSubmitted ? 'text-white font-medium' : 'text-white'} truncate flex-1">{player.name}</span>
-										<!-- Cost info -->
-										<div class="flex items-center gap-2 shrink-0 text-right">
-											<span class="text-xs text-slate-500" title="Base cost · years kept">
-												{fmt(player.baseCost)} × {1 + (0.2 * (player.yearsKept + 1))}
-											</span>
-											<span class="text-sm font-semibold w-10 text-right {playerSubmitted ? 'text-green-400' : 'text-amber-400'}">
-												{fmt(player.keeperCost)}
-											</span>
-											{#if isCommish}
+											{#if saveError}
+												<p class="text-xs text-red-400">{saveError}</p>
+											{/if}
+											<div class="flex gap-2">
 												<button
-													onclick={() => startEdit(player)}
-													class="text-slate-600 hover:text-slate-300 transition-colors ml-0.5"
-													title="Edit keeper data"
+													onclick={() => saveEdit(player.playerId)}
+													disabled={saving}
+													class="flex-1 py-1 text-xs font-semibold bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-900 rounded transition-colors"
 												>
-													<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-														<path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
-													</svg>
+													{saving ? 'Saving…' : 'Save'}
+												</button>
+												<button
+													onclick={cancelEdit}
+													class="flex-1 py-1 text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-200 rounded transition-colors"
+												>
+													Cancel
+												</button>
+											</div>
+											{#if player.yearsKeptOverridden || player.baseOverride !== null}
+												<button
+													onclick={() => resetPlayer(player.playerId)}
+													disabled={saving}
+													class="w-full py-1 text-xs text-slate-500 hover:text-red-400 disabled:opacity-40 transition-colors"
+													title="Clear all overrides — use when player is dropped to the draft pool"
+												>
+													Reset to auto (player was dropped)
 												</button>
 											{/if}
 										</div>
-									</div>
-									<!-- Subtitle line -->
-									<div class="flex justify-between ml-6 mt-0.5">
-										{#if player.draftSeason && !isCommish}
-											<span class="text-xs text-slate-700 leading-none">
-												R{player.draftRound} · {player.draftSeason}
+									{:else}
+										<!-- Normal row -->
+										{@const playerSubmitted = isCommish && mySelection?.playerIds.includes(player.playerId)}
+										<div class="flex items-center gap-2">
+											{#if isMyRoster}
+												<input
+													type="checkbox"
+													bind:checked={checked[player.playerId]}
+													disabled={!checked[player.playerId] && atKeeperLimit(roster)}
+													class="accent-amber-400 w-3.5 h-3.5 shrink-0 rounded cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+												/>
+											{:else if isCommish && playerSubmitted}
+												<svg class="w-3.5 h-3.5 shrink-0 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+												</svg>
+											{:else}
+												<span class="w-3.5 h-3.5 shrink-0"></span>
+											{/if}
+											<span class="text-xs font-semibold {posColor(player.pos)} w-6 shrink-0">{player.pos}</span>
+											<span class="text-sm {playerSubmitted ? 'text-white font-medium' : 'text-white'} truncate flex-1">{player.name}</span>
+											<div class="flex items-center gap-2 shrink-0 text-right">
+												<span class="text-xs text-slate-500" title="Base cost · years kept">
+													{fmt(player.baseCost)} × {1 + (0.2 * (player.yearsKept + 1))}
+												</span>
+												<span class="text-sm font-semibold w-10 text-right {playerSubmitted ? 'text-green-400' : 'text-amber-400'}">
+													{fmt(player.keeperCost)}
+												</span>
+												{#if isCommish}
+													<button
+														onclick={() => startEdit(player)}
+														class="text-slate-600 hover:text-slate-300 transition-colors ml-0.5"
+														title="Edit keeper data"
+													>
+														<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
+														</svg>
+													</button>
+												{/if}
+											</div>
+										</div>
+										<div class="flex justify-between ml-6 mt-0.5">
+											{#if player.draftSeason && !isCommish}
+												<span class="text-xs text-slate-700 leading-none">
+													R{player.draftRound} · {player.draftSeason}
+												</span>
+											{:else}
+												<span></span>
+											{/if}
+											<span class="text-xs text-slate-500 leading-none whitespace-nowrap text-right">
+												Years kept: {player.yearsKept}
 											</span>
-										{:else}
-											<span></span>
-										{/if}
-										<span class="text-xs text-slate-500 leading-none whitespace-nowrap text-right">
-											Years kept: {player.yearsKept}
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+
+						<!-- Roster footer -->
+						{#if isMyRoster}
+							<div class="px-4 py-2.5 border-t border-navy-700 bg-navy-900">
+								{#if count > 0}
+									<div class="flex items-center justify-between mb-2">
+										<span class="text-xs text-slate-500">
+											{count}{maxKeepers > 0 ? `/${maxKeepers}` : ''} keeper{count !== 1 ? 's' : ''} · <span class="text-amber-400">${total}</span>
+										</span>
+										<span class="text-sm font-bold {faabLeft < 0 ? 'text-red-400' : 'text-green-400'}">
+											${faabLeft} left
 										</span>
 									</div>
 								{/if}
-							</div>
-						{/each}
-					</div>
-
-					<!-- Roster footer -->
-					{#if isMyRoster}
-						<div class="px-4 py-2.5 border-t border-navy-700 bg-navy-900">
-							{#if count > 0}
-								<div class="flex items-center justify-between mb-2">
-									<span class="text-xs text-slate-500">
-										{count}{maxKeepers > 0 ? `/${maxKeepers}` : ''} keeper{count !== 1 ? 's' : ''} · <span class="text-amber-400">${total}</span>
-									</span>
-									<span class="text-sm font-bold {faabLeft < 0 ? 'text-red-400' : 'text-green-400'}">
-										${faabLeft} left
-									</span>
+								<div class="flex items-center justify-between gap-3">
+									{#if mySelection}
+										<span class="text-xs text-green-400 leading-tight">
+											✓ Submitted {formatSubmittedAt(mySelection.submittedAt)}
+										</span>
+										<button
+											onclick={submitKeepers}
+											disabled={submitting}
+											class="px-3 py-1 text-xs font-semibold bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-200 rounded-lg transition-colors shrink-0"
+										>
+											{submitting ? 'Saving…' : 'Update'}
+										</button>
+									{:else}
+										<span class="text-xs text-slate-500">Not yet submitted</span>
+										<button
+											onclick={submitKeepers}
+											disabled={submitting}
+											class="px-3 py-1 text-xs font-semibold bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-900 rounded-lg transition-colors shrink-0"
+										>
+											{submitting ? 'Saving…' : 'Submit keepers'}
+										</button>
+									{/if}
 								</div>
-							{/if}
-							<div class="flex items-center justify-between gap-3">
-								{#if mySelection}
-									<span class="text-xs text-green-400 leading-tight">
-										✓ Submitted {formatSubmittedAt(mySelection.submittedAt)}
-									</span>
-									<button
-										onclick={submitKeepers}
-										disabled={submitting}
-										class="px-3 py-1 text-xs font-semibold bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-200 rounded-lg transition-colors shrink-0"
-									>
-										{submitting ? 'Saving…' : 'Update'}
-									</button>
-								{:else}
-									<span class="text-xs text-slate-500">Not yet submitted</span>
-									<button
-										onclick={submitKeepers}
-										disabled={submitting}
-										class="px-3 py-1 text-xs font-semibold bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-900 rounded-lg transition-colors shrink-0"
-									>
-										{submitting ? 'Saving…' : 'Submit keepers'}
-									</button>
+								{#if submitError}
+									<p class="text-xs text-red-400 mt-1">{submitError}</p>
 								{/if}
 							</div>
-							{#if submitError}
-								<p class="text-xs text-red-400 mt-1">{submitError}</p>
-							{/if}
-						</div>
-					{:else if mySelection && isCommish}
-						{@const submittedCost = roster.players
-							.filter(p => mySelection.playerIds.includes(p.playerId))
-							.reduce((s, p) => s + p.keeperCost, 0)}
-						<div class="px-4 py-2.5 border-t border-navy-700 bg-navy-900 flex items-center justify-between">
-							<span class="text-xs text-slate-500">
-								{mySelection.playerIds.length} keeper{mySelection.playerIds.length !== 1 ? 's' : ''} · <span class="text-amber-400">${submittedCost}</span>
-							</span>
-							<span class="text-xs text-green-400 font-semibold">✓ Submitted</span>
-						</div>
+						{:else if mySelection && isCommish}
+							{@const submittedCost = roster.players
+								.filter(p => mySelection.playerIds.includes(p.playerId))
+								.reduce((s, p) => s + p.keeperCost, 0)}
+							<div class="px-4 py-2.5 border-t border-navy-700 bg-navy-900 flex items-center justify-between">
+								<span class="text-xs text-slate-500">
+									{mySelection.playerIds.length} keeper{mySelection.playerIds.length !== 1 ? 's' : ''} · <span class="text-amber-400">${submittedCost}</span>
+								</span>
+								<span class="text-xs text-green-400 font-semibold">✓ Submitted</span>
+							</div>
+						{/if}
 					{/if}
 				</div>
 			{/each}
