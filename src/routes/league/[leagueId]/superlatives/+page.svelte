@@ -34,6 +34,7 @@
 	let season = $state('');
 	let superlatives = $state<Superlative[]>([]);
 	let noGames = $state(false);
+	let failedVideos = $state(new Set<string>());
 
 	$effect(() => {
 		const leagueId = data.leagueId;
@@ -545,33 +546,49 @@
 		<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
 			{#each superlatives as s (s.key)}
 				{#if s.entry}
-					<div class="bg-navy-850 rounded-lg border border-navy-700 p-4 flex flex-col gap-3">
-						<!-- Award name + description -->
-						<div>
-							<div class="flex items-start gap-1.5">
-								<span class="text-base leading-none shrink-0 mt-0.5">{s.emoji}</span>
-								<p class="font-sport font-bold uppercase tracking-wide text-amber-400 text-sm leading-tight">{s.title}</p>
+					<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden flex flex-col">
+						<!-- Video (full-bleed, graceful fallback if file missing) -->
+						{#if !failedVideos.has(s.key)}
+							<video
+								src="/superlatives/{s.key}.mp4"
+								autoplay
+								loop
+								muted
+								playsinline
+								class="w-full h-40 object-cover"
+								onerror={() => { failedVideos = new Set([...failedVideos, s.key]); }}
+							></video>
+						{/if}
+
+						<!-- Card content -->
+						<div class="p-4 flex flex-col gap-3 flex-1">
+							<!-- Award name + description -->
+							<div>
+								<div class="flex items-start gap-1.5">
+									<span class="text-base leading-none shrink-0 mt-0.5">{s.emoji}</span>
+									<p class="font-sport font-bold uppercase tracking-wide text-amber-400 text-sm leading-tight">{s.title}</p>
+								</div>
+								<p class="text-[10px] text-navy-500 uppercase tracking-widest mt-1 leading-snug ml-6">{s.desc}</p>
 							</div>
-							<p class="text-[10px] text-navy-500 uppercase tracking-widest mt-1 leading-snug ml-6">{s.desc}</p>
-						</div>
 
-						<!-- Stat value -->
-						<div class="text-xl font-black tabular-nums text-white font-mono leading-none">
-							{s.entry.stat}
-						</div>
+							<!-- Stat value -->
+							<div class="text-xl font-black tabular-nums text-white font-mono leading-none">
+								{s.entry.stat}
+							</div>
 
-						<!-- Winner -->
-						<div class="flex items-center gap-2 min-w-0 mt-auto">
-							{#if s.entry.avatar}
-								<img src={s.entry.avatar} alt="" class="w-7 h-7 rounded-full shrink-0 object-cover" />
-							{:else}
-								<div class="w-7 h-7 rounded-full bg-navy-800 shrink-0 flex items-center justify-center text-xs">🏈</div>
-							{/if}
-							<div class="min-w-0">
-								<p class="text-sm font-semibold text-white truncate leading-tight">{s.entry.teamName}</p>
-								{#if s.entry.sub}
-									<p class="text-xs text-slate-500 truncate">{s.entry.sub}</p>
+							<!-- Winner -->
+							<div class="flex items-center gap-2 min-w-0 mt-auto">
+								{#if s.entry.avatar}
+									<img src={s.entry.avatar} alt="" class="w-7 h-7 rounded-full shrink-0 object-cover" />
+								{:else}
+									<div class="w-7 h-7 rounded-full bg-navy-800 shrink-0 flex items-center justify-center text-xs">🏈</div>
 								{/if}
+								<div class="min-w-0">
+									<p class="text-sm font-semibold text-white truncate leading-tight">{s.entry.teamName}</p>
+									{#if s.entry.sub}
+										<p class="text-xs text-slate-500 truncate">{s.entry.sub}</p>
+									{/if}
+								</div>
 							</div>
 						</div>
 					</div>
