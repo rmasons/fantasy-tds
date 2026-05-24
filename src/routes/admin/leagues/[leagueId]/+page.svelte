@@ -5,17 +5,19 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const ALL_NAV = [
-		{ href: 'standings',      label: 'Standings'      },
-		{ href: 'matchups',       label: 'Matchups'       },
-		{ href: 'power-rankings', label: 'Power Rankings' },
-		{ href: 'rosters',        label: 'Rosters'        },
-		{ href: 'records',        label: 'Records'        },
-		{ href: 'transactions',   label: 'Transactions'   },
-		{ href: 'drafts',         label: 'Drafts'         },
-		{ href: 'awards',         label: 'Awards'         },
-		{ href: 'managers',       label: 'Managers'       },
-		{ href: 'rivalry',        label: 'Rivalry'        },
-		{ href: 'blog',           label: 'Blog'           },
+		{ href: 'standings',       label: 'Standings'       },
+		{ href: 'matchups',        label: 'Matchups'        },
+		{ href: 'playoff-bracket', label: 'Playoff Bracket' },
+		{ href: 'power-rankings',  label: 'Power Rankings'  },
+		{ href: 'rosters',         label: 'Rosters'         },
+		{ href: 'records',         label: 'Records'         },
+		{ href: 'transactions',    label: 'Transactions'    },
+		{ href: 'drafts',          label: 'Drafts'          },
+		{ href: 'awards',          label: 'Awards'          },
+		{ href: 'managers',        label: 'Managers'        },
+		{ href: 'rivalry',         label: 'Rivalry'         },
+		{ href: 'keepers',         label: 'Keepers'         },
+		{ href: 'blog',            label: 'Blog'            },
 	];
 
 	interface NavItem { href: string; label: string; enabled: boolean; }
