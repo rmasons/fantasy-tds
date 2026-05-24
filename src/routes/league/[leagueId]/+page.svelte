@@ -1,7 +1,10 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { SleeperLeague, SleeperNflState } from '$lib/types';
-	import { fetchLeague, fetchNflState, fetchUsers, fetchRosters, fetchWinnersBracket, buildRosterInfoMap, fetchDisplayNameOverrides } from '$lib/sleeper';
+	import {
+		fetchLeague, fetchNflState, fetchUsers, fetchRosters, fetchWinnersBracket,
+		buildRosterInfoMap, fetchDisplayNameOverrides, fetchLeagueCore, fetchMatchups, combineFpts,
+	} from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -17,12 +20,30 @@
 	}
 	let champion = $state<Champion | null>(null);
 
+	interface StandingMini {
+		rank: number;
+		teamName: string;
+		ownerName: string | null;
+		avatar: string | null;
+		wins: number;
+		losses: number;
+		fpts: number;
+	}
+
+	interface MatchupWidget {
+		matchupId: number;
+		teams: { teamName: string; avatar: string | null; points: number }[];
+	}
+
+	let standingsMini = $state<StandingMini[]>([]);
+	let standingsLoading = $state(false);
+	let weekMatchups = $state<MatchupWidget[]>([]);
+	let matchupsLoading = $state(false);
+
 	const CHAMP_CACHE_PREFIX = 'ftds_champ_';
 
 	async function fetchPreviousChampion(prevLeagueId: string, forLeagueId: string) {
 		const cacheKey = `${CHAMP_CACHE_PREFIX}${forLeagueId}`;
-
-		// Return cached result immediately if available
 		try {
 			const cached = sessionStorage.getItem(cacheKey);
 			if (cached) {
@@ -39,8 +60,6 @@
 				fetchRosters(prevLeagueId),
 				fetchWinnersBracket(prevLeagueId),
 			]);
-
-			// Discard if the user navigated away during fetch
 			if (data.leagueId !== forLeagueId) return;
 			if (!Array.isArray(winners) || winners.length === 0) return;
 
@@ -52,23 +71,81 @@
 			if (!finalsMatch?.w) return;
 
 			const info = rosterInfo.get(finalsMatch.w);
-
 			const result: Champion = {
 				teamName: info?.teamName ?? `Team ${finalsMatch.w}`,
 				ownerName: info?.ownerName ?? null,
 				avatar: info?.avatar ?? null,
 				season: prevLeague.season,
 			};
-
 			champion = result;
-
-			try {
-				sessionStorage.setItem(cacheKey, JSON.stringify(result));
-			} catch {}
+			try { sessionStorage.setItem(cacheKey, JSON.stringify(result)); } catch {}
 		} catch {}
 	}
 
-	// Reacts to leagueId changes — covers both initial mount and year-switcher navigation
+	async function loadWidgets(leagueId: string, nflData: SleeperNflState) {
+		standingsLoading = true;
+		matchupsLoading = nflData.season_type === 'regular';
+		standingsMini = [];
+		weekMatchups = [];
+
+		try {
+			const [core, rawMatchups] = await Promise.all([
+				fetchLeagueCore(leagueId),
+				nflData.season_type === 'regular'
+					? fetchMatchups(leagueId, nflData.week).catch(() => [])
+					: Promise.resolve([]),
+			]);
+			if (data.leagueId !== leagueId) return;
+
+			const overrides = await fetchDisplayNameOverrides(core.users.map(u => u.user_id));
+			if (data.leagueId !== leagueId) return;
+
+			const rosterInfo = buildRosterInfoMap(core.rosters, core.users, overrides);
+
+			// Build standings mini
+			const rows: StandingMini[] = core.rosters.map(r => {
+				const info = rosterInfo.get(r.roster_id)!;
+				return {
+					rank: 0,
+					teamName: info.teamName,
+					ownerName: info.ownerName,
+					avatar: info.avatar,
+					wins: r.settings.wins ?? 0,
+					losses: r.settings.losses ?? 0,
+					fpts: combineFpts(r.settings.fpts, r.settings.fpts_decimal),
+				};
+			});
+			rows.sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
+			rows.forEach((r, i) => r.rank = i + 1);
+			standingsMini = rows;
+
+			// Build matchup widgets
+			if (rawMatchups.length > 0) {
+				const groups = new Map<number, { teamName: string; avatar: string | null; points: number }[]>();
+				for (const m of rawMatchups) {
+					if (!groups.has(m.matchup_id)) groups.set(m.matchup_id, []);
+					const info = rosterInfo.get(m.roster_id);
+					groups.get(m.matchup_id)!.push({
+						teamName: info?.teamName ?? `Team ${m.roster_id}`,
+						avatar: info?.avatar ?? null,
+						points: m.points ?? 0,
+					});
+				}
+				weekMatchups = [...groups.entries()]
+					.filter(([, pair]) => pair.length === 2)
+					.map(([mid, teams]) => ({ matchupId: mid, teams }))
+					.sort((a, b) => a.matchupId - b.matchupId);
+			}
+		} catch {
+			// widget failures are non-critical
+		} finally {
+			if (data.leagueId === leagueId) {
+				standingsLoading = false;
+				matchupsLoading = false;
+			}
+		}
+	}
+
 	$effect(() => {
 		const leagueId = data.leagueId;
 
@@ -76,12 +153,16 @@
 		league = null;
 		nflState = null;
 		champion = null;
+		standingsMini = [];
+		standingsLoading = false;
+		weekMatchups = [];
+		matchupsLoading = false;
 
 		Promise.all([
 			fetchLeague(leagueId),
 			fetchNflState(),
 		]).then(([leagueData, nflData]: [SleeperLeague, SleeperNflState]) => {
-			if (data.leagueId !== leagueId) return; // navigated away during fetch
+			if (data.leagueId !== leagueId) return;
 			league = leagueData;
 			nflState = nflData;
 			loading = false;
@@ -90,6 +171,8 @@
 			if (prevId && prevId !== '0') {
 				fetchPreviousChampion(prevId, leagueId);
 			}
+
+			loadWidgets(leagueId, nflData);
 		});
 	});
 
@@ -183,7 +266,7 @@
 	{#if champion}
 		<a
 			href="/league/{data.leagueId}/awards"
-			class="group relative flex items-center gap-4 rounded-xl overflow-hidden mb-6
+			class="group relative flex items-center gap-4 rounded-xl overflow-hidden mb-4
 			       border border-amber-500/25 hover:border-amber-400/40 transition-colors"
 		>
 			<div class="absolute inset-0 bg-slate-900"></div>
@@ -231,6 +314,87 @@
 				</div>
 			</div>
 		</a>
+	{/if}
+
+	<!-- Week matchups widget (regular season only) -->
+	{#if matchupsLoading}
+		<div class="mb-6">
+			<div class="h-4 w-32 bg-navy-850 rounded animate-pulse mb-3"></div>
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+				{#each Array(5) as _}
+					<div class="h-20 bg-navy-850 rounded-lg animate-pulse"></div>
+				{/each}
+			</div>
+		</div>
+	{:else if weekMatchups.length > 0}
+		<div class="mb-6">
+			<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2">
+				<span class="text-amber-400">◆</span>Week {nflState?.week} Matchups
+			</h2>
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+				{#each weekMatchups as matchup}
+					<a
+						href="/league/{data.leagueId}/matchups"
+						class="bg-navy-850 rounded-lg border border-navy-700 hover:border-navy-600 px-4 py-3 transition-colors block"
+					>
+						{#each matchup.teams as team, i}
+							{#if i === 1}
+								<div class="my-2 border-t border-navy-700/50"></div>
+							{/if}
+							<div class="flex items-center gap-2.5">
+								{#if team.avatar}
+									<img src={team.avatar} alt="" class="w-7 h-7 rounded-full shrink-0 object-cover" />
+								{:else}
+									<div class="w-7 h-7 rounded-full bg-navy-800 flex items-center justify-center text-sm shrink-0">🏈</div>
+								{/if}
+								<span class="flex-1 text-sm text-white truncate">{team.teamName}</span>
+								<span class="text-sm font-mono font-semibold tabular-nums shrink-0
+								             {team.points > 0 ? 'text-amber-300' : 'text-navy-600'}">
+									{team.points > 0 ? team.points.toFixed(2) : '—'}
+								</span>
+							</div>
+						{/each}
+					</a>
+				{/each}
+			</div>
+		</div>
+	{/if}
+
+	<!-- Standings mini widget -->
+	{#if standingsLoading}
+		<div class="bg-navy-850 rounded-xl border border-navy-700 animate-pulse mb-6 h-64"></div>
+	{:else if standingsMini.length > 0}
+		<div class="bg-navy-850 rounded-xl border border-navy-700 overflow-hidden mb-6">
+			<div class="flex items-center justify-between px-4 py-3 border-b border-navy-700">
+				<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 flex items-center gap-2">
+					<span class="text-amber-400">◆</span>Standings
+				</h2>
+				<a href="/league/{data.leagueId}/standings" class="text-xs text-navy-500 hover:text-amber-400 transition-colors">
+					Full →
+				</a>
+			</div>
+			{#each standingsMini as row}
+				<div class="flex items-center gap-3 px-4 py-2.5 border-b border-navy-700/40 last:border-b-0 hover:bg-navy-800/30 transition-colors">
+					<span class="text-[11px] font-mono w-4 text-center shrink-0
+					             {row.rank === 1 ? 'text-amber-400 font-bold' : row.rank <= 3 ? 'text-slate-300' : 'text-navy-600'}">
+						{row.rank}
+					</span>
+					{#if row.avatar}
+						<img src={row.avatar} alt="" class="w-7 h-7 rounded-full object-cover shrink-0" />
+					{:else}
+						<div class="w-7 h-7 rounded-full bg-navy-800 flex items-center justify-center shrink-0 text-sm">🏈</div>
+					{/if}
+					<div class="flex-1 min-w-0">
+						<p class="text-sm text-white truncate leading-tight">{row.teamName}</p>
+						{#if row.ownerName && row.ownerName !== row.teamName}
+							<p class="text-[11px] text-navy-500 truncate leading-tight">{row.ownerName}</p>
+						{/if}
+					</div>
+					<span class="text-xs font-mono tabular-nums text-slate-400 shrink-0">{row.wins}–{row.losses}</span>
+					<span class="text-xs font-mono tabular-nums text-navy-600 w-16 text-right shrink-0">{row.fpts.toFixed(1)} pts</span>
+				</div>
+			{/each}
+		</div>
 	{/if}
 
 	<!-- Quick nav cards -->

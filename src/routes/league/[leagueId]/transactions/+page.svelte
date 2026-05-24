@@ -116,6 +116,22 @@
 	};
 
 	const filtered = $derived(filter === 'all' ? transactions : transactions.filter((t) => t.type === filter));
+
+	const counts = $derived({
+		all: transactions.length,
+		trade: transactions.filter(t => t.type === 'trade').length,
+		waiver: transactions.filter(t => t.type === 'waiver').length,
+		free_agent: transactions.filter(t => t.type === 'free_agent').length,
+	});
+
+	function tradeSides(tx: Transaction) {
+		return tx.rosterIds.map(rid => ({
+			rid,
+			team: rosterInfoMap.get(rid),
+			players: tx.moves.filter(m => m.type === 'add' && m.rosterId === rid),
+			picks: tx.moves.filter(m => m.type === 'pick' && m.rosterId === rid),
+		}));
+	}
 </script>
 
 <div>
@@ -129,10 +145,16 @@
 		{#each (['all', 'trade', 'waiver', 'free_agent'] as TxType[]) as f}
 			<button
 				onclick={() => (filter = f)}
-				class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+				class="flex items-center gap-1.5 px-4 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
 				       {filter === f ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
 			>
-				{f === 'all' ? 'All' : f === 'free_agent' ? 'Free Agent' : f.charAt(0).toUpperCase() + f.slice(1)}
+				{f === 'all' ? 'All' : f === 'free_agent' ? 'FA' : f.charAt(0).toUpperCase() + f.slice(1)}
+				{#if !loading && counts[f] > 0}
+					<span class="text-[10px] font-mono rounded px-1 py-0.5
+					             {filter === f ? 'bg-amber-400/15 text-amber-400' : 'bg-navy-800 text-navy-500'}">
+						{counts[f]}
+					</span>
+				{/if}
 			</button>
 		{/each}
 	</div>
@@ -150,50 +172,77 @@
 	{:else}
 		<div class="space-y-3">
 			{#each filtered as tx (tx.id)}
-				<div class="bg-navy-850 rounded-lg border border-navy-700 px-4 py-3">
-					<div class="flex items-center gap-2 mb-2">
-						<span class="text-xs px-2 py-0.5 rounded-full font-semibold {typeBadge[tx.type] ?? 'bg-slate-700 text-slate-300'}">
-							{typeLabel[tx.type] ?? tx.type}
-						</span>
-						<span class="text-xs text-slate-500">{tx.date}</span>
-						{#if tx.type === 'trade'}
-							<span class="text-xs text-slate-500">·</span>
-							{#each tx.rosterIds as rid, i}
-								<span class="text-xs text-slate-400">{rosterInfoMap.get(rid)?.teamName ?? `Team ${rid}`}{i < tx.rosterIds.length - 1 ? ' ↔ ' : ''}</span>
+				{#if tx.type === 'trade'}
+					{@const sides = tradeSides(tx)}
+					<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden">
+						<div class="flex items-center gap-2 px-4 py-2.5 border-b border-navy-700/60">
+							<span class="text-xs px-2 py-0.5 rounded-full font-semibold {typeBadge.trade}">Trade</span>
+							<span class="text-xs text-slate-500">{tx.date}</span>
+						</div>
+						<div class="grid divide-x divide-navy-700/50"
+						     style="grid-template-columns: repeat({sides.length}, 1fr)">
+							{#each sides as side}
+								<div class="px-4 py-3">
+									<div class="flex items-center gap-2 mb-2">
+										{#if side.team?.avatar}
+											<img src={side.team.avatar} alt="" class="w-6 h-6 rounded-full shrink-0 object-cover" />
+										{:else}
+											<div class="w-6 h-6 rounded-full bg-navy-800 shrink-0"></div>
+										{/if}
+										<span class="text-[11px] font-bold uppercase tracking-wide text-white truncate">
+											{side.team?.teamName ?? `Team ${side.rid}`}
+										</span>
+									</div>
+									<p class="text-[9px] text-navy-500 uppercase tracking-widest font-semibold mb-1.5">received</p>
+									{#each side.players as move}
+										<div class="flex items-center gap-1.5 text-sm mb-0.5">
+											<span class="text-[10px] w-6 text-center text-navy-500 shrink-0 font-medium">{playerPos(move.player!)}</span>
+											<span class="text-slate-200 truncate">{playerName(move.player!)}</span>
+										</div>
+									{/each}
+									{#each side.picks as pick}
+										<div class="flex items-center gap-1.5 text-sm mb-0.5">
+											<span class="text-[10px] w-6 text-center text-amber-600/70 shrink-0 font-medium">Rd</span>
+											<span class="text-slate-300">{pick.season} Round {pick.round}</span>
+										</div>
+									{/each}
+									{#if side.players.length === 0 && side.picks.length === 0}
+										<span class="text-xs text-navy-600 italic">nothing</span>
+									{/if}
+								</div>
 							{/each}
-						{/if}
+						</div>
 					</div>
+				{:else}
+					<div class="bg-navy-850 rounded-lg border border-navy-700 px-4 py-3">
+						<div class="flex items-center gap-2 mb-2">
+							<span class="text-xs px-2 py-0.5 rounded-full font-semibold {typeBadge[tx.type] ?? 'bg-slate-700 text-slate-300'}">
+								{typeLabel[tx.type] ?? tx.type}
+							</span>
+							<span class="text-xs text-slate-500">{tx.date}</span>
+						</div>
 
-					<div class="space-y-1">
-						{#each tx.moves as move}
-							{#if move.type === 'add' && move.player}
-								<div class="flex items-center gap-2 text-sm">
-									<span class="text-green-500 text-xs w-3">+</span>
-									<span class="text-xs text-slate-600 w-5">{playerPos(move.player)}</span>
-									<span class="text-slate-200">{playerName(move.player)}</span>
-									{#if tx.type !== 'trade'}
+						<div class="space-y-1">
+							{#each tx.moves as move}
+								{#if move.type === 'add' && move.player}
+									<div class="flex items-center gap-2 text-sm">
+										<span class="text-green-500 text-xs w-3">+</span>
+										<span class="text-xs text-slate-600 w-5">{playerPos(move.player)}</span>
+										<span class="text-slate-200">{playerName(move.player)}</span>
 										<span class="text-xs text-slate-500 ml-auto">{rosterInfoMap.get(move.rosterId)?.teamName}</span>
-									{/if}
-								</div>
-							{:else if move.type === 'drop' && move.player}
-								<div class="flex items-center gap-2 text-sm">
-									<span class="text-red-500 text-xs w-3">−</span>
-									<span class="text-xs text-slate-600 w-5">{playerPos(move.player)}</span>
-									<span class="text-slate-400">{playerName(move.player)}</span>
-									{#if tx.type !== 'trade'}
+									</div>
+								{:else if move.type === 'drop' && move.player}
+									<div class="flex items-center gap-2 text-sm">
+										<span class="text-red-500 text-xs w-3">−</span>
+										<span class="text-xs text-slate-600 w-5">{playerPos(move.player)}</span>
+										<span class="text-slate-400">{playerName(move.player)}</span>
 										<span class="text-xs text-slate-500 ml-auto">{rosterInfoMap.get(move.rosterId)?.teamName}</span>
-									{/if}
-								</div>
-							{:else if move.type === 'pick'}
-								<div class="flex items-center gap-2 text-sm">
-									<span class="text-yellow-500 text-xs w-3">↑</span>
-									<span class="text-slate-300">{move.season} Round {move.round} pick</span>
-									<span class="text-xs text-slate-500 ml-auto">→ {rosterInfoMap.get(move.rosterId)?.teamName}</span>
-								</div>
-							{/if}
-						{/each}
+									</div>
+								{/if}
+							{/each}
+						</div>
 					</div>
-				</div>
+				{/if}
 			{/each}
 		</div>
 	{/if}
