@@ -81,6 +81,7 @@
 		{ href: 'managers',        label: 'Managers'        },
 		{ href: 'rivalry',         label: 'Rivalry'         },
 		{ href: 'keepers',         label: 'Keepers'         },
+		{ href: 'superlatives',    label: 'Superlatives'    },
 		{ href: 'blog',            label: 'Blog'            },
 	];
 

@@ -5,7 +5,7 @@ import { fetchRosters, fetchUsers, buildRosterInfoMap } from '$lib/sleeper';
 
 const VALID_NAV_ITEMS = new Set([
 	'standings', 'matchups', 'power-rankings', 'rosters', 'records',
-	'transactions', 'drafts', 'awards', 'managers', 'rivalry', 'keepers', 'blog',
+	'transactions', 'drafts', 'awards', 'managers', 'rivalry', 'keepers', 'superlatives', 'blog',
 ]);
 
 export const load: PageServerLoad = async ({ locals, params }) => {
