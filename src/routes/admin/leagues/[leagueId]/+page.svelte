@@ -54,6 +54,28 @@
 	);
 
 	let confirmDelete = $state(false);
+
+	// FAAB bonuses — local copy keyed by rosterId string
+	let faabBonuses = $state<Record<string, number>>(
+		Object.fromEntries(
+			Object.entries(data.leagueConfig.faabBonuses ?? {}).map(([k, v]) => [k, v])
+		)
+	);
+
+	function faabBonusFor(rosterId: string): number {
+		return faabBonuses[rosterId] ?? 0;
+	}
+
+	function setFaabBonus(rosterId: string, raw: string) {
+		const val = parseInt(raw, 10);
+		if (raw === '' || val === 0) {
+			const copy = { ...faabBonuses };
+			delete copy[rosterId];
+			faabBonuses = copy;
+		} else if (!isNaN(val) && val > 0) {
+			faabBonuses = { ...faabBonuses, [rosterId]: val };
+		}
+	}
 </script>
 
 <div class="max-w-2xl space-y-8">
@@ -176,6 +198,56 @@
 			{#if form?.success}
 				<span class="text-xs text-emerald-400">Saved.</span>
 			{/if}
+		</div>
+	</form>
+
+	<!-- FAAB Bonuses -->
+	<form method="POST" action="?/saveFaabBonuses" use:enhance class="space-y-4">
+		<div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+			<div>
+				<h2 class="text-sm font-semibold text-white">FAAB Bonuses</h2>
+				<p class="text-xs text-slate-500 mt-0.5">
+					Award extra FAAB outside Sleeper. These are added to each team's Sleeper balance on the Keepers page.
+				</p>
+			</div>
+
+			{#if data.rosterList.length === 0}
+				<p class="text-xs text-slate-600">No rosters found — check that the league ID is valid.</p>
+			{:else}
+				<div class="space-y-2">
+					{#each data.rosterList as roster}
+						<div class="flex items-center gap-3">
+							<span class="flex-1 text-sm text-slate-300 truncate">{roster.teamName}</span>
+							<div class="flex items-center gap-1">
+								<span class="text-slate-600 text-sm">$</span>
+								<input
+									type="number"
+									name="faab_{roster.rosterId}"
+									min="0"
+									step="1"
+									value={faabBonusFor(roster.rosterId) || ''}
+									oninput={(e) => setFaabBonus(roster.rosterId, (e.target as HTMLInputElement).value)}
+									placeholder="0"
+									class="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white
+									       placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-right"
+								/>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			<div class="flex items-center gap-4 pt-1">
+				<button
+					type="submit"
+					class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-medium text-white transition-colors"
+				>
+					Save Bonuses
+				</button>
+				{#if form?.faabSuccess}
+					<span class="text-xs text-emerald-400">Saved.</span>
+				{/if}
+			</div>
 		</div>
 	</form>
 

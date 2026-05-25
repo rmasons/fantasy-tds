@@ -11,6 +11,8 @@ export interface LeagueConfig {
 	contentfulManagementToken?: string;
 	/** Ordered list of nav slugs to show; omit to show all defaults */
 	enabledNavItems?: string[];
+	/** Bonus FAAB awarded outside Sleeper, keyed by roster_id (as string) */
+	faabBonuses?: Record<string, number>;
 }
 
 function toFirestoreWrite(obj: Record<string, unknown>): Record<string, unknown> {

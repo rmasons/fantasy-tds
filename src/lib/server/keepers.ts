@@ -1,6 +1,7 @@
 import { adminDb } from '$lib/firebase/admin';
 import { avatarUrl } from '$lib/sleeper';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
+import { getLeagueConfig } from '$lib/server/config';
 
 export interface KeeperPlayerData {
 	playerId: string;
@@ -148,12 +149,15 @@ export async function getKeeperData(leagueId: string): Promise<{
 
 	const sleeperUserIds: string[] = (usersRaw ?? []).map((u: any) => u.user_id).filter(Boolean);
 
-	const [draftHistory, overridesSnap, playersCache, managerProfiles] = await Promise.all([
+	const [draftHistory, overridesSnap, playersCache, managerProfiles, leagueConfig] = await Promise.all([
 		getCachedDraftHistory(leagueId),
 		adminDb.collection('keeperData').doc(leagueId).collection('players').get(),
 		getPlayersCache(),
 		getManagerProfilesBatch(sleeperUserIds),
+		getLeagueConfig(leagueId),
 	]);
+
+	const faabBonuses: Record<string, number> = leagueConfig.faabBonuses ?? {};
 
 	const userMap = new Map<string, { name: string; avatar: string | null }>();
 	for (const u of (usersRaw ?? [])) {
@@ -174,7 +178,8 @@ export async function getKeeperData(leagueId: string): Promise<{
 		const ownerInfo = userMap.get(ownerUserId);
 		const ownerName = ownerInfo?.name ?? `Roster ${roster.roster_id}`;
 		const ownerAvatar = ownerInfo?.avatar ?? null;
-		const faabRemaining = faabBudget - (roster.settings?.waiver_budget_used ?? 0);
+		const faabBonus = faabBonuses[String(roster.roster_id)] ?? 0;
+		const faabRemaining = faabBudget - (roster.settings?.waiver_budget_used ?? 0) + faabBonus;
 
 		const players: KeeperPlayerData[] = [];
 
