@@ -80,8 +80,8 @@
 				teams = rosters.map((r) => {
 					const info = rosterInfo.get(r.roster_id)!;
 					const starterIds = new Set((r as any).starters ?? []);
-					const irIds = new Set((r as any).reserve ?? []);
-					const allIds: string[] = (r as any).players ?? [];
+					const irIds = new Set(r.reserve ?? []);
+					const allIds: string[] = r.players ?? [];
 
 					return {
 						rosterId: r.roster_id,

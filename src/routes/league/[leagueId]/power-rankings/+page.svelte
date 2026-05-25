@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { LayoutData } from '../$types';
 	import { fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap, fetchDisplayNameOverrides, combineFpts } from '$lib/sleeper';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: LayoutData }>();
 
@@ -450,6 +451,7 @@
 				{:else}
 					Week {currentWeek} · {weeksRemaining} week{weeksRemaining !== 1 ? 's' : ''} remaining
 				{/if}
+			<FaabEasterEgg eggId="5" leagueId={data.leagueId} loggedIn={!!data.user} />
 			</p>
 		</div>
 

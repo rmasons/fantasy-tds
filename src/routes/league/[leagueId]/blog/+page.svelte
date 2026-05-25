@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -64,7 +65,7 @@
 
 <div>
 	<div class="mb-6">
-		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Blog</h1>
+		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Blog<FaabEasterEgg eggId="11" leagueId={data.leagueId} loggedIn={!!data.user} /></h1>
 	</div>
 
 	{#if categories.length > 0}

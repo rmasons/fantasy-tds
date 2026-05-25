@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { SleeperLeague, SleeperNflState } from '$lib/types';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 	import {
 		fetchLeague, fetchNflState, fetchUsers, fetchRosters, fetchWinnersBracket,
 		buildRosterInfoMap, fetchDisplayNameOverrides, fetchLeagueCore, fetchMatchups, combineFpts,
@@ -230,7 +231,7 @@
 			{/if}
 
 			<div class="min-w-0">
-				<h1 class="font-sport font-black text-3xl sm:text-4xl uppercase tracking-tight text-white leading-tight truncate">{league.name}</h1>
+				<h1 class="font-sport font-black text-3xl sm:text-4xl uppercase tracking-tight text-white leading-tight truncate">{league.name}<FaabEasterEgg eggId="12" leagueId={data.leagueId} loggedIn={!!data.user} /></h1>
 				{#if nflState}
 					<p class="text-slate-400 text-sm mt-1 font-medium">
 						NFL {nflState.season}

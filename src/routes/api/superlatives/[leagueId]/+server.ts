@@ -118,13 +118,17 @@ export const PUT: RequestHandler = async ({ params, locals }) => {
 	const seasonUpdates: Record<string, Record<string, StoredAwardEntry>> = {};
 	const report: Array<{ season: string; computed: number }> = [];
 
+	const startTime = Date.now();
+	const BUDGET_MS = 50_000; // stay well under Vercel's 60s default
+
 	for (const league of leagues) {
+		if (Date.now() - startTime > BUDGET_MS) break;
 		const season = league.season;
 
 		// Only process regular + post seasons (skip pre-season).
 		if (league.season_type === 'pre') continue;
 
-		const playoffWeekStart: number = (league.settings as any).playoff_week_start ?? 15;
+		const playoffWeekStart: number = league.settings.playoff_week_start ?? 15;
 		const weeksToFetch = playoffWeekStart - 1;
 		if (weeksToFetch < 1) continue;
 
@@ -148,9 +152,10 @@ export const PUT: RequestHandler = async ({ params, locals }) => {
 		for (const [key, entry] of computed) {
 			const prev = existing[key];
 			if (prev) {
-				// Preserve existing ownerId/teamName — only update stat + sub.
+				// Preserve existing ownerId/teamName — update stat and replace sub (clear if absent).
+				const { sub: _s, ...prevCore } = prev;
 				merged[key] = {
-					...prev,
+					...prevCore,
 					stat: entry.stat,
 					...(entry.sub ? { sub: entry.sub } : {}),
 				};

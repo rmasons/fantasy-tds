@@ -122,19 +122,21 @@
 	let computeResult = $state('');
 
 	async function saveAll() {
-		for (const { season, awards } of seasons) {
-			status[season] = 'saving';
-			try {
-				const res = await fetch(`/api/superlatives/${data.leagueId}`, {
-					method: 'POST',
-					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify({ season, awards }),
-				});
-				status[season] = res.ok ? 'done' : 'error';
-			} catch {
-				status[season] = 'error';
-			}
-		}
+		await Promise.allSettled(
+			seasons.map(async ({ season, awards }) => {
+				status[season] = 'saving';
+				try {
+					const res = await fetch(`/api/superlatives/${data.leagueId}`, {
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({ season, awards }),
+					});
+					status[season] = res.ok ? 'done' : 'error';
+				} catch {
+					status[season] = 'error';
+				}
+			}),
+		);
 	}
 
 	async function computeStats() {

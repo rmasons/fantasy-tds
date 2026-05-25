@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { RosterInfo } from '$lib/sleeper';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 	import {
 		fetchLeagueCore, fetchNflState, fetchMatchups as fetchWeekMatchups,
 		fetchWinnersBracket, fetchLosersBracket, buildRosterInfoMap, fetchDisplayNameOverrides
@@ -286,7 +287,7 @@
 	<!-- Header -->
 	<div class="mb-6">
 		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Matchups</h1>
-		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">{season} Season</p>
+		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">{season} Season<FaabEasterEgg eggId="4" leagueId={data.leagueId} loggedIn={!!data.user} /></p>
 	</div>
 
 	<!-- View tabs + week navigator -->

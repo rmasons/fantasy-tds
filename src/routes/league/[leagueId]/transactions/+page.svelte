@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { LayoutData } from '../$types';
 	import type { SlimPlayer } from '$lib/types';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 	import { fetchLeagueCore, fetchNflState, fetchTransactions as fetchWeekTransactions, buildRosterInfoMap, fetchDisplayNameOverrides, type RosterInfo } from '$lib/sleeper';
 
 	let { data } = $props<{ data: LayoutData }>();
@@ -138,6 +139,7 @@
 	<div class="flex items-start justify-between mb-6 flex-wrap gap-3">
 		<div>
 			<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Transactions</h1>
+			<FaabEasterEgg eggId="6" leagueId={data.leagueId} loggedIn={!!data.user} />
 		</div>
 	</div>
 

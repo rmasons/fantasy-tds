@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import { fetchRosters, fetchUsers, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
 	import type { ManagerProfile } from '$lib/types';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -83,7 +84,7 @@
 </script>
 
 <div>
-	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Managers</h1>
+	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Managers<FaabEasterEgg eggId="10" leagueId={data.leagueId} loggedIn={!!data.user} /></h1>
 
 	{#if loading}
 		<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

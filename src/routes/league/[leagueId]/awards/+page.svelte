@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { ManagerProfile } from '$lib/types';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 	import {
 		fetchLeague, fetchLeagueCore, fetchWinnersBracket, fetchLosersBracket,
 		fetchMatchups, buildRosterInfoMap, combineFpts,
@@ -288,7 +289,7 @@
 
 <div>
 	<div class="mb-6">
-		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Awards</h1>
+		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Awards<FaabEasterEgg eggId="9" leagueId={data.leagueId} loggedIn={!!data.user} /></h1>
 	</div>
 
 	{#if loading && podiums.length === 0}

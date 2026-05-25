@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { fetchRosters, fetchUsers, fetchLeague, fetchMatchups as fetchWeekMatchups, buildRosterInfoMap, fetchDisplayNameOverrides } from '$lib/sleeper';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -205,7 +206,7 @@
 </script>
 
 <div>
-	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Rivalry</h1>
+	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Rivalry<FaabEasterEgg eggId="8" leagueId={data.leagueId} loggedIn={!!data.user} /></h1>
 
 	{#if loadingManagers}
 		<div class="h-20 bg-navy-850 rounded-lg animate-pulse"></div>

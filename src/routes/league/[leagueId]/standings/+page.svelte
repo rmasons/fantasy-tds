@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import type { StandingRow } from '$lib/types';
 	import { fetchLeagueCore, buildRosterInfoMap, fetchDisplayNameOverrides, combineFpts } from '$lib/sleeper';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -83,7 +84,7 @@
 <div>
 	<div class="mb-6">
 		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Standings</h1>
-		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">{season} Season</p>
+		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">{season} Season<FaabEasterEgg eggId="1" leagueId={data.leagueId} loggedIn={!!data.user} /></p>
 	</div>
 
 	{#if loading}

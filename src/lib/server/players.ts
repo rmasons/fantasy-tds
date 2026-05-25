@@ -52,10 +52,10 @@ export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
 	}
 
 	const slim = await fetchAndSlimFromSleeper();
-	const json_str = JSON.stringify(slim);
-	console.log(`[players] Cache payload size: ${(json_str.length / 1024).toFixed(1)} KB`);
+	const jsonStr = JSON.stringify(slim);
+	console.log(`[players] Cache payload size: ${(jsonStr.length / 1024).toFixed(1)} KB`);
 	try {
-		await docRef.set({ data: json_str, cachedDate: date });
+		await docRef.set({ data: jsonStr, cachedDate: date });
 	} catch (e) {
 		console.error('[players] Failed to write to Firestore:', e);
 	}
