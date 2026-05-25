@@ -78,10 +78,14 @@
 					: null;
 				if (!url) return '';
 				const alt = (f?.title ?? f?.description ?? '').replace(/"/g, '&quot;');
-				const img = `<img src="${url.replace(/"/g, '%22')}" alt="${alt}" style="max-width:100%;border-radius:0.5rem;display:block" />`;
+				const contentType: string = f?.file?.contentType ?? '';
+				const safeUrl = url.replace(/"/g, '%22');
+				const media = contentType.startsWith('video/')
+					? `<video src="${safeUrl}" controls autoplay muted loop playsinline style="max-width:100%;border-radius:0.5rem;display:block"></video>`
+					: `<img src="${safeUrl}" alt="${alt}" style="max-width:100%;border-radius:0.5rem;display:block" />`;
 				return node.nodeType === 'embedded-asset-inline'
-					? img
-					: `<figure style="margin:1.5rem 0;text-align:center">${img}</figure>`;
+					? media
+					: `<figure style="margin:1.5rem 0;text-align:center">${media}</figure>`;
 			}
 			case 'table': return `<div style="overflow-x:auto;margin:1rem 0"><table style="width:100%;font-size:0.875rem;border-collapse:collapse">${children}</table></div>`;
 			case 'table-row': return `<tr style="border-bottom:1px solid #1e293b">${children}</tr>`;
