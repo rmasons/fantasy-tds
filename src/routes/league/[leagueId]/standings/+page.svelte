@@ -84,7 +84,7 @@
 <div>
 	<div class="mb-6">
 		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Standings</h1>
-		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">{season} Season<FaabEasterEgg eggId="1" leagueId={data.leagueId} loggedIn={!!data.user} /></p>
+		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">{season} Season</p>
 	</div>
 
 	{#if loading}
@@ -117,7 +117,7 @@
 							<th class="px-4 py-3 text-center">T</th>
 						{/if}
 						<th class="px-4 py-3 text-right">PF</th>
-						<th class="px-4 py-3 text-right">PA</th>
+						<th class="px-4 py-3 text-right">PA<FaabEasterEgg eggId="1" leagueId={data.leagueId} loggedIn={!!data.user} /></th>
 						<th class="px-4 py-3 text-center">Streak</th>
 					</tr>
 				</thead>

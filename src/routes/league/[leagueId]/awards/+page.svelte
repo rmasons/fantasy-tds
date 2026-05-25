@@ -289,7 +289,7 @@
 
 <div>
 	<div class="mb-6">
-		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Awards<FaabEasterEgg eggId="9" leagueId={data.leagueId} loggedIn={!!data.user} /></h1>
+		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Awards</h1>
 	</div>
 
 	{#if loading && podiums.length === 0}
@@ -513,7 +513,7 @@
 
 		<!-- ── ALL-TIME CHAMPIONS ─────────────────────────── -->
 		<div class="mt-10">
-			<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2"><span class="text-amber-400">◆</span>All-Time Champions</h2>
+			<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2"><span class="text-amber-400">◆</span>All-Time Champions<FaabEasterEgg eggId="9" leagueId={data.leagueId} loggedIn={!!data.user} /></h2>
 			<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden">
 				<table class="w-full text-sm">
 					<thead>

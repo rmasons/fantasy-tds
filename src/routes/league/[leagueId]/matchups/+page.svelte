@@ -287,7 +287,7 @@
 	<!-- Header -->
 	<div class="mb-6">
 		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Matchups</h1>
-		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">{season} Season<FaabEasterEgg eggId="4" leagueId={data.leagueId} loggedIn={!!data.user} /></p>
+		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">{season} Season</p>
 	</div>
 
 	<!-- View tabs + week navigator -->
@@ -303,7 +303,7 @@
 				class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
 				       {view === 'bracket' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
 			>
-				{bracketLoading ? 'Loading…' : 'Bracket'}
+				{bracketLoading ? 'Loading…' : 'Bracket'}<FaabEasterEgg eggId="4" leagueId={data.leagueId} loggedIn={!!data.user} />
 			</button>
 		</div>
 

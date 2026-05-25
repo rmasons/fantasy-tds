@@ -139,7 +139,6 @@
 	<div class="flex items-start justify-between mb-6 flex-wrap gap-3">
 		<div>
 			<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Transactions</h1>
-			<FaabEasterEgg eggId="6" leagueId={data.leagueId} loggedIn={!!data.user} />
 		</div>
 	</div>
 
@@ -150,7 +149,7 @@
 				class="flex items-center gap-1.5 px-4 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
 				       {filter === f ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
 			>
-				{f === 'all' ? 'All' : f === 'free_agent' ? 'FA' : f.charAt(0).toUpperCase() + f.slice(1)}
+				{f === 'all' ? 'All' : f === 'free_agent' ? 'FA' : f.charAt(0).toUpperCase() + f.slice(1)}{#if f === 'free_agent'}<FaabEasterEgg eggId="6" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}
 				{#if !loading && counts[f] > 0}
 					<span class="text-[10px] font-mono rounded px-1 py-0.5
 					             {filter === f ? 'bg-amber-400/15 text-amber-400' : 'bg-navy-800 text-navy-500'}">

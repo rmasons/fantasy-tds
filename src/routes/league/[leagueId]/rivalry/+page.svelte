@@ -206,7 +206,7 @@
 </script>
 
 <div>
-	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Rivalry<FaabEasterEgg eggId="8" leagueId={data.leagueId} loggedIn={!!data.user} /></h1>
+	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Rivalry</h1>
 
 	{#if loadingManagers}
 		<div class="h-20 bg-navy-850 rounded-lg animate-pulse"></div>
@@ -334,7 +334,7 @@
 							<p class="text-[10px] text-navy-600">{highlights.biggestWinGame.season} Wk {highlights.biggestWinGame.week}</p>
 						</div>
 						<div class="bg-navy-850 rounded-lg border border-navy-700 p-3 text-center">
-							<p class="text-[9px] text-navy-500 uppercase tracking-widest mb-1.5">Closest Game</p>
+							<p class="text-[9px] text-navy-500 uppercase tracking-widest mb-1.5">Closest Game<FaabEasterEgg eggId="8" leagueId={data.leagueId} loggedIn={!!data.user} /></p>
 							<p class="text-xl font-bold text-white tabular-nums">+{highlights.closestMargin.toFixed(2)}</p>
 							<p class="text-[11px] text-navy-500 mt-0.5">margin</p>
 							<p class="text-[10px] text-navy-600">{highlights.closestGame.season} Wk {highlights.closestGame.week}</p>

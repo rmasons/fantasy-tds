@@ -84,7 +84,7 @@
 </script>
 
 <div>
-	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Managers<FaabEasterEgg eggId="10" leagueId={data.leagueId} loggedIn={!!data.user} /></h1>
+	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Managers</h1>
 
 	{#if loading}
 		<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -136,5 +136,6 @@
 				</a>
 			{/each}
 		</div>
+		<p class="mt-3 text-right text-[10px] text-navy-800 select-none">sorted by all-time record<FaabEasterEgg eggId="10" leagueId={data.leagueId} loggedIn={!!data.user} /></p>
 	{/if}
 </div>

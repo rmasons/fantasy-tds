@@ -2,7 +2,7 @@
 	import type { PageData } from './$types';
 	import type { SlimPlayer } from '$lib/types';
 	import { onMount } from 'svelte';
-	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
+
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -140,7 +140,7 @@
 </script>
 
 <div>
-	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Drafts<FaabEasterEgg eggId="7" leagueId={data.leagueId} loggedIn={!!data.user} /></h1>
+	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Drafts</h1>
 
 	{#if draftsMeta.length === 0}
 		{#if loadingPicks}

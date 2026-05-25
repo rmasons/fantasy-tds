@@ -451,8 +451,7 @@
 				{:else}
 					Week {currentWeek} · {weeksRemaining} week{weeksRemaining !== 1 ? 's' : ''} remaining
 				{/if}
-			<FaabEasterEgg eggId="5" leagueId={data.leagueId} loggedIn={!!data.user} />
-			</p>
+				</p>
 		</div>
 
 		<!-- Week navigator -->
@@ -529,7 +528,7 @@
 						<th class="px-4 py-3 text-left">Team</th>
 						<th class="px-4 py-3 text-center">Record</th>
 						<th class="px-4 py-3 text-right">Total PF</th>
-						<th class="px-4 py-3 text-right">Score</th>
+						<th class="px-4 py-3 text-right">Score<FaabEasterEgg eggId="5" leagueId={data.leagueId} loggedIn={!!data.user} /></th>
 						<th class="px-4 py-3 text-right">Playoff %</th>
 					</tr>
 				</thead>
