@@ -1,41 +1,17 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { enhance } from '$app/forms';
-	import type { PageData, ActionData } from './$types';
+	import type { PageData } from './$types';
 
-	let { data, form }: { data: PageData; form: ActionData } = $props();
+	let { data }: { data: PageData } = $props();
 
 	let newLeagueId = $state('');
 
 	function configureLeague() {
 		const id = newLeagueId.trim();
-		if (id) goto(`/admin/leagues/${id}`);
+		if (id) goto(`/league/${id}/admin`);
 	}
 
 	const leagueIds = $derived(Object.keys(data.leagueConfigs).sort());
-
-	// FAAB bonuses
-	let selectedLeagueId = $state(leagueIds[0] ?? '');
-	let faabBonuses = $state<Record<string, Record<string, number>>>(
-		Object.fromEntries(
-			leagueIds.map(id => [id, { ...(data.leagueConfigs[id].faabBonuses ?? {}) }])
-		)
-	);
-
-	function faabBonusFor(leagueId: string, rosterId: string): number {
-		return faabBonuses[leagueId]?.[rosterId] ?? 0;
-	}
-
-	function setFaabBonus(leagueId: string, rosterId: string, raw: string) {
-		const val = parseInt(raw, 10);
-		const league = { ...(faabBonuses[leagueId] ?? {}) };
-		if (raw === '' || val <= 0 || isNaN(val)) {
-			delete league[rosterId];
-		} else {
-			league[rosterId] = val;
-		}
-		faabBonuses = { ...faabBonuses, [leagueId]: league };
-	}
 </script>
 
 <div class="space-y-10">
@@ -93,10 +69,10 @@
 							</p>
 						</div>
 						<a
-							href="/admin/leagues/{id}"
+							href="/league/{id}/admin"
 							class="shrink-0 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-slate-300 hover:text-white transition-colors"
 						>
-							Edit
+							Admin
 						</a>
 					</div>
 				{/each}
@@ -104,74 +80,11 @@
 		{/if}
 	</section>
 
-	<!-- FAAB Bonuses -->
-	{#if leagueIds.length > 0}
-	<section>
-		<h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">FAAB Bonuses</h2>
-		<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-			<p class="text-xs text-slate-500">Award extra FAAB outside Sleeper. Added to each team's balance on the Keepers page.</p>
-
-			{#if leagueIds.length > 1}
-				<div class="flex gap-2">
-					{#each leagueIds as id}
-						<button
-							type="button"
-							onclick={() => (selectedLeagueId = id)}
-							class="px-3 py-1 rounded-lg text-xs font-medium transition-colors
-							       {selectedLeagueId === id ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}"
-						>{id}</button>
-					{/each}
-				</div>
-			{/if}
-
-			<form method="POST" action="?/saveFaabBonuses" use:enhance class="space-y-3">
-				<input type="hidden" name="leagueId" value={selectedLeagueId} />
-
-				{#each (data.rostersByLeague[selectedLeagueId] ?? []) as roster}
-					<div class="flex items-center gap-3">
-						<span class="flex-1 text-sm text-slate-300 truncate">{roster.teamName}</span>
-						<div class="flex items-center gap-1">
-							<span class="text-slate-600 text-sm">$</span>
-							<input
-								type="number"
-								name="faab_{roster.rosterId}"
-								min="0"
-								step="1"
-								value={faabBonusFor(selectedLeagueId, roster.rosterId) || ''}
-								oninput={(e) => setFaabBonus(selectedLeagueId, roster.rosterId, (e.target as HTMLInputElement).value)}
-								placeholder="0"
-								class="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white
-								       placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-right"
-							/>
-						</div>
-					</div>
-				{/each}
-
-				{#if (data.rostersByLeague[selectedLeagueId] ?? []).length === 0}
-					<p class="text-xs text-slate-600">No rosters loaded for this league.</p>
-				{/if}
-
-				<div class="flex items-center gap-4 pt-1">
-					<button
-						type="submit"
-						class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-medium text-white transition-colors"
-					>
-						Save Bonuses
-					</button>
-					{#if form?.faabSuccess && form?.savedLeagueId === selectedLeagueId}
-						<span class="text-xs text-emerald-400">Saved.</span>
-					{/if}
-				</div>
-			</form>
-		</div>
-	</section>
-	{/if}
-
 	<!-- Add / configure a league -->
 	<section>
 		<h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Configure a League</h2>
 		<div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-			<p class="text-xs text-slate-500 mb-3">Enter a Sleeper league ID to open its config.</p>
+			<p class="text-xs text-slate-500 mb-3">Enter a Sleeper league ID to open its admin page.</p>
 			<div class="flex gap-3">
 				<input
 					type="text"
@@ -185,7 +98,7 @@
 					disabled={!newLeagueId.trim()}
 					class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-sm font-medium text-white transition-colors"
 				>
-					Configure →
+					Go →
 				</button>
 			</div>
 		</div>
