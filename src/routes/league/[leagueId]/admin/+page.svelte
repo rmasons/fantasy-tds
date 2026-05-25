@@ -1,8 +1,23 @@
 <script lang="ts">
-	import type { PageData } from './$types';
+	import { enhance } from '$app/forms';
+	import type { PageData, ActionData } from './$types';
 	import type { SeedDraftResult } from '$lib/server/drafts';
 
-	let { data } = $props<{ data: PageData }>();
+	let { data, form } = $props<{ data: PageData; form: ActionData }>();
+
+	let faabBonuses = $state<Record<string, number>>({ ...(data.faabBonuses ?? {}) });
+
+	function faabBonusFor(rosterId: string): number {
+		return faabBonuses[rosterId] ?? 0;
+	}
+
+	function setFaabBonus(rosterId: string, raw: string) {
+		const val = parseInt(raw, 10);
+		const copy = { ...faabBonuses };
+		if (raw === '' || val <= 0 || isNaN(val)) delete copy[rosterId];
+		else copy[rosterId] = val;
+		faabBonuses = copy;
+	}
 
 	let seeding = $state(false);
 	let seedResults = $state<SeedDraftResult[]>([]);
@@ -121,5 +136,51 @@
 		{:else if done}
 			<p class="mt-3 text-sm text-slate-500">No completed drafts found in this league's history.</p>
 		{/if}
+	</section>
+
+	<!-- ── FAAB Bonuses ── -->
+	<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
+		<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1 flex items-center gap-2"><span class="text-amber-400">◆</span>FAAB Bonuses</h2>
+		<p class="text-sm text-slate-400 mb-4">
+			Award extra FAAB outside Sleeper. Bonuses are added to each team's Sleeper balance on the Keepers page.
+		</p>
+
+		<form method="POST" action="?/saveFaabBonuses" use:enhance class="space-y-3">
+			{#each data.rosterList as roster}
+				<div class="flex items-center gap-3">
+					<span class="flex-1 text-sm text-slate-300 truncate">{roster.teamName}</span>
+					<div class="flex items-center gap-1.5">
+						<span class="text-navy-500 text-sm">$</span>
+						<input
+							type="number"
+							name="faab_{roster.rosterId}"
+							min="0"
+							step="1"
+							value={faabBonusFor(roster.rosterId) || ''}
+							oninput={(e) => setFaabBonus(roster.rosterId, (e.target as HTMLInputElement).value)}
+							placeholder="0"
+							class="w-20 bg-navy-800 border border-navy-700 rounded-lg px-2 py-1.5 text-sm text-white
+							       placeholder-navy-500 focus:outline-none focus:border-amber-500 text-right transition-colors"
+						/>
+					</div>
+				</div>
+			{/each}
+
+			{#if data.rosterList.length === 0}
+				<p class="text-sm text-navy-500">No rosters found.</p>
+			{/if}
+
+			<div class="flex items-center gap-4 pt-2">
+				<button
+					type="submit"
+					class="px-4 py-2 text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg transition-colors"
+				>
+					Save Bonuses
+				</button>
+				{#if form?.faabSuccess}
+					<span class="text-xs text-green-400">Saved.</span>
+				{/if}
+			</div>
+		</form>
 	</section>
 </div>
