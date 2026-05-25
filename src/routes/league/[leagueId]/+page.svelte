@@ -185,7 +185,6 @@
 		{ href: 'records',         label: 'Records',          icon: '📊' },
 		{ href: 'transactions',    label: 'Transactions',     icon: '🔄' },
 		{ href: 'drafts',          label: 'Drafts',           icon: '🎯' },
-		{ href: 'awards',          label: 'Awards',           icon: '🥇' },
 		{ href: 'managers',        label: 'Managers',         icon: '👤' },
 		{ href: 'rivalry',         label: 'Rivalry',          icon: '⚡' },
 		{ href: 'keepers',         label: 'Keepers',          icon: '🔒' },
@@ -231,7 +230,7 @@
 			{/if}
 
 			<div class="min-w-0">
-				<h1 class="font-sport font-black text-3xl sm:text-4xl uppercase tracking-tight text-white leading-tight truncate">{league.name}<FaabEasterEgg eggId="12" leagueId={data.leagueId} loggedIn={!!data.user} /></h1>
+				<h1 class="font-sport font-black text-3xl sm:text-4xl uppercase tracking-tight text-white leading-tight truncate">{league.name}</h1>
 				{#if nflState}
 					<p class="text-slate-400 text-sm mt-1 font-medium">
 						NFL {nflState.season}
@@ -265,7 +264,7 @@
 	<!-- Reigning Champion banner -->
 	{#if champion}
 		<a
-			href="/league/{data.leagueId}/awards"
+			href="/league/{data.leagueId}/records"
 			class="group relative flex items-center gap-4 rounded-xl overflow-hidden mb-4
 			       border border-amber-500/25 hover:border-amber-400/40 transition-colors"
 		>
@@ -329,7 +328,7 @@
 	{:else if weekMatchups.length > 0}
 		<div class="mb-6">
 			<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2">
-				<span class="text-amber-400">◆</span>Week {nflState?.week} Matchups
+				<span class="text-amber-400">◆</span>Week {nflState?.week} Matchups<FaabEasterEgg eggId="12" leagueId={data.leagueId} loggedIn={!!data.user} />
 			</h2>
 			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 				{#each weekMatchups as matchup}

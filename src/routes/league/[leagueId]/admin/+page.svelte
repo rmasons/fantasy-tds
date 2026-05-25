@@ -77,7 +77,6 @@
 		{ href: 'records',         label: 'Records'         },
 		{ href: 'transactions',    label: 'Transactions'    },
 		{ href: 'drafts',          label: 'Drafts'          },
-		{ href: 'awards',          label: 'Awards'          },
 		{ href: 'managers',        label: 'Managers'        },
 		{ href: 'rivalry',         label: 'Rivalry'         },
 		{ href: 'keepers',         label: 'Keepers'         },
