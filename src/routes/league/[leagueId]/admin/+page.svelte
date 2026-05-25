@@ -88,6 +88,8 @@
 	interface NavItem { href: string; label: string; enabled: boolean; }
 
 	function initNavItems(saved: string[]): NavItem[] {
+		// Empty/null saved means "all defaults" — show everything as enabled
+		if (!saved || saved.length === 0) return ALL_NAV.map(n => ({ ...n, enabled: true }));
 		const enabledSet = new Set(saved);
 		const ordered = saved
 			.map(h => ALL_NAV.find(n => n.href === h))

@@ -43,13 +43,16 @@ export const actions: Actions = {
 		if (!locals.user?.isAdmin) throw error(403, 'Forbidden');
 		const data = await request.formData();
 
-		const contentfulSpaceId = (data.get('contentfulSpaceId') as string)?.trim() || undefined;
 		const navRaw = (data.get('enabledNavItems') as string)?.trim();
 		const enabledNavItems = navRaw
 			? navRaw.split(',').filter(item => VALID_NAV_ITEMS.has(item))
 			: undefined;
 
-		const update: Parameters<typeof setLeagueConfig>[1] = { contentfulSpaceId, enabledNavItems };
+		const update: Parameters<typeof setLeagueConfig>[1] = { enabledNavItems };
+
+		// Only update Contentful fields when explicitly provided — never delete on blank
+		const contentfulSpaceId = (data.get('contentfulSpaceId') as string)?.trim();
+		if (contentfulSpaceId) update.contentfulSpaceId = contentfulSpaceId;
 
 		const accessToken = (data.get('contentfulAccessToken') as string)?.trim();
 		if (accessToken) update.contentfulAccessToken = accessToken;
