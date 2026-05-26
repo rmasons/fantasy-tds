@@ -3,11 +3,13 @@
 	import type { RosterInfo } from '$lib/sleeper';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 	import {
-		fetchLeagueCore, fetchNflState, fetchMatchups as fetchWeekMatchups,
+		fetchLeague, fetchLeagueCore, fetchNflState, fetchMatchups as fetchWeekMatchups,
 		fetchWinnersBracket, fetchLosersBracket, buildRosterInfoMap, fetchDisplayNameOverrides
 	} from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
+
+	interface SeasonEntry { leagueId: string; season: string }
 
 	interface MatchupTeam {
 		rosterId: number;
@@ -58,12 +60,17 @@
 	let bracketLoadingStatus = $state('');
 	let playoffStart = $state(15);
 
+	let seasons = $state<SeasonEntry[]>([]);
+	let viewLeagueId = $state(data.leagueId);
+
 	let userMap = new Map<number, RosterInfo>();
-	let savedOverrides: Record<string, string> = {};
+	let savedOverrides: Map<string, string> = new Map();
 	let bracketStartLeagueId = '';
 
 	$effect(() => {
-		const leagueId = data.leagueId;
+		const urlLeagueId = data.leagueId;
+		viewLeagueId = urlLeagueId;
+		seasons = [];
 		allMatchups = {};
 		selectedWeek = 1;
 		maxWeek = 1;
@@ -76,72 +83,111 @@
 		bracketSelectedIdx = 0;
 		bracketLoadingStatus = '';
 		userMap = new Map();
-		savedOverrides = {};
+		savedOverrides = new Map();
 		bracketStartLeagueId = '';
 
-		(async () => {
-			try {
-				const [{ league, rosters, users }, nfl] = await Promise.all([
-					fetchLeagueCore(leagueId),
-					fetchNflState(),
-				]);
-
-				if (data.leagueId !== leagueId) return;
-
-				season = league.season;
-				playoffStart = league.settings?.playoff_week_start ?? 15;
-				const pType = league.settings?.playoff_round_type ?? 0;
-				regularSeasonLength = playoffStart - 1;
-
-				const prevId = league.previous_league_id ?? '';
-				if (league.status === 'pre_draft' || league.status === 'drafting') {
-					bracketStartLeagueId = (prevId && prevId !== '0') ? prevId : '';
-				} else {
-					bracketStartLeagueId = leagueId;
-				}
-
-				const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
-				if (data.leagueId !== leagueId) return;
-				savedOverrides = overrides;
-				userMap = buildRosterInfoMap(rosters, users, overrides);
-
-				const playoffTeams = league.settings?.playoff_teams ?? 4;
-				const numRounds = Math.ceil(Math.log2(Math.max(playoffTeams, 2)));
-				const weeksPerRound = pType === 2 ? 2 : 1;
-				const lastPlayoffWeek = playoffStart + numRounds * weeksPerRound - 1;
-
-				let week = 1;
-				if (league.status === 'complete') {
-					week = lastPlayoffWeek; maxWeek = lastPlayoffWeek;
-				} else if (nfl.season_type === 'regular') {
-					week = Math.min(nfl.display_week, regularSeasonLength);
-					maxWeek = week;
-				} else if (nfl.season_type === 'post') {
-					week = regularSeasonLength; maxWeek = lastPlayoffWeek;
-				}
-				selectedWeek = week;
-
-				await loadWeek(week);
-			} catch (e: any) {
-				if (data.leagueId !== leagueId) return;
-				error = e.message;
-			} finally {
-				if (data.leagueId !== leagueId) return;
-				loading = false;
-			}
-		})();
+		loadMatchups(urlLeagueId);
+		walkSeasons(urlLeagueId);
 	});
 
+	async function walkSeasons(urlLeagueId: string) {
+		let curId: string | null = urlLeagueId;
+		while (curId && curId !== '0') {
+			try {
+				const league = await fetchLeague(curId);
+				if (data.leagueId !== urlLeagueId) return;
+				seasons = [...seasons, { leagueId: curId, season: league.season }];
+				curId = league.previous_league_id ?? null;
+			} catch {
+				return;
+			}
+		}
+	}
+
+	async function loadMatchups(lid: string) {
+		allMatchups = {};
+		selectedWeek = 1;
+		maxWeek = 1;
+		loading = true;
+		error = '';
+		season = '';
+		view = 'weekly';
+		bracketLoaded = false;
+		bracketSeasons = [];
+		bracketSelectedIdx = 0;
+		userMap = new Map();
+		savedOverrides = new Map();
+		bracketStartLeagueId = '';
+
+		try {
+			const [{ league, rosters, users }, nfl] = await Promise.all([
+				fetchLeagueCore(lid),
+				fetchNflState(),
+			]);
+
+			if (viewLeagueId !== lid) return;
+
+			season = league.season;
+			playoffStart = league.settings?.playoff_week_start ?? 15;
+			const pType = league.settings?.playoff_round_type ?? 0;
+			regularSeasonLength = playoffStart - 1;
+
+			const prevId = league.previous_league_id ?? '';
+			if (league.status === 'pre_draft' || league.status === 'drafting') {
+				bracketStartLeagueId = (prevId && prevId !== '0') ? prevId : '';
+			} else {
+				bracketStartLeagueId = lid;
+			}
+
+			const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+			if (viewLeagueId !== lid) return;
+			savedOverrides = overrides;
+			userMap = buildRosterInfoMap(rosters, users, overrides);
+
+			const playoffTeams = league.settings?.playoff_teams ?? 4;
+			const numRounds = Math.ceil(Math.log2(Math.max(playoffTeams, 2)));
+			const weeksPerRound = pType === 2 ? 2 : 1;
+			const lastPlayoffWeek = playoffStart + numRounds * weeksPerRound - 1;
+
+			let week = 1;
+			if (league.status === 'complete') {
+				week = lastPlayoffWeek; maxWeek = lastPlayoffWeek;
+			} else if (nfl.season_type === 'regular') {
+				week = Math.min(nfl.display_week, regularSeasonLength);
+				maxWeek = week;
+			} else if (nfl.season_type === 'post') {
+				week = regularSeasonLength; maxWeek = lastPlayoffWeek;
+			}
+			selectedWeek = week;
+
+			await loadWeek(week);
+		} catch (e: any) {
+			if (viewLeagueId !== lid) return;
+			error = e.message;
+		} finally {
+			if (viewLeagueId !== lid) return;
+			loading = false;
+		}
+	}
+
+	function selectSeason(lid: string) {
+		if (viewLeagueId === lid) return;
+		viewLeagueId = lid;
+		loadMatchups(lid);
+	}
+
 	async function loadWeek(week: number) {
+		const lid = viewLeagueId;
 		if (allMatchups[week]) { selectedWeek = week; return; }
 		weekLoading = true;
 		try {
-			const raw = await fetchWeekMatchups(data.leagueId, week);
+			const raw = await fetchWeekMatchups(lid, week);
+			if (viewLeagueId !== lid) return;
 
 			const grouped: Record<number, MatchupTeam[]> = {};
 			for (const m of raw) {
 				if (!grouped[m.matchup_id]) grouped[m.matchup_id] = [];
-				const info = userMap.get(m.roster_id) ?? { teamName: `Team ${m.roster_id}`, ownerName: null, avatar: null };
+				const info = userMap.get(m.roster_id) ?? { teamName: `Team ${m.roster_id}`, ownerName: null, avatar: null, ownerId: '' };
 				grouped[m.matchup_id].push({ rosterId: m.roster_id, ...info, points: m.points ?? 0, starters: m.starters ?? [] });
 			}
 
@@ -153,7 +199,7 @@
 			};
 			selectedWeek = week;
 		} finally {
-			weekLoading = false;
+			if (viewLeagueId === lid) weekLoading = false;
 		}
 	}
 
@@ -170,14 +216,14 @@
 
 		bracketLoading = true;
 		bracketLoadingStatus = 'Fetching league history…';
-		const leagueId = data.leagueId;
+		const viewLid = viewLeagueId;
 
 		try {
 			let curId: string | null = bracketStartLeagueId;
 
 			while (curId && curId !== '0') {
 				const lid = curId;
-				if (data.leagueId !== leagueId) return;
+				if (viewLeagueId !== viewLid) return;
 
 				const [{ league, rosters, users }, winnersData, losersData] = await Promise.all([
 					fetchLeagueCore(lid),
@@ -185,7 +231,7 @@
 					fetchLosersBracket(lid),
 				]);
 
-				if (data.leagueId !== leagueId) return;
+				if (viewLeagueId !== viewLid) return;
 				bracketLoadingStatus = `Loading ${league.season}…`;
 
 				const rosterInfo = buildRosterInfoMap(rosters, users, savedOverrides);
@@ -205,7 +251,7 @@
 				const weekDataArr = await Promise.all(
 					playoffWeeks.map(w => fetchWeekMatchups(lid, w).catch(() => []))
 				);
-				if (data.leagueId !== leagueId) return;
+				if (viewLeagueId !== viewLid) return;
 
 				const weekPoints = new Map<number, Map<number, number>>();
 				for (let i = 0; i < playoffWeeks.length; i++) {
@@ -264,10 +310,10 @@
 
 			bracketLoaded = true;
 		} catch (e: any) {
-			if (data.leagueId !== leagueId) return;
+			if (viewLeagueId !== viewLid) return;
 			error = e.message;
 		} finally {
-			if (data.leagueId !== leagueId) return;
+			if (viewLeagueId !== viewLid) return;
 			bracketLoading = false;
 		}
 		view = 'bracket';
@@ -289,6 +335,20 @@
 		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Matchups</h1>
 		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">{season} Season</p>
 	</div>
+
+	{#if seasons.length > 1}
+		<div class="flex mb-4 border-b border-navy-700 flex-wrap">
+			{#each seasons as s}
+				<button
+					onclick={() => selectSeason(s.leagueId)}
+					class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+					       {viewLeagueId === s.leagueId ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
+				>
+					{s.season}
+				</button>
+			{/each}
+		</div>
+	{/if}
 
 	<!-- View tabs + week navigator -->
 	<div class="flex items-center justify-between mb-6 flex-wrap gap-3">

@@ -3,9 +3,11 @@
 	import type { SlimPlayer } from '$lib/types';
 	import { onMount } from 'svelte';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
-
+	import { fetchLeague, fetchLeagueCore, buildRosterInfoMap } from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
+
+	interface SeasonEntry { leagueId: string; season: string }
 
 	interface DraftPick {
 		round: number;
@@ -31,14 +33,20 @@
 		rosterNames: Map<number, string>;
 	}
 
-	const names = $derived(
+	let seasons = $state<SeasonEntry[]>([]);
+	let viewLeagueId = $state(data.leagueId);
+
+	// Draft list + roster names — seeded from SSR, replaced on year change
+	let viewDrafts = $state<any[]>(data.completedDrafts ?? []);
+	let viewRosterNames = $state<Map<number, string>>(
 		new Map<number, string>(
 			Object.entries(data.rosterInfo as Record<string, string>).map(([k, v]) => [Number(k), v])
 		)
 	);
+	let draftsLoading = $state(false);
 
 	const draftsMeta = $derived<DraftMeta[]>(
-		(data.completedDrafts ?? []).map((d: any) => ({
+		viewDrafts.map((d: any) => ({
 			id: d.draft_id,
 			season: d.season,
 			type: d.type,
@@ -46,7 +54,7 @@
 			rounds: d.settings?.rounds ?? 0,
 			teams: Object.keys(d.slot_to_roster_id ?? {}).length,
 			slotToRoster: d.slot_to_roster_id ?? {},
-			rosterNames: names,
+			rosterNames: viewRosterNames,
 		}))
 	);
 
@@ -59,16 +67,16 @@
 
 	async function loadPicks(meta: DraftMeta) {
 		const draftId = meta.id;
-		const leagueId = data.leagueId;
+		const activeLid = viewLeagueId;
 		loadingPicks = true;
 		picksError = '';
 		try {
 			const res = await fetch(
-				`/api/drafts?leagueId=${encodeURIComponent(leagueId)}&draftId=${encodeURIComponent(draftId)}`,
+				`/api/drafts?leagueId=${encodeURIComponent(activeLid)}&draftId=${encodeURIComponent(draftId)}`,
 			);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const { picks: rawPicks } = await res.json();
-			if (data.leagueId !== leagueId || draftsMeta[selectedIdx]?.id !== draftId) return;
+			if (viewLeagueId !== activeLid || draftsMeta[selectedIdx]?.id !== draftId) return;
 			currentPicks = rawPicks.map((p: any) => {
 				const player = playersMap[p.player_id];
 				return {
@@ -85,10 +93,10 @@
 				};
 			});
 		} catch (e: any) {
-			if (data.leagueId !== leagueId || draftsMeta[selectedIdx]?.id !== draftId) return;
+			if (viewLeagueId !== activeLid || draftsMeta[selectedIdx]?.id !== draftId) return;
 			picksError = e.message;
 		} finally {
-			if (data.leagueId !== leagueId || draftsMeta[selectedIdx]?.id !== draftId) return;
+			if (viewLeagueId !== activeLid || draftsMeta[selectedIdx]?.id !== draftId) return;
 			loadingPicks = false;
 		}
 	}
@@ -110,6 +118,98 @@
 		}
 	});
 
+	$effect(() => {
+		const urlLeagueId = data.leagueId;
+		viewLeagueId = urlLeagueId;
+		seasons = [];
+		// Re-seed from SSR data on league navigation
+		viewDrafts = data.completedDrafts ?? [];
+		viewRosterNames = new Map<number, string>(
+			Object.entries(data.rosterInfo as Record<string, string>).map(([k, v]) => [Number(k), v])
+		);
+		draftsLoading = false;
+		selectedIdx = 0;
+		currentPicks = [];
+		loadingPicks = true;
+		picksError = '';
+
+		walkSeasons(urlLeagueId);
+	});
+
+	async function walkSeasons(urlLeagueId: string) {
+		let curId: string | null = urlLeagueId;
+		while (curId && curId !== '0') {
+			try {
+				const league = await fetchLeague(curId);
+				if (data.leagueId !== urlLeagueId) return;
+				seasons = [...seasons, { leagueId: curId, season: league.season }];
+				curId = league.previous_league_id ?? null;
+			} catch {
+				return;
+			}
+		}
+	}
+
+	async function loadHistoricalDrafts(lid: string) {
+		draftsLoading = true;
+		viewDrafts = [];
+		viewRosterNames = new Map();
+		selectedIdx = 0;
+		currentPicks = [];
+		loadingPicks = false;
+		picksError = '';
+
+		try {
+			const [{ rosters, users }, draftsRes] = await Promise.all([
+				fetchLeagueCore(lid),
+				fetch(`/api/drafts?leagueId=${encodeURIComponent(lid)}`),
+			]);
+
+			if (viewLeagueId !== lid) return;
+
+			const rInfo = buildRosterInfoMap(rosters, users);
+			viewRosterNames = new Map([...rInfo.entries()].map(([k, v]) => [k, v.teamName]));
+
+			const body = await draftsRes.json();
+			if (viewLeagueId !== lid) return;
+
+			viewDrafts = ((body.drafts ?? []) as any[])
+				.filter((d: any) => d.status === 'complete')
+				.sort((a: any, b: any) => parseInt(b.season, 10) - parseInt(a.season, 10));
+
+			// Auto-load picks for first draft
+			const meta = draftsMeta[0];
+			if (meta) {
+				loadingPicks = true;
+				await loadPicks(meta);
+			}
+		} catch {
+			if (viewLeagueId !== lid) return;
+		} finally {
+			if (viewLeagueId !== lid) return;
+			draftsLoading = false;
+		}
+	}
+
+	function selectSeason(lid: string) {
+		if (viewLeagueId === lid) return;
+		viewLeagueId = lid;
+		if (lid === data.leagueId) {
+			// Back to current season — restore SSR data
+			viewDrafts = data.completedDrafts ?? [];
+			viewRosterNames = new Map<number, string>(
+				Object.entries(data.rosterInfo as Record<string, string>).map(([k, v]) => [Number(k), v])
+			);
+			selectedIdx = 0;
+			currentPicks = [];
+			const meta = draftsMeta[0];
+			if (meta) { loadingPicks = true; loadPicks(meta); }
+			else loadingPicks = false;
+		} else {
+			loadHistoricalDrafts(lid);
+		}
+	}
+
 	function nflLogoUrl(team: string): string | null {
 		if (!team || team === 'FA' || team === '?') return null;
 		return `https://sleepercdn.com/images/team_logos/nfl/${team.toLowerCase()}.png`;
@@ -127,8 +227,6 @@
 
 	const draft = $derived(draftsMeta[selectedIdx]);
 
-	// grid[round-1][slot-1]; falls back to deriving team count from picks when
-	// slot_to_roster_id was missing from the cached draft metadata.
 	function picksGrid(meta: DraftMeta, picks: DraftPick[], teams: number): (DraftPick | null)[][] {
 		const rounds = meta.rounds > 0 ? meta.rounds : Math.max(0, ...picks.map(p => p.round));
 		const grid: (DraftPick | null)[][] = Array.from({ length: rounds }, () =>
@@ -148,7 +246,27 @@
 <div>
 	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Drafts</h1>
 
-	{#if draftsMeta.length === 0}
+	{#if seasons.length > 1}
+		<div class="flex mb-6 border-b border-navy-700 flex-wrap">
+			{#each seasons as s}
+				<button
+					onclick={() => selectSeason(s.leagueId)}
+					class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+					       {viewLeagueId === s.leagueId ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
+				>
+					{s.season}
+				</button>
+			{/each}
+		</div>
+	{/if}
+
+	{#if draftsLoading}
+		<div class="space-y-3">
+			{#each Array(3) as _}
+				<div class="h-12 bg-navy-850 rounded-lg animate-pulse"></div>
+			{/each}
+		</div>
+	{:else if draftsMeta.length === 0}
 		{#if loadingPicks}
 			<div class="space-y-3">
 				{#each Array(3) as _}
