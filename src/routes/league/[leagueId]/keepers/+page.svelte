@@ -4,6 +4,8 @@
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 	import { onMount } from 'svelte';
 
+	let { data } = $props<{ data: PageData }>();
+
 	const TOTAL_EGGS = 12;
 	let huntOpen = $state(false);
 	let huntClaimed = $state(0);
@@ -22,8 +24,6 @@
 			huntLoading = false;
 		}
 	}
-
-	let { data } = $props<{ data: PageData }>();
 
 	// ── State ──────────────────────────────────────────────────────────────
 	let rosters = $state<KeeperRosterData[]>([]);

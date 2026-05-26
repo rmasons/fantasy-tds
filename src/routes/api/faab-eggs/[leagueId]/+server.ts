@@ -8,6 +8,9 @@ export interface EggClaim {
 	claimedAt: string;
 }
 
+const VALID_EGG_IDS = new Set(['1','2','3','4','5','6','7','8','9','10','11','12']);
+const MAX_CLAIMS_PER_USER = 3;
+
 // GET — public; returns all claimed eggs for this league
 export const GET: RequestHandler = async ({ params }) => {
 	const doc = await adminDb.collection('faabEggs').doc(params.leagueId).get();
@@ -20,13 +23,14 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 
 	const body = await request.json().catch(() => null);
 	const eggId = typeof body?.eggId === 'string' ? body.eggId : null;
-	if (!eggId) throw error(400, 'Missing eggId');
+	if (!eggId || !VALID_EGG_IDS.has(eggId)) throw error(400, 'Invalid eggId');
 
 	const { leagueId } = params;
 	const docRef = adminDb.collection('faabEggs').doc(leagueId);
+	const uid = locals.user.sleeperUserId ?? locals.user.uid;
 
 	const claim: EggClaim = {
-		claimedBy: locals.user.sleeperUserId ?? locals.user.uid,
+		claimedBy: uid,
 		displayName: locals.user.sleeperUsername ?? locals.user.email ?? 'Someone',
 		claimedAt: new Date().toISOString(),
 	};
@@ -40,11 +44,22 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 
 		if (data[eggId]) {
 			existingClaim = data[eggId];
-		} else {
-			tx.set(docRef, { [eggId]: claim }, { merge: true });
-			won = true;
+			return;
 		}
+
+		const userClaimCount = Object.values(data).filter(c => c.claimedBy === uid).length;
+		if (userClaimCount >= MAX_CLAIMS_PER_USER) {
+			existingClaim = { claimedBy: uid, displayName: 'you', claimedAt: '' };
+			return;
+		}
+
+		tx.set(docRef, { [eggId]: claim }, { merge: true });
+		won = true;
 	});
+
+	if (!won && existingClaim?.claimedBy === uid && existingClaim.claimedAt === '') {
+		throw error(409, 'Claim limit reached');
+	}
 
 	return json({ won, claim: won ? claim : existingClaim }, { status: won ? 201 : 200 });
 };

@@ -189,6 +189,8 @@ export function computeForSeason(
 		const flexSlots: string[] = [];
 		for (const pos of rosterPositions) {
 			if (pos === 'BN' || pos === 'IR') continue;
+			// IDP_FLEX and K slots are intentionally excluded — optimal score
+			// for kickers/IDP is not tracked by this engine.
 			if (['FLEX', 'WRRB_FLEX', 'REC_FLEX', 'SUPER_FLEX'].includes(pos)) flexSlots.push(pos);
 			else posCounts[pos] = (posCounts[pos] ?? 0) + 1;
 		}

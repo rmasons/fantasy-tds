@@ -59,9 +59,14 @@
 				claimError = 'Sign in to claim.';
 				return;
 			}
+			if (res.status === 409) {
+				claimError = "You've already claimed your max (3). Nice hunting!";
+				return;
+			}
 			const body = await res.json();
 			if (body.won) {
 				localStorage.setItem(STORAGE_KEY, '1');
+				claimsCache.delete(leagueId);
 				status = 'mine';
 				open = true;
 			} else {

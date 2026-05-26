@@ -4,7 +4,7 @@ import { getLeagueConfig, setLeagueConfig, deleteLeagueConfig } from '$lib/serve
 import { fetchRosters, fetchUsers, buildRosterInfoMap } from '$lib/sleeper';
 
 const VALID_NAV_ITEMS = new Set([
-	'standings', 'matchups', 'power-rankings', 'rosters', 'records',
+	'standings', 'matchups', 'power-rankings', 'rosters', 'history',
 	'transactions', 'drafts', 'managers', 'rivalry', 'keepers', 'superlatives', 'blog',
 ]);
 

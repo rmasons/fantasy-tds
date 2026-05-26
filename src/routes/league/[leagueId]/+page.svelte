@@ -185,10 +185,11 @@
 		{ href: 'history',         label: 'Awards & Records', icon: '📊' },
 		{ href: 'transactions',    label: 'Transactions',     icon: '🔄' },
 		{ href: 'drafts',          label: 'Drafts',           icon: '🎯' },
+		{ href: 'superlatives',    label: 'Superlatives',     icon: '🏅' },
 		{ href: 'managers',        label: 'Managers',         icon: '👤' },
 		{ href: 'rivalry',         label: 'Rivalry',          icon: '⚡' },
-		{ href: 'keepers',         label: 'Keepers',          icon: '🔒' },
 		{ href: 'blog',            label: 'Blog',             icon: '📝' },
+		{ href: 'keepers',         label: 'Keepers',          icon: '🔒' },
 	];
 	const navItems = $derived.by(() => {
 		const enabled = data.enabledNavItems;
