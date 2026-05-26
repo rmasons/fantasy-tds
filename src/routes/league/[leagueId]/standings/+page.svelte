@@ -163,7 +163,7 @@
 							<th class="px-4 py-3 text-center">T</th>
 						{/if}
 						<th class="px-4 py-3 text-right">PF</th>
-						<th class="px-4 py-3 text-right">PA<FaabEasterEgg eggId="1" leagueId={data.leagueId} loggedIn={!!data.user} /></th>
+						<th class="px-4 py-3 text-right">PA{#if viewLeagueId === data.leagueId}<FaabEasterEgg eggId="1" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</th>
 						<th class="px-4 py-3 text-center">Streak</th>
 					</tr>
 				</thead>

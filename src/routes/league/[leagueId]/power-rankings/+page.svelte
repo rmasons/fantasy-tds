@@ -563,7 +563,7 @@
 						<th class="px-4 py-3 text-left">Team</th>
 						<th class="px-4 py-3 text-center">Record</th>
 						<th class="px-4 py-3 text-right">Total PF</th>
-						<th class="px-4 py-3 text-right">Score<FaabEasterEgg eggId="5" leagueId={data.leagueId} loggedIn={!!data.user} /></th>
+						<th class="px-4 py-3 text-right">Score{#if viewLeagueId === data.leagueId}<FaabEasterEgg eggId="5" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</th>
 						<th class="px-4 py-3 text-right">Playoff %</th>
 					</tr>
 				</thead>

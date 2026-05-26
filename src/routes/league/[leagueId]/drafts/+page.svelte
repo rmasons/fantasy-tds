@@ -3,7 +3,7 @@
 	import type { SlimPlayer } from '$lib/types';
 	import { onMount } from 'svelte';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
-	import { fetchLeague, fetchLeagueCore, buildRosterInfoMap } from '$lib/sleeper';
+	import { fetchLeague } from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -160,20 +160,18 @@
 		picksError = '';
 
 		try {
-			const [{ rosters, users }, draftsRes] = await Promise.all([
-				fetchLeagueCore(lid),
-				fetch(`/api/drafts?leagueId=${encodeURIComponent(lid)}`),
-			]);
-
+			const draftsRes = await fetch(`/api/drafts?leagueId=${encodeURIComponent(lid)}`);
 			if (viewLeagueId !== lid) return;
-
-			const rInfo = buildRosterInfoMap(rosters, users);
-			viewRosterNames = new Map([...rInfo.entries()].map(([k, v]) => [k, v.teamName]));
 
 			const body = await draftsRes.json();
 			if (viewLeagueId !== lid) return;
 
-			viewDrafts = ((body.drafts ?? []) as any[])
+			// body.drafts is DraftListPayload = { drafts: any[], rosterInfo: Record<string, string> }
+			const payload = body.drafts ?? {};
+			viewRosterNames = new Map(
+				Object.entries(payload.rosterInfo ?? {}).map(([k, v]) => [Number(k), v as string])
+			);
+			viewDrafts = ((payload.drafts ?? []) as any[])
 				.filter((d: any) => d.status === 'complete')
 				.sort((a: any, b: any) => parseInt(b.season, 10) - parseInt(a.season, 10));
 
@@ -343,7 +341,7 @@
 					<table class="text-xs border-collapse w-max">
 						<thead>
 							<tr class="bg-navy-900">
-								<th class="px-2 py-2 text-navy-500 text-left font-semibold w-12 border-b border-navy-700 uppercase tracking-wider text-[10px]">Rd<FaabEasterEgg eggId="6" leagueId={data.leagueId} loggedIn={!!data.user} /></th>
+								<th class="px-2 py-2 text-navy-500 text-left font-semibold w-12 border-b border-navy-700 uppercase tracking-wider text-[10px]">Rd{#if viewLeagueId === data.leagueId}<FaabEasterEgg eggId="6" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</th>
 								{#each slots as [, rid]}
 									<th class="px-2 py-2 text-navy-500 font-semibold border-b border-navy-700 min-w-[120px] max-w-[150px] uppercase tracking-wider text-[10px]">
 										<span class="truncate block">{draft.rosterNames.get(rid) ?? `T${rid}`}</span>

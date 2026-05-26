@@ -54,10 +54,8 @@
 
 	let view = $state<'weekly' | 'bracket'>('weekly');
 	let bracketSeasons = $state<SeasonBracket[]>([]);
-	let bracketSelectedIdx = $state(0);
 	let bracketLoading = $state(false);
 	let bracketLoaded = $state(false);
-	let bracketLoadingStatus = $state('');
 	let playoffStart = $state(15);
 
 	let seasons = $state<SeasonEntry[]>([]);
@@ -80,8 +78,6 @@
 		view = 'weekly';
 		bracketLoaded = false;
 		bracketSeasons = [];
-		bracketSelectedIdx = 0;
-		bracketLoadingStatus = '';
 		userMap = new Map();
 		savedOverrides = new Map();
 		bracketStartLeagueId = '';
@@ -114,7 +110,6 @@
 		view = 'weekly';
 		bracketLoaded = false;
 		bracketSeasons = [];
-		bracketSelectedIdx = 0;
 		userMap = new Map();
 		savedOverrides = new Map();
 		bracketStartLeagueId = '';
@@ -132,9 +127,8 @@
 			const pType = league.settings?.playoff_round_type ?? 0;
 			regularSeasonLength = playoffStart - 1;
 
-			const prevId = league.previous_league_id ?? '';
 			if (league.status === 'pre_draft' || league.status === 'drafting') {
-				bracketStartLeagueId = (prevId && prevId !== '0') ? prevId : '';
+				bracketStartLeagueId = '';
 			} else {
 				bracketStartLeagueId = lid;
 			}
@@ -215,99 +209,85 @@
 		if (!bracketStartLeagueId) { view = 'bracket'; return; }
 
 		bracketLoading = true;
-		bracketLoadingStatus = 'Fetching league history…';
 		const viewLid = viewLeagueId;
+		const lid = bracketStartLeagueId;
 
 		try {
-			let curId: string | null = bracketStartLeagueId;
+			const [{ league, rosters, users }, winnersData, losersData] = await Promise.all([
+				fetchLeagueCore(lid),
+				fetchWinnersBracket(lid),
+				fetchLosersBracket(lid),
+			]);
 
-			while (curId && curId !== '0') {
-				const lid = curId;
-				if (viewLeagueId !== viewLid) return;
+			if (viewLeagueId !== viewLid) return;
 
-				const [{ league, rosters, users }, winnersData, losersData] = await Promise.all([
-					fetchLeagueCore(lid),
-					fetchWinnersBracket(lid),
-					fetchLosersBracket(lid),
-				]);
+			const rosterInfo = buildRosterInfoMap(rosters, users, savedOverrides);
+			const pStart = league.settings?.playoff_week_start ?? 15;
+			const pType = league.settings?.playoff_round_type ?? 0;
+			const pTeams = league.settings?.playoff_teams ?? 4;
+			const nRounds = Math.ceil(Math.log2(Math.max(pTeams, 2)));
+			const wpr = pType === 2 ? 2 : 1;
 
-				if (viewLeagueId !== viewLid) return;
-				bracketLoadingStatus = `Loading ${league.season}…`;
-
-				const rosterInfo = buildRosterInfoMap(rosters, users, savedOverrides);
-				const pStart = league.settings?.playoff_week_start ?? 15;
-				const pType = league.settings?.playoff_round_type ?? 0;
-				const pTeams = league.settings?.playoff_teams ?? 4;
-				const nRounds = Math.ceil(Math.log2(Math.max(pTeams, 2)));
-				const wpr = pType === 2 ? 2 : 1;
-
-				const playoffWeeks: number[] = [];
-				for (let r = 0; r < nRounds; r++) {
-					for (let w = 0; w < wpr; w++) {
-						playoffWeeks.push(pStart + r * wpr + w);
-					}
+			const playoffWeeks: number[] = [];
+			for (let r = 0; r < nRounds; r++) {
+				for (let w = 0; w < wpr; w++) {
+					playoffWeeks.push(pStart + r * wpr + w);
 				}
-
-				const weekDataArr = await Promise.all(
-					playoffWeeks.map(w => fetchWeekMatchups(lid, w).catch(() => []))
-				);
-				if (viewLeagueId !== viewLid) return;
-
-				const weekPoints = new Map<number, Map<number, number>>();
-				for (let i = 0; i < playoffWeeks.length; i++) {
-					const rp = new Map<number, number>();
-					for (const m of weekDataArr[i] ?? []) rp.set(m.roster_id, m.points ?? 0);
-					weekPoints.set(playoffWeeks[i], rp);
-				}
-
-				function getPoints(rosterId: number, round: number): number | null {
-					const week = pStart + (round - 1);
-					const pts = weekPoints.get(week)?.get(rosterId) ?? null;
-					if (pts === null) return null;
-					if (pType === 2) return pts + (weekPoints.get(week + 1)?.get(rosterId) ?? 0);
-					return pts;
-				}
-
-				function teamSide(rosterId: number | null, winnerId: number | null, round: number): BracketSide {
-					const info = rosterId ? rosterInfo.get(rosterId) : null;
-					return {
-						rosterId,
-						teamName: info?.teamName ?? (rosterId ? `Team ${rosterId}` : null),
-						avatar: info?.avatar ?? null,
-						points: rosterId ? getPoints(rosterId, round) : null,
-						won: !!rosterId && rosterId === winnerId,
-						bye: !rosterId,
-					};
-				}
-
-				function processBracket(raw: any[], losers: boolean): BracketMatch[][] {
-					if (!raw?.length) return [];
-					const maxR = Math.max(...raw.map((m: any) => m.r));
-					const byRound: BracketMatch[][] = [];
-					for (let r = 1; r <= maxR; r++) {
-						byRound.push(
-							raw.filter((e: any) => e.r === r).map((e: any) => ({
-								round: r,
-								matchId: e.m,
-								t1: teamSide(e.t1 ?? null, e.w ?? null, r),
-								t2: teamSide(e.t2 ?? null, e.w ?? null, r),
-								label: roundLabel(r, maxR, e, losers),
-							}))
-						);
-					}
-					return byRound;
-				}
-
-				const winnersRounds = processBracket(winnersData, false);
-				const losersRounds = processBracket(losersData, true);
-
-				if (winnersRounds.length > 0) {
-					bracketSeasons = [...bracketSeasons, { season: league.season, leagueId: lid, winnersRounds, losersRounds }];
-				}
-
-				curId = league.previous_league_id ?? null;
 			}
 
+			const weekDataArr = await Promise.all(
+				playoffWeeks.map(w => fetchWeekMatchups(lid, w).catch(() => []))
+			);
+			if (viewLeagueId !== viewLid) return;
+
+			const weekPoints = new Map<number, Map<number, number>>();
+			for (let i = 0; i < playoffWeeks.length; i++) {
+				const rp = new Map<number, number>();
+				for (const m of weekDataArr[i] ?? []) rp.set(m.roster_id, m.points ?? 0);
+				weekPoints.set(playoffWeeks[i], rp);
+			}
+
+			function getPoints(rosterId: number, round: number): number | null {
+				const week = pStart + (round - 1);
+				const pts = weekPoints.get(week)?.get(rosterId) ?? null;
+				if (pts === null) return null;
+				if (pType === 2) return pts + (weekPoints.get(week + 1)?.get(rosterId) ?? 0);
+				return pts;
+			}
+
+			function teamSide(rosterId: number | null, winnerId: number | null, round: number): BracketSide {
+				const info = rosterId ? rosterInfo.get(rosterId) : null;
+				return {
+					rosterId,
+					teamName: info?.teamName ?? (rosterId ? `Team ${rosterId}` : null),
+					avatar: info?.avatar ?? null,
+					points: rosterId ? getPoints(rosterId, round) : null,
+					won: !!rosterId && rosterId === winnerId,
+					bye: !rosterId,
+				};
+			}
+
+			function processBracket(raw: any[], losers: boolean): BracketMatch[][] {
+				if (!raw?.length) return [];
+				const maxR = Math.max(...raw.map((m: any) => m.r));
+				const byRound: BracketMatch[][] = [];
+				for (let r = 1; r <= maxR; r++) {
+					byRound.push(
+						raw.filter((e: any) => e.r === r).map((e: any) => ({
+							round: r,
+							matchId: e.m,
+							t1: teamSide(e.t1 ?? null, e.w ?? null, r),
+							t2: teamSide(e.t2 ?? null, e.w ?? null, r),
+							label: roundLabel(r, maxR, e, losers),
+						}))
+					);
+				}
+				return byRound;
+			}
+
+			const winnersRounds = processBracket(winnersData, false);
+			const losersRounds = processBracket(losersData, true);
+			bracketSeasons = [{ season: league.season, leagueId: lid, winnersRounds, losersRounds }];
 			bracketLoaded = true;
 		} catch (e: any) {
 			if (viewLeagueId !== viewLid) return;
@@ -320,7 +300,7 @@
 	}
 
 	const weekMatchups = $derived(allMatchups[selectedWeek] ?? []);
-	const bracketSeason = $derived(bracketSeasons[bracketSelectedIdx]);
+	const bracketSeason = $derived(bracketSeasons[0]);
 
 	function weekLabel(week: number): string {
 		return week <= regularSeasonLength
@@ -363,7 +343,7 @@
 				class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
 				       {view === 'bracket' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
 			>
-				{bracketLoading ? 'Loading…' : 'Bracket'}<FaabEasterEgg eggId="4" leagueId={data.leagueId} loggedIn={!!data.user} />
+				{bracketLoading ? 'Loading…' : 'Bracket'}{#if viewLeagueId === data.leagueId}<FaabEasterEgg eggId="4" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}
 			</button>
 		</div>
 
@@ -476,27 +456,10 @@
 				{#each Array(3) as _}
 					<div class="h-12 bg-navy-850 rounded-lg animate-pulse"></div>
 				{/each}
-				<p class="text-navy-500 text-sm">{bracketLoadingStatus}</p>
 			</div>
 		{:else if bracketSeasons.length === 0}
 			<p class="text-navy-500">No bracket data available for this season.</p>
 		{:else}
-			<!-- Season tabs -->
-			<div class="flex mb-6 border-b border-navy-700 flex-wrap">
-				{#each bracketSeasons as s, i}
-					<button
-						onclick={() => (bracketSelectedIdx = i)}
-						class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
-						       {bracketSelectedIdx === i ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
-					>
-						{s.season}
-					</button>
-				{/each}
-				{#if bracketLoading}
-					<span class="px-4 py-2.5 text-xs text-navy-500 italic self-center">{bracketLoadingStatus}</span>
-				{/if}
-			</div>
-
 			{#if bracketSeason}
 				{#snippet bracketSection(rounds: BracketMatch[][], title: string, finalIcon: string)}
 					{#if rounds.length > 0}

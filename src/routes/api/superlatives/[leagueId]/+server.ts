@@ -1,14 +1,14 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '$lib/firebase/admin';
 import {
 	fetchLeague,
 	fetchRosters,
 	fetchUsers,
-	fetchMatchups,
-	fetchTransactions,
 	buildRosterInfoMap,
 } from '$lib/sleeper';
+import { getCachedMatchups, getCachedTransactions } from '$lib/server/sleeperCache';
 import { computeForSeason } from '$lib/superlativesEngine';
 import { getPlayers } from '$lib/server/players';
 
@@ -22,9 +22,7 @@ export interface StoredAwardEntry {
 // Document shape: superlativeHistory/{leagueId}
 // { seasons: { "2024": { big_hairy: { teamName, stat, sub? }, ... }, ... } }
 
-export const GET: RequestHandler = async ({ params, locals }) => {
-	if (!locals.user) throw error(401, 'Unauthorized');
-
+export const GET: RequestHandler = async ({ params }) => {
 	const { leagueId } = params;
 
 	// Try the current leagueId first, then fall back one hop for new-season transitions.
@@ -141,8 +139,8 @@ export const PUT: RequestHandler = async ({ params, locals }) => {
 		const weeks = Array.from({ length: weeksToFetch }, (_, i) => i + 1);
 
 		const [matchupWeeks, txWeeks] = await Promise.all([
-			Promise.all(weeks.map(w => fetchMatchups(league.league_id, w).catch(() => []))),
-			Promise.all(weeks.map(w => fetchTransactions(league.league_id, w).catch(() => []))),
+			Promise.all(weeks.map(w => getCachedMatchups(league.league_id, w).catch(() => []))),
+			Promise.all(weeks.map(w => getCachedTransactions(league.league_id, w).catch(() => []))),
 		]);
 
 		const computed = computeForSeason(league, rosters, rosterInfoMap, matchupWeeks, txWeeks, playersData);
@@ -178,4 +176,22 @@ export const PUT: RequestHandler = async ({ params, locals }) => {
 	}
 
 	return json({ ok: true, seasons: report });
+};
+
+// DELETE — admin only: remove a single season's data from Firestore.
+export const DELETE: RequestHandler = async ({ params, request, locals }) => {
+	if (!locals.user) throw error(401, 'Unauthorized');
+	if (!locals.user.isAdmin) throw error(403, 'Forbidden');
+
+	const { leagueId } = params;
+	const body = await request.json().catch(() => null);
+
+	if (!body || typeof body.season !== 'string' || !/^\d{4}$/.test(body.season)) {
+		throw error(400, 'Body must be { season: "YYYY" }');
+	}
+
+	const docRef = adminDb.collection('superlativeHistory').doc(leagueId);
+	await docRef.update({ [`seasons.${body.season}`]: FieldValue.delete() });
+
+	return json({ ok: true, deleted: body.season });
 };
