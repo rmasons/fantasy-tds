@@ -23,12 +23,6 @@
 		{ href: 'keepers',         label: 'Keepers'         },
 	];
 
-	function currentSubPath(): string {
-		const parts = page.url.pathname.split('/');
-		const sub = parts.slice(3).join('/');
-		return sub;
-	}
-
 	onMount(async () => {
 		const res = await fetch(`https://api.sleeper.app/v1/league/${leagueId}`);
 		if (!res.ok) return;
