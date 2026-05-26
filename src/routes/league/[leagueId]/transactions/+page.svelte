@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { LayoutData } from '../$types';
 	import type { SlimPlayer } from '$lib/types';
-	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
+
 	import { fetchLeagueCore, fetchNflState, fetchTransactions as fetchWeekTransactions, buildRosterInfoMap, fetchDisplayNameOverrides, type RosterInfo } from '$lib/sleeper';
 
 	let { data } = $props<{ data: LayoutData }>();
@@ -149,7 +149,7 @@
 				class="flex items-center gap-1.5 px-4 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
 				       {filter === f ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
 			>
-				{f === 'all' ? 'All' : f === 'free_agent' ? 'FA' : f.charAt(0).toUpperCase() + f.slice(1)}{#if f === 'free_agent'}<FaabEasterEgg eggId="6" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}
+				{f === 'all' ? 'All' : f === 'free_agent' ? 'FA' : f.charAt(0).toUpperCase() + f.slice(1)}
 				{#if !loading && counts[f] > 0}
 					<span class="text-[10px] font-mono rounded px-1 py-0.5
 					             {filter === f ? 'bg-amber-400/15 text-amber-400' : 'bg-navy-800 text-navy-500'}">

@@ -182,7 +182,7 @@
 		{ href: 'matchups',        label: 'Matchups',         icon: '⚔️' },
 		{ href: 'power-rankings',  label: 'Power Rankings',   icon: '📈' },
 		{ href: 'rosters',         label: 'Rosters',          icon: '📋' },
-		{ href: 'records',         label: 'Records',          icon: '📊' },
+		{ href: 'history',         label: 'Awards & Records', icon: '📊' },
 		{ href: 'transactions',    label: 'Transactions',     icon: '🔄' },
 		{ href: 'drafts',          label: 'Drafts',           icon: '🎯' },
 		{ href: 'managers',        label: 'Managers',         icon: '👤' },
@@ -264,7 +264,7 @@
 	<!-- Reigning Champion banner -->
 	{#if champion}
 		<a
-			href="/league/{data.leagueId}/records"
+			href="/league/{data.leagueId}/history"
 			class="group relative flex items-center gap-4 rounded-xl overflow-hidden mb-4
 			       border border-amber-500/25 hover:border-amber-400/40 transition-colors"
 		>

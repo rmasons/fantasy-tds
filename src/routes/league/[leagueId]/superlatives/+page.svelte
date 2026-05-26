@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { LayoutData } from '../$types';
 	import type { SlimPlayer } from '$lib/types';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 	import {
 		fetchLeagueCore,
 		fetchNflState,
@@ -214,7 +215,7 @@
 		</div>
 	{:else}
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-			{#each superlatives as s (s.key)}
+			{#each superlatives as s, si (s.key)}
 				<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden flex flex-col">
 
 					<!-- Award title at top -->
@@ -223,7 +224,7 @@
 							<span class="text-2xl leading-none shrink-0 mt-0.5">{s.emoji}</span>
 							<div>
 								<p class="font-sport font-black uppercase tracking-wide text-amber-400 text-xl leading-tight">{s.title}</p>
-								<p class="text-[10px] text-navy-500 uppercase tracking-widest mt-0.5 leading-snug">{s.desc}</p>
+								<p class="text-[10px] text-navy-500 uppercase tracking-widest mt-0.5 leading-snug">{s.desc}{#if si === superlatives.length - 1}<FaabEasterEgg eggId="8" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</p>
 							</div>
 						</div>
 					</div>

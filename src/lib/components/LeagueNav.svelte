@@ -23,7 +23,7 @@
 		{ href: 'matchups',        label: 'Matchups'        },
 		{ href: 'power-rankings',  label: 'Power Rankings'  },
 		{ href: 'rosters',         label: 'Rosters'         },
-		{ href: 'records',         label: 'Records'         },
+		{ href: 'history',         label: 'Awards & Records' },
 		{ href: 'transactions',    label: 'Transactions'    },
 		{ href: 'drafts',          label: 'Drafts'          },
 		{ href: 'superlatives',    label: 'Superlatives'    },
@@ -100,7 +100,7 @@
 	const bottomTabDefs = [
 		{ href: 'standings', label: 'Standings', emoji: '🏆' },
 		{ href: 'matchups',  label: 'Matchups',  emoji: '⚔️' },
-		{ href: 'records',   label: 'Records',   emoji: '📊' },
+		{ href: 'history',   label: 'Records',   emoji: '📊' },
 		{ href: 'rosters',   label: 'Rosters',   emoji: '📋' },
 	];
 	const bottomTabs = $derived(

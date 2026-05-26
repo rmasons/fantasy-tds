@@ -74,7 +74,7 @@
 		{ href: 'matchups',        label: 'Matchups'        },
 		{ href: 'power-rankings',  label: 'Power Rankings'  },
 		{ href: 'rosters',         label: 'Rosters'         },
-		{ href: 'records',         label: 'Records'         },
+		{ href: 'history',         label: 'Awards & Records' },
 		{ href: 'transactions',    label: 'Transactions'    },
 		{ href: 'drafts',          label: 'Drafts'          },
 		{ href: 'managers',        label: 'Managers'        },
