@@ -1,6 +1,9 @@
 import { adminDb } from '$lib/firebase/admin';
 import type { SlimPlayer } from '$lib/types';
 
+// Bump when SlimPlayer shape changes to invalidate the Firestore cache.
+const SCHEMA_VERSION = 2;
+
 let memCache: Record<string, SlimPlayer> | null = null;
 let memCacheDate = '';
 
@@ -25,6 +28,7 @@ async function fetchAndSlimFromSleeper(): Promise<Record<string, SlimPlayer>> {
 					pos: p.position ?? '?',
 					team: p.team ?? 'FA',
 					yearsExp: p.years_exp ?? 0,
+					...(p.number != null ? { number: p.number } : {}),
 				} satisfies SlimPlayer,
 			])
 	);
@@ -41,7 +45,7 @@ export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
 		const doc = await docRef.get();
 		if (doc.exists) {
 			const cached = doc.data()!;
-			if (cached.cachedDate === date) {
+			if (cached.cachedDate === date && cached.schemaVersion === SCHEMA_VERSION) {
 				memCache = JSON.parse(cached.data);
 				memCacheDate = date;
 				return memCache!;
@@ -55,7 +59,7 @@ export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
 	const jsonStr = JSON.stringify(slim);
 	console.log(`[players] Cache payload size: ${(jsonStr.length / 1024).toFixed(1)} KB`);
 	try {
-		await docRef.set({ data: jsonStr, cachedDate: date });
+		await docRef.set({ data: jsonStr, cachedDate: date, schemaVersion: SCHEMA_VERSION });
 	} catch (e) {
 		console.error('[players] Failed to write to Firestore:', e);
 	}

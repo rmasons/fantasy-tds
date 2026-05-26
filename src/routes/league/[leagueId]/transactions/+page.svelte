@@ -108,6 +108,9 @@
 	function playerPos(id: string) {
 		return players[id]?.pos ?? '?';
 	}
+	function playerNumber(id: string): number | undefined {
+		return players[id]?.number;
+	}
 
 	const typeLabel: Record<string, string> = { trade: 'Trade', waiver: 'Waiver', free_agent: 'Free Agent' };
 	const typeBadge: Record<string, string> = {
@@ -199,6 +202,9 @@
 										<div class="flex items-center gap-1.5 text-sm mb-0.5">
 											<span class="text-[10px] w-6 text-center text-navy-500 shrink-0 font-medium">{playerPos(move.player!)}</span>
 											<span class="text-slate-200 truncate">{playerName(move.player!)}</span>
+											{#if playerNumber(move.player!) != null}
+												<span class="text-[10px] text-navy-500 shrink-0 font-mono">#{playerNumber(move.player!)}</span>
+											{/if}
 										</div>
 									{/each}
 									{#each side.picks as pick}
@@ -230,6 +236,9 @@
 										<span class="text-green-500 text-xs w-3">+</span>
 										<span class="text-xs text-slate-600 w-5">{playerPos(move.player)}</span>
 										<span class="text-slate-200">{playerName(move.player)}</span>
+										{#if playerNumber(move.player) != null}
+											<span class="text-[10px] text-navy-500 font-mono">#{playerNumber(move.player)}</span>
+										{/if}
 										<span class="text-xs text-slate-500 ml-auto">{rosterInfoMap.get(move.rosterId)?.teamName}</span>
 									</div>
 								{:else if move.type === 'drop' && move.player}
@@ -237,6 +246,9 @@
 										<span class="text-red-500 text-xs w-3">−</span>
 										<span class="text-xs text-slate-600 w-5">{playerPos(move.player)}</span>
 										<span class="text-slate-400">{playerName(move.player)}</span>
+										{#if playerNumber(move.player) != null}
+											<span class="text-[10px] text-navy-500 font-mono">#{playerNumber(move.player)}</span>
+										{/if}
 										<span class="text-xs text-slate-500 ml-auto">{rosterInfoMap.get(move.rosterId)?.teamName}</span>
 									</div>
 								{/if}

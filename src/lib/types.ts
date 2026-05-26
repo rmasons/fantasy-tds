@@ -40,6 +40,7 @@ export interface SlimPlayer {
 	pos: string;
 	team: string;
 	yearsExp: number; // NFL years of experience (0 = rookie)
+	number?: number;  // jersey number; absent for DEF/ST and some inactive players
 }
 
 export interface SleeperNflState {
