@@ -110,6 +110,11 @@
 		}
 	});
 
+	function nflLogoUrl(team: string): string | null {
+		if (!team || team === 'FA' || team === '?') return null;
+		return `https://sleepercdn.com/images/team_logos/nfl/${team.toLowerCase()}.png`;
+	}
+
 	const posColor: Record<string, string> = {
 		QB: 'border-l-red-500',
 		RB: 'border-l-green-500',
@@ -197,6 +202,9 @@
 									<div class="flex items-center gap-2 px-3 py-2 border-l-2 {pc(pick.pos)}">
 										<span class="text-xs text-slate-500 w-6 text-right shrink-0">${pick.amount}</span>
 										<span class="text-xs font-bold text-slate-400 w-6 shrink-0">{pick.pos}</span>
+										{#if nflLogoUrl(pick.nflTeam)}
+											<img src={nflLogoUrl(pick.nflTeam)} alt={pick.nflTeam} class="w-4 h-4 shrink-0 object-contain" />
+										{/if}
 										<span class="text-sm text-slate-200 truncate">{pick.playerName}</span>
 									</div>
 								{/each}
@@ -233,7 +241,12 @@
 										{#if pick}
 											<td class="px-2 py-1.5 border-l-2 {pc(pick.pos)}">
 												<p class="text-slate-200 truncate font-medium">{pick.playerName}</p>
-												<p class="text-navy-500">{pick.pos} · {pick.nflTeam}</p>
+												<p class="flex items-center gap-1 text-navy-500">
+													{#if nflLogoUrl(pick.nflTeam)}
+														<img src={nflLogoUrl(pick.nflTeam)} alt={pick.nflTeam} class="w-3.5 h-3.5 object-contain shrink-0" />
+													{/if}
+													{pick.pos} · {pick.nflTeam}
+												</p>
 											</td>
 										{:else}
 											<td class="px-2 py-1.5 text-navy-700">—</td>

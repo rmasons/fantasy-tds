@@ -111,6 +111,11 @@
 	function playerNumber(id: string): number | undefined {
 		return players[id]?.number;
 	}
+	function teamLogoUrl(id: string): string | null {
+		const team = players[id]?.team;
+		if (!team || team === 'FA' || team === '?') return null;
+		return `https://sleepercdn.com/images/team_logos/nfl/${team.toLowerCase()}.png`;
+	}
 
 	const typeLabel: Record<string, string> = { trade: 'Trade', waiver: 'Waiver', free_agent: 'Free Agent' };
 	const typeBadge: Record<string, string> = {
@@ -201,6 +206,9 @@
 									{#each side.players as move}
 										<div class="flex items-center gap-1.5 text-sm mb-0.5">
 											<span class="text-[10px] w-6 text-center text-navy-500 shrink-0 font-medium">{playerPos(move.player!)}</span>
+											{#if teamLogoUrl(move.player!)}
+												<img src={teamLogoUrl(move.player!)} alt="" class="w-4 h-4 shrink-0 object-contain" />
+											{/if}
 											<span class="text-slate-200 truncate">{playerName(move.player!)}</span>
 											{#if playerNumber(move.player!) != null}
 												<span class="text-[10px] text-navy-500 shrink-0 font-mono">#{playerNumber(move.player!)}</span>
@@ -235,6 +243,9 @@
 									<div class="flex items-center gap-2 text-sm">
 										<span class="text-green-500 text-xs w-3">+</span>
 										<span class="text-xs text-slate-600 w-5">{playerPos(move.player)}</span>
+										{#if teamLogoUrl(move.player)}
+											<img src={teamLogoUrl(move.player)} alt="" class="w-4 h-4 shrink-0 object-contain" />
+										{/if}
 										<span class="text-slate-200">{playerName(move.player)}</span>
 										{#if playerNumber(move.player) != null}
 											<span class="text-[10px] text-navy-500 font-mono">#{playerNumber(move.player)}</span>
@@ -245,6 +256,9 @@
 									<div class="flex items-center gap-2 text-sm">
 										<span class="text-red-500 text-xs w-3">−</span>
 										<span class="text-xs text-slate-600 w-5">{playerPos(move.player)}</span>
+										{#if teamLogoUrl(move.player)}
+											<img src={teamLogoUrl(move.player)} alt="" class="w-4 h-4 shrink-0 object-contain" />
+										{/if}
 										<span class="text-slate-400">{playerName(move.player)}</span>
 										{#if playerNumber(move.player) != null}
 											<span class="text-[10px] text-navy-500 font-mono">#{playerNumber(move.player)}</span>
