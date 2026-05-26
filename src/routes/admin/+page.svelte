@@ -8,7 +8,7 @@
 
 	function configureLeague() {
 		const id = newLeagueId.trim();
-		if (id) goto(`/admin/leagues/${id}`);
+		if (id) goto(`/league/${id}/admin`);
 	}
 
 	const leagueIds = $derived(Object.keys(data.leagueConfigs).sort());
@@ -69,10 +69,10 @@
 							</p>
 						</div>
 						<a
-							href="/admin/leagues/{id}"
+							href="/league/{id}/admin"
 							class="shrink-0 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-slate-300 hover:text-white transition-colors"
 						>
-							Edit
+							Admin
 						</a>
 					</div>
 				{/each}
@@ -84,7 +84,7 @@
 	<section>
 		<h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Configure a League</h2>
 		<div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-			<p class="text-xs text-slate-500 mb-3">Enter a Sleeper league ID to open its config.</p>
+			<p class="text-xs text-slate-500 mb-3">Enter a Sleeper league ID to open its admin page.</p>
 			<div class="flex gap-3">
 				<input
 					type="text"
@@ -98,7 +98,7 @@
 					disabled={!newLeagueId.trim()}
 					class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-sm font-medium text-white transition-colors"
 				>
-					Configure →
+					Go →
 				</button>
 			</div>
 		</div>

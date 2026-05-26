@@ -1,9 +1,29 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { KeeperPlayerData, KeeperRosterData, KeeperSelection } from '$lib/server/keepers';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 	import { onMount } from 'svelte';
 
 	let { data } = $props<{ data: PageData }>();
+
+	const TOTAL_EGGS = 12;
+	let huntOpen = $state(false);
+	let huntClaimed = $state(0);
+	let huntLoading = $state(false);
+
+	async function openHunt() {
+		huntOpen = true;
+		if (huntLoading || huntClaimed > 0) return;
+		huntLoading = true;
+		try {
+			const res = await fetch(`/api/faab-eggs/${data.leagueId}`);
+			if (res.ok) huntClaimed = Object.keys(await res.json()).length;
+		} catch {
+			// fail silently — count is non-critical
+		} finally {
+			huntLoading = false;
+		}
+	}
 
 	// ── State ──────────────────────────────────────────────────────────────
 	let rosters = $state<KeeperRosterData[]>([]);
@@ -288,11 +308,15 @@
 				</p>
 			{/if}
 			<p class="text-xs text-slate-600 mt-1 font-mono whitespace-nowrap">
-				salary = base × (1 + (0.20 × (years kept + 1)))
+				salary = base × (1 + (0.20 × (years kept + 1)))<FaabEasterEgg eggId="3" leagueId={data.leagueId} loggedIn={!!data.user} />
 			</p>
 		</div>
 
 		<div class="flex items-center gap-2 flex-wrap">
+			<button
+				onclick={openHunt}
+				class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-400/40 bg-amber-400/10 text-amber-400 text-xs font-bold uppercase tracking-wide hover:bg-amber-400/20 hover:border-amber-400 transition-colors"
+			>💰 FAAB Hunt</button>
 			{#if data.user?.isAdmin}
 				<label class="flex items-center gap-2 text-sm text-slate-400 cursor-pointer select-none">
 					<input
@@ -633,6 +657,34 @@
 					Close
 				</button>
 			</div>
+		</div>
+	</div>
+{/if}
+
+{#if huntOpen}
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(0,0,0,0.85);backdrop-filter:blur(4px)">
+		<div class="bg-navy-850 border border-amber-500/30 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+			<div class="text-4xl mb-4 text-center">💰</div>
+			<h2 class="font-sport font-black text-2xl uppercase text-amber-400 text-center leading-tight mb-1">FAAB Hunt</h2>
+			<p class="text-center text-navy-500 text-xs uppercase tracking-widest font-semibold mb-6">
+				{#if huntLoading}
+					Loading…
+				{:else}
+					{huntClaimed} / {TOTAL_EGGS} claimed · {TOTAL_EGGS - huntClaimed} remaining
+				{/if}
+			</p>
+
+			<div class="space-y-3 mb-7 text-sm text-slate-300 leading-relaxed text-center">
+				<p>We've hidden <span class="text-amber-400 font-bold">{TOTAL_EGGS} secret $5 FAAB bonuses</span> across the site.</p>
+				<p>When you find the <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-amber-400/50 bg-amber-400/10 text-amber-400 text-[10px] font-bold uppercase">💰 $5</span> badge, click it to claim your bonus.</p>
+				<p>Take a screenshot of the <span class="font-semibold text-white">Congratulations</span> screen and send it to the league group text to collect.</p>
+				<p class="text-navy-500 text-xs">Each bonus can only be claimed once — first come, first served. You must be signed in to claim. Maximum of 3 per person.</p>
+			</div>
+
+			<button
+				onclick={() => { huntOpen = false; }}
+				class="w-full py-3 bg-amber-500 hover:bg-amber-400 text-navy-950 font-sport font-bold uppercase tracking-wide rounded-xl transition-colors text-sm"
+			>Let's Hunt!</button>
 		</div>
 	</div>
 {/if}

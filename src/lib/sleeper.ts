@@ -94,6 +94,10 @@ export function fetchLeague(leagueId: string): Promise<SleeperLeague> {
 	return sleeperGet(`${BASE}/league/${leagueId}`);
 }
 
+export function fetchUser(username: string): Promise<import('./types').SleeperUser> {
+	return sleeperGet(`${BASE}/user/${username}`);
+}
+
 export function fetchRosters(leagueId: string): Promise<SleeperRoster[]> {
 	return sleeperGet(`${BASE}/league/${leagueId}/rosters`);
 }

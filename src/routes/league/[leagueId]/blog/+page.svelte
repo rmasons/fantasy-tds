@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -73,7 +74,7 @@
 				onclick={() => (filterType = '')}
 				class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
 				       {filterType === '' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
-			>All</button>
+			>All<FaabEasterEgg eggId="11" leagueId={data.leagueId} loggedIn={!!data.user} /></button>
 			{#each categories as cat}
 				<button
 					onclick={() => (filterType = cat)}

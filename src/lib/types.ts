@@ -53,6 +53,8 @@ export interface SleeperRoster {
 	roster_id: number;
 	owner_id: string;
 	co_owners: string[] | null;
+	players: string[] | null;   // all rostered player IDs
+	reserve: string[] | null;   // IR slot player IDs
 	settings: {
 		wins: number;
 		losses: number;

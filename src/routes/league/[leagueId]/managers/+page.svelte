@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import { fetchRosters, fetchUsers, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
 	import type { ManagerProfile } from '$lib/types';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -135,5 +136,6 @@
 				</a>
 			{/each}
 		</div>
+		<p class="mt-3 text-right text-[10px] text-navy-800 select-none">sorted by all-time record<FaabEasterEgg eggId="10" leagueId={data.leagueId} loggedIn={!!data.user} /></p>
 	{/if}
 </div>

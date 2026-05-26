@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { SleeperLeague, SleeperNflState } from '$lib/types';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 	import {
 		fetchLeague, fetchNflState, fetchUsers, fetchRosters, fetchWinnersBracket,
 		buildRosterInfoMap, fetchDisplayNameOverrides, fetchLeagueCore, fetchMatchups, combineFpts,
@@ -181,14 +182,14 @@
 		{ href: 'matchups',        label: 'Matchups',         icon: '⚔️' },
 		{ href: 'power-rankings',  label: 'Power Rankings',   icon: '📈' },
 		{ href: 'rosters',         label: 'Rosters',          icon: '📋' },
-		{ href: 'records',         label: 'Records',          icon: '📊' },
+		{ href: 'history',         label: 'Awards & Records', icon: '📊' },
 		{ href: 'transactions',    label: 'Transactions',     icon: '🔄' },
 		{ href: 'drafts',          label: 'Drafts',           icon: '🎯' },
-		{ href: 'awards',          label: 'Awards',           icon: '🥇' },
+		{ href: 'superlatives',    label: 'Superlatives',     icon: '🏅' },
 		{ href: 'managers',        label: 'Managers',         icon: '👤' },
 		{ href: 'rivalry',         label: 'Rivalry',          icon: '⚡' },
-		{ href: 'keepers',         label: 'Keepers',          icon: '🔒' },
 		{ href: 'blog',            label: 'Blog',             icon: '📝' },
+		{ href: 'keepers',         label: 'Keepers',          icon: '🔒' },
 	];
 	const navItems = $derived.by(() => {
 		const enabled = data.enabledNavItems;
@@ -264,7 +265,7 @@
 	<!-- Reigning Champion banner -->
 	{#if champion}
 		<a
-			href="/league/{data.leagueId}/awards"
+			href="/league/{data.leagueId}/history"
 			class="group relative flex items-center gap-4 rounded-xl overflow-hidden mb-4
 			       border border-amber-500/25 hover:border-amber-400/40 transition-colors"
 		>
@@ -328,7 +329,7 @@
 	{:else if weekMatchups.length > 0}
 		<div class="mb-6">
 			<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2">
-				<span class="text-amber-400">◆</span>Week {nflState?.week} Matchups
+				<span class="text-amber-400">◆</span>Week {nflState?.week} Matchups<FaabEasterEgg eggId="12" leagueId={data.leagueId} loggedIn={!!data.user} />
 			</h2>
 			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 				{#each weekMatchups as matchup}

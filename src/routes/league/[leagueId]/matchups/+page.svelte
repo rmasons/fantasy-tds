@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { RosterInfo } from '$lib/sleeper';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 	import {
 		fetchLeagueCore, fetchNflState, fetchMatchups as fetchWeekMatchups,
 		fetchWinnersBracket, fetchLosersBracket, buildRosterInfoMap, fetchDisplayNameOverrides
@@ -302,7 +303,7 @@
 				class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
 				       {view === 'bracket' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
 			>
-				{bracketLoading ? 'Loading…' : 'Bracket'}
+				{bracketLoading ? 'Loading…' : 'Bracket'}<FaabEasterEgg eggId="4" leagueId={data.leagueId} loggedIn={!!data.user} />
 			</button>
 		</div>
 

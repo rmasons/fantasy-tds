@@ -3,6 +3,7 @@
 	import type { LayoutData } from '../$types';
 	import type { SlimPlayer } from '$lib/types';
 	import { fetchLeagueCore, buildRosterInfoMap, fetchDisplayNameOverrides } from '$lib/sleeper';
+	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: LayoutData }>();
 
@@ -80,8 +81,8 @@
 				teams = rosters.map((r) => {
 					const info = rosterInfo.get(r.roster_id)!;
 					const starterIds = new Set((r as any).starters ?? []);
-					const irIds = new Set((r as any).reserve ?? []);
-					const allIds: string[] = (r as any).players ?? [];
+					const irIds = new Set(r.reserve ?? []);
+					const allIds: string[] = r.players ?? [];
 
 					return {
 						rosterId: r.roster_id,
@@ -181,7 +182,7 @@
 							<!-- Bench -->
 							{#if team.bench.length}
 								<div>
-									<p class="font-sport font-bold text-[10px] uppercase tracking-widest text-slate-300 mb-2 flex items-center gap-1.5"><span class="text-amber-400">◆</span>Bench</p>
+									<p class="font-sport font-bold text-[10px] uppercase tracking-widest text-slate-300 mb-2 flex items-center gap-1.5"><span class="text-amber-400">◆</span>Bench{#if i === teams.length - 1}<FaabEasterEgg eggId="7" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</p>
 									<div class="space-y-1">
 										{#each team.bench as p}
 											{@const logo = teamLogoUrl(p.team)}
