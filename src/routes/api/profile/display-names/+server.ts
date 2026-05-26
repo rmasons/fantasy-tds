@@ -1,10 +1,8 @@
-import { json, error } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 
-export const GET: RequestHandler = async ({ url, locals }) => {
-	if (!locals.user) throw error(401, 'Unauthorized');
-
+export const GET: RequestHandler = async ({ url }) => {
 	const raw = url.searchParams.get('userIds') ?? '';
 	const userIds = raw
 		.split(',')

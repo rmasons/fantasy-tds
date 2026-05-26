@@ -138,9 +138,10 @@ export const PUT: RequestHandler = async ({ params, locals }) => {
 		const rosterInfoMap = buildRosterInfoMap(rosters, users);
 		const weeks = Array.from({ length: weeksToFetch }, (_, i) => i + 1);
 
+		const bypassCache = league.status !== 'complete';
 		const [matchupWeeks, txWeeks] = await Promise.all([
-			Promise.all(weeks.map(w => getCachedMatchups(league.league_id, w).catch(() => []))),
-			Promise.all(weeks.map(w => getCachedTransactions(league.league_id, w).catch(() => []))),
+			Promise.all(weeks.map(w => getCachedMatchups(league.league_id, w, bypassCache).catch(() => []))),
+			Promise.all(weeks.map(w => getCachedTransactions(league.league_id, w, bypassCache).catch(() => []))),
 		]);
 
 		const computed = computeForSeason(league, rosters, rosterInfoMap, matchupWeeks, txWeeks, playersData);

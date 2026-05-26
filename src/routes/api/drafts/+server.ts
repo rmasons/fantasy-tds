@@ -8,8 +8,7 @@ function validateParam(id: string | null, name: string): string {
 	return id;
 }
 
-export const GET: RequestHandler = async ({ url, locals }) => {
-	if (!locals.user) throw error(401, 'Unauthorized');
+export const GET: RequestHandler = async ({ url }) => {
 
 	const leagueId = validateParam(url.searchParams.get('leagueId'), 'leagueId');
 	const draftId = url.searchParams.get('draftId');

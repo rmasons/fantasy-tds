@@ -5,6 +5,9 @@ import { fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap, comb
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 import type { SeasonRecords, RosterSummary, RecordGame, RecordScore } from '$lib/types';
 
+// Bump when SeasonRecords shape changes to invalidate the Firestore cache.
+const SCHEMA_VERSION = 3;
+
 function today(): string {
 	return new Date().toISOString().split('T')[0];
 }
@@ -124,11 +127,10 @@ async function buildRecords(leagueId: string): Promise<SeasonRecords> {
 	};
 }
 
-export const GET: RequestHandler = async ({ params, locals }) => {
-	if (!locals.user) return json({ error: 'Unauthorized' }, { status: 401 });
+export const GET: RequestHandler = async ({ params }) => {
 
 	const { leagueId } = params;
-	const docRef = adminDb.collection('cache').doc(`records_v3_${leagueId}`);
+	const docRef = adminDb.collection('recordsCache').doc(leagueId);
 
 	let records: SeasonRecords | null = null;
 
@@ -136,8 +138,8 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		const doc = await docRef.get();
 		if (doc.exists) {
 			const data = doc.data()!;
-			if (data.status === 'complete' || data.cachedDate === today()) {
-				const { cachedDate: _, ...cached } = data;
+			if (data.schemaVersion === SCHEMA_VERSION && (data.status === 'complete' || data.cachedDate === today())) {
+				const { cachedDate: _, schemaVersion: _v, ...cached } = data;
 				records = cached as SeasonRecords;
 			}
 		}
@@ -148,7 +150,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	if (!records) {
 		records = await buildRecords(leagueId);
 		try {
-			await docRef.set({ ...records, cachedDate: today() });
+			await docRef.set({ ...records, cachedDate: today(), schemaVersion: SCHEMA_VERSION });
 		} catch (e) {
 			console.error('[records] Failed to write cache:', e);
 		}

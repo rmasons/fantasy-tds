@@ -20,8 +20,7 @@ function validatePlayerId(id: string | null): string {
 	return id;
 }
 
-export const GET: RequestHandler = async ({ url, locals }) => {
-	if (!locals.user) throw error(401, 'Unauthorized');
+export const GET: RequestHandler = async ({ url }) => {
 	const leagueId = validateLeagueId(url.searchParams.get('leagueId'));
 	try {
 		return json(await getKeeperData(leagueId));

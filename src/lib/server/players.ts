@@ -39,7 +39,7 @@ export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
 
 	if (memCache && memCacheDate === date) return memCache;
 
-	const docRef = adminDb.collection('cache').doc('players_nfl');
+	const docRef = adminDb.collection('playersCache').doc('players_nfl');
 
 	try {
 		const doc = await docRef.get();
