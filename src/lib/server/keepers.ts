@@ -2,6 +2,7 @@ import { adminDb } from '$lib/firebase/admin';
 import { avatarUrl } from '$lib/sleeper';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 import { getLeagueConfig } from '$lib/server/config';
+import { getPlayers } from '$lib/server/players';
 
 export interface KeeperPlayerData {
 	playerId: string;
@@ -109,19 +110,6 @@ async function getCachedDraftHistory(leagueId: string): Promise<Map<string, Draf
 	return history;
 }
 
-let playersCacheData: Record<string, { name: string; pos: string; team: string }> | null = null;
-let playersCacheExpiry = 0;
-const PLAYERS_CACHE_TTL_MS = 5 * 60 * 1000;
-
-async function getPlayersCache(): Promise<Record<string, { name: string; pos: string; team: string }>> {
-	if (playersCacheData && Date.now() < playersCacheExpiry) return playersCacheData;
-	const doc = await adminDb.collection('cache').doc('players_nfl').get();
-	const fresh: Record<string, { name: string; pos: string; team: string }> =
-		doc.exists ? JSON.parse(doc.data()!.data) : {};
-	playersCacheData = fresh;
-	playersCacheExpiry = Date.now() + PLAYERS_CACHE_TTL_MS;
-	return fresh;
-}
 
 const POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 function posRank(pos: string) {
@@ -152,7 +140,7 @@ export async function getKeeperData(leagueId: string): Promise<{
 	const [draftHistory, overridesSnap, playersCache, managerProfiles, leagueConfig] = await Promise.all([
 		getCachedDraftHistory(leagueId),
 		adminDb.collection('keeperData').doc(leagueId).collection('players').get(),
-		getPlayersCache(),
+		getPlayers(),
 		getManagerProfilesBatch(sleeperUserIds),
 		getLeagueConfig(leagueId),
 	]);
