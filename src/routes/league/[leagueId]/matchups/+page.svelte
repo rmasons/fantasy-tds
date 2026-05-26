@@ -273,13 +273,16 @@
 				const byRound: BracketMatch[][] = [];
 				for (let r = 1; r <= maxR; r++) {
 					byRound.push(
-						raw.filter((e: any) => e.r === r).map((e: any) => ({
-							round: r,
-							matchId: e.m,
-							t1: teamSide(e.t1 ?? null, e.w ?? null, r),
-							t2: teamSide(e.t2 ?? null, e.w ?? null, r),
-							label: roundLabel(r, maxR, e, losers),
-						}))
+						raw
+							.filter((e: any) => e.r === r)
+							.sort((a: any, b: any) => a.m - b.m)
+							.map((e: any) => ({
+								round: r,
+								matchId: e.m,
+								t1: teamSide(e.t1 ?? null, e.w ?? null, r),
+								t2: teamSide(e.t2 ?? null, e.w ?? null, r),
+								label: roundLabel(r, maxR, e, losers),
+							}))
 					);
 				}
 				return byRound;
@@ -463,64 +466,99 @@
 			{#if bracketSeason}
 				{#snippet bracketSection(rounds: BracketMatch[][], title: string, finalIcon: string)}
 					{#if rounds.length > 0}
-						<div class="mb-10">
-							<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-4 flex items-center gap-2"><span class="text-amber-400">◆</span>{title}</h2>
+						{@const TEAM_H = 46}
+						{@const CARD_H = TEAM_H * 2}
+						{@const MIN_GAP = 16}
+						{@const CONN_W = 44}
+						{@const ROUND_W = 214}
+						{@const LABEL_H = 26}
+						{@const n0 = Math.max(...rounds.map(r => r.length))}
+						{@const matchAreaH = n0 * (CARD_H + MIN_GAP)}
+						<div class="mb-12">
+							<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-5 flex items-center gap-2">
+								<span class="text-amber-400">◆</span>{title}
+							</h2>
 							<div class="overflow-x-auto pb-3">
-								<div class="flex gap-4 items-start min-w-max">
+								<div class="flex" style={`height: ${matchAreaH + LABEL_H}px`}>
 									{#each rounds as roundMatches, ri}
-										{@const isChampionRound = ri === rounds.length - 1}
-										<div class="flex flex-col gap-3" style="min-width: 190px; max-width: 230px;">
-											<p class="text-[10px] text-navy-500 uppercase tracking-wider text-center font-semibold">
+										{@const isLastRound = ri === rounds.length - 1}
+										<div style={`width: ${ROUND_W}px`}>
+											<p class="text-[10px] text-navy-500 uppercase tracking-wider text-center font-semibold"
+											   style={`height: ${LABEL_H}px; line-height: ${LABEL_H}px`}>
 												{roundMatches[0]?.label ?? `Round ${ri + 1}`}
 											</p>
-											{#each roundMatches as match}
-												<div class="rounded-lg overflow-hidden border
-												            {isChampionRound
-												                ? 'border-amber-500/40'
-												                : 'border-navy-700'}">
-													{#each [match.t1, match.t2] as side, si}
-														{#if side.bye}
-															<div class="flex items-center gap-2 px-3 py-2.5
-															            {si === 0 ? 'border-b border-navy-700' : ''}
-															            bg-navy-850 text-navy-500 text-xs italic">
-																BYE
-															</div>
-														{:else}
-															<div class="flex items-center gap-2 px-3 py-2.5
-															            {si === 0 ? 'border-b border-navy-700' : ''}
-															            {side.won
-															                ? isChampionRound
-															                    ? 'bg-amber-950/60'
-															                    : 'bg-navy-800'
-															                : 'bg-navy-850'}">
-																{#if side.avatar}
-																	<img src={side.avatar} alt="" class="w-7 h-7 rounded-full object-cover shrink-0
-																	            {side.won ? 'ring-2 ring-white/30' : 'opacity-60'}" />
-																{:else}
-																	<div class="w-7 h-7 rounded-full bg-navy-800 flex items-center justify-center text-sm shrink-0
-																	            {side.won ? '' : 'opacity-50'}">🏈</div>
-																{/if}
-																<span class="text-xs font-semibold truncate flex-1 leading-tight
-																             {side.won
-																                 ? isChampionRound ? 'text-amber-200' : 'text-white'
-																                 : 'text-navy-500'}">
-																	{side.teamName ?? '—'}
-																</span>
-																{#if side.won && isChampionRound}
-																	<span class="text-sm shrink-0">{finalIcon}</span>
-																{/if}
-																{#if side.points !== null}
-																	<span class="font-mono text-xs shrink-0 tabular-nums
-																	             {side.won ? 'text-white' : 'text-navy-500'}">
-																		{side.points.toFixed(1)}
+											<div class="flex flex-col justify-around" style={`height: ${matchAreaH}px`}>
+												{#each roundMatches as match}
+													<div class={`rounded-lg overflow-hidden border ${isLastRound ? 'border-amber-500/40' : 'border-navy-700'}`}
+													     style={`height: ${CARD_H}px`}>
+														{#each [match.t1, match.t2] as side, si}
+															{#if side.bye}
+																<div class={`flex items-center gap-2 px-3 ${si === 0 ? 'border-b border-navy-700' : ''} bg-navy-850 text-navy-500 text-xs italic`}
+																     style={`height: ${TEAM_H}px`}>
+																	BYE
+																</div>
+															{:else}
+																<div class={`flex items-center gap-2 px-3 ${si === 0 ? 'border-b border-navy-700' : ''} ${side.won ? (isLastRound ? 'bg-amber-950/60' : 'bg-navy-800') : 'bg-navy-850'}`}
+																     style={`height: ${TEAM_H}px`}>
+																	{#if side.avatar}
+																		<img src={side.avatar} alt="" class={`w-7 h-7 rounded-full object-cover shrink-0 ${side.won ? '' : 'opacity-50'}`} />
+																	{:else}
+																		<div class={`w-7 h-7 rounded-full bg-navy-700 flex items-center justify-center text-sm shrink-0 ${side.won ? '' : 'opacity-50'}`}>🏈</div>
+																	{/if}
+																	<span class={`text-xs font-semibold truncate flex-1 leading-tight ${side.won ? (isLastRound ? 'text-amber-200' : 'text-white') : 'text-navy-500'}`}>
+																		{side.teamName ?? '—'}
 																	</span>
-																{/if}
-															</div>
-														{/if}
-													{/each}
-												</div>
-											{/each}
+																	{#if side.won && isLastRound}
+																		<span class="text-sm shrink-0">{finalIcon}</span>
+																	{/if}
+																	{#if side.points !== null}
+																		<span class={`font-mono text-xs shrink-0 tabular-nums ${side.won ? 'text-white' : 'text-navy-500'}`}>
+																			{side.points.toFixed(1)}
+																		</span>
+																	{/if}
+																</div>
+															{/if}
+														{/each}
+													</div>
+												{/each}
+											</div>
 										</div>
+										{#if ri < rounds.length - 1}
+											{@const curN = roundMatches.length}
+											{@const nextN = rounds[ri + 1].length}
+											<div style={`width: ${CONN_W}px; padding-top: ${LABEL_H}px`}>
+												<svg width={CONN_W} height={matchAreaH} style="display: block">
+													{#if nextN > curN}
+														<!-- Expanding bracket (e.g. 2→3): draw 1:1 connectors for the matches that exist -->
+														{#each Array(Math.min(curN, nextN)).fill(0) as _, i}
+															{@const fromY = (2 * i + 1) / (2 * curN) * matchAreaH}
+															{@const toY = (2 * i + 1) / (2 * nextN) * matchAreaH}
+															{@const midX = CONN_W / 2}
+															<path d={`M 0 ${fromY.toFixed(1)} H ${midX} V ${toY.toFixed(1)} H ${CONN_W}`}
+															      fill="none" stroke="rgb(100 116 139)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+														{/each}
+													{:else}
+														<!-- Contracting bracket (e.g. 4→2, 3→2): pair matches 2i/2i+1 → i -->
+														{#each rounds[ri + 1] as _nm, ni}
+															{@const fromIdx0 = ni * 2}
+															{@const fromIdx1 = ni * 2 + 1}
+															{@const toY = (2 * ni + 1) / (2 * nextN) * matchAreaH}
+															{@const midX = CONN_W / 2}
+															{#if fromIdx0 < curN}
+																{@const fromTop = (2 * fromIdx0 + 1) / (2 * curN) * matchAreaH}
+																<path d={`M 0 ${fromTop.toFixed(1)} H ${midX} V ${toY.toFixed(1)} H ${CONN_W}`}
+																      fill="none" stroke="rgb(100 116 139)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+															{/if}
+															{#if fromIdx1 < curN}
+																{@const fromBot = (2 * fromIdx1 + 1) / (2 * curN) * matchAreaH}
+																<path d={`M 0 ${fromBot.toFixed(1)} H ${midX} V ${toY.toFixed(1)}`}
+																      fill="none" stroke="rgb(100 116 139)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+															{/if}
+														{/each}
+													{/if}
+												</svg>
+											</div>
+										{/if}
 									{/each}
 								</div>
 							</div>
