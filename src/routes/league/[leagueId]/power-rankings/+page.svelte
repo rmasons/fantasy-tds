@@ -1,9 +1,11 @@
 <script lang="ts">
 	import type { LayoutData } from '../$types';
-	import { fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap, fetchDisplayNameOverrides, combineFpts } from '$lib/sleeper';
+	import { fetchLeague, fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap, fetchDisplayNameOverrides, combineFpts } from '$lib/sleeper';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: LayoutData }>();
+
+	interface SeasonEntry { leagueId: string; season: string }
 
 	interface PowerRank {
 		rosterId: number;
@@ -42,17 +44,12 @@
 	let playoffSpots = $state(0);
 	let loading = $state(true);
 	let error = $state('');
+	let seasons = $state<SeasonEntry[]>([]);
+	let viewLeagueId = $state(data.leagueId);
 
 	const SIM_COUNT = 10_000;
 
 	// ── Power score computation ────────────────────────────────────────────────
-	//
-	// Score = PF × (2 + H2H Win% + Median Win%)
-	//   PF:           cumulative points through `throughWeek`
-	//   H2H Win%:     actual matchup wins / games played
-	//   Median Win%:  weeks above median score / weeks played
-	//
-	// Returns a map of rosterId → { score, rank, wins, losses, ties, pf }
 
 	function computePowerRankMap(
 		rosterIds: number[],
@@ -106,9 +103,6 @@
 	}
 
 	// ── Monte Carlo simulation ─────────────────────────────────────────────────
-	//
-	// `weeklyAvgPts` is used (not the power score) so Gaussian noise (std ≈ 20)
-	// stays physically meaningful relative to per-week scoring.
 
 	function randn(): number {
 		return Math.sqrt(-2 * Math.log(Math.random())) * Math.cos(2 * Math.PI * Math.random());
@@ -154,7 +148,9 @@
 	// ── Main data load ─────────────────────────────────────────────────────────
 
 	$effect(() => {
-		const leagueId = data.leagueId;
+		const urlLeagueId = data.leagueId;
+		viewLeagueId = urlLeagueId;
+		seasons = [];
 		rosterBaseData = [];
 		weekScoreMap = new Map();
 		weekMatchupPairs = new Map();
@@ -167,122 +163,154 @@
 		loading = true;
 		error = '';
 
-		(async () => {
+		loadPowerRankings(urlLeagueId);
+		walkSeasons(urlLeagueId);
+	});
+
+	async function walkSeasons(urlLeagueId: string) {
+		let curId: string | null = urlLeagueId;
+		while (curId && curId !== '0') {
 			try {
-				const [{ league, rosters, users }, nfl] = await Promise.all([
-					fetchLeagueCore(leagueId),
-					fetchNflState(),
-				]);
+				const league = await fetchLeague(curId);
+				if (data.leagueId !== urlLeagueId) return;
+				seasons = [...seasons, { leagueId: curId, season: league.season }];
+				curId = league.previous_league_id ?? null;
+			} catch {
+				return;
+			}
+		}
+	}
 
-				if (data.leagueId !== leagueId) return;
+	async function loadPowerRankings(lid: string) {
+		rosterBaseData = [];
+		weekScoreMap = new Map();
+		weekMatchupPairs = new Map();
+		weekMedians = new Map();
+		futureSchedule = [];
+		selectedWeek = 0;
+		currentWeek = 0;
+		weeksRemaining = 0;
+		playoffSpots = 0;
+		loading = true;
+		error = '';
 
-				const playoffStart: number = league.settings.playoff_week_start ?? 15;
-				const spots = league.settings.playoff_teams ?? 6;
-				playoffSpots = spots;
+		try {
+			const [{ league, rosters, users }, nfl] = await Promise.all([
+				fetchLeagueCore(lid),
+				fetchNflState(),
+			]);
 
-				let completedWeeks = 0;
-				if (nfl.season_type === 'regular') {
-					completedWeeks = Math.max(0, nfl.display_week - 1);
-				} else if (nfl.season_type === 'post' || league.status === 'complete') {
-					completedWeeks = playoffStart - 1;
-				}
-				completedWeeks = Math.min(completedWeeks, playoffStart - 1);
-				currentWeek = completedWeeks;
-				selectedWeek = completedWeeks;
+			if (viewLeagueId !== lid) return;
 
-				const remaining = Math.max(0, playoffStart - 1 - completedWeeks);
-				weeksRemaining = remaining;
+			const playoffStart: number = league.settings.playoff_week_start ?? 15;
+			const spots = league.settings.playoff_teams ?? 6;
+			playoffSpots = spots;
 
-				const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
-				const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
-				rosterBaseData = rosters.map((r) => {
-					const info = rosterInfo.get(r.roster_id)!;
-					return {
-						rosterId: r.roster_id,
-						teamName: info.teamName,
-						ownerName: info.ownerName,
-						avatar: info.avatar,
-						wins: r.settings.wins ?? 0,
-						losses: r.settings.losses ?? 0,
-						ties: r.settings.ties ?? 0,
-						totalPF: combineFpts(r.settings.fpts, r.settings.fpts_decimal),
-					};
-				});
+			let completedWeeks = 0;
+			if (nfl.season_type === 'regular') {
+				completedWeeks = Math.max(0, nfl.display_week - 1);
+			} else if (nfl.season_type === 'post' || league.status === 'complete') {
+				completedWeeks = playoffStart - 1;
+			}
+			completedWeeks = Math.min(completedWeeks, playoffStart - 1);
+			currentWeek = completedWeeks;
+			selectedWeek = completedWeeks;
 
-				if (completedWeeks === 0) return;
+			const remaining = Math.max(0, playoffStart - 1 - completedWeeks);
+			weeksRemaining = remaining;
 
-				// Fetch all completed weeks + future schedule in parallel
-				const allWeeks = Array.from({ length: completedWeeks }, (_, i) => i + 1);
-				const futureWeeks = Array.from({ length: remaining }, (_, i) => completedWeeks + 1 + i);
+			const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+			if (viewLeagueId !== lid) return;
+			const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
+			rosterBaseData = rosters.map((r) => {
+				const info = rosterInfo.get(r.roster_id)!;
+				return {
+					rosterId: r.roster_id,
+					teamName: info.teamName,
+					ownerName: info.ownerName,
+					avatar: info.avatar,
+					wins: r.settings.wins ?? 0,
+					losses: r.settings.losses ?? 0,
+					ties: r.settings.ties ?? 0,
+					totalPF: combineFpts(r.settings.fpts, r.settings.fpts_decimal),
+				};
+			});
 
-				const [allHistDataArr, futureDataArr] = await Promise.all([
-					Promise.all(allWeeks.map((w) => fetchMatchups(leagueId, w))),
-					Promise.all(futureWeeks.map((w) => fetchMatchups(leagueId, w))),
-				]);
+			if (completedWeeks === 0) return;
 
-				if (data.leagueId !== leagueId) return;
+			const allWeeks = Array.from({ length: completedWeeks }, (_, i) => i + 1);
+			const futureWeeks = Array.from({ length: remaining }, (_, i) => completedWeeks + 1 + i);
 
-				// Build score map, matchup pairs, and medians for every completed week
-				const newWeekScoreMap = new Map<number, Map<number, number>>();
-				const newWeekMatchupPairs = new Map<number, [number, number][]>();
-				const newWeekMedians = new Map<number, number>();
+			const [allHistDataArr, futureDataArr] = await Promise.all([
+				Promise.all(allWeeks.map((w) => fetchMatchups(lid, w))),
+				Promise.all(futureWeeks.map((w) => fetchMatchups(lid, w))),
+			]);
 
-				for (let i = 0; i < allWeeks.length; i++) {
-					const week = allWeeks[i];
-					const wm = new Map<number, number>();
-					const groups = new Map<number, number[]>();
+			if (viewLeagueId !== lid) return;
 
-					for (const m of allHistDataArr[i]) {
-						const pts = m.points ?? 0;
-						wm.set(m.roster_id, pts);
-						if (m.matchup_id != null) {
-							if (!groups.has(m.matchup_id)) groups.set(m.matchup_id, []);
-							groups.get(m.matchup_id)!.push(m.roster_id);
-						}
-					}
+			const newWeekScoreMap = new Map<number, Map<number, number>>();
+			const newWeekMatchupPairs = new Map<number, [number, number][]>();
+			const newWeekMedians = new Map<number, number>();
 
-					// Compute true median from sorted scores
-					const sorted = [...wm.values()].filter((p) => p > 0).sort((a, b) => a - b);
-					if (sorted.length > 0) {
-						const mid = Math.floor(sorted.length / 2);
-						const median = sorted.length % 2 === 0
-							? (sorted[mid - 1] + sorted[mid]) / 2
-							: sorted[mid];
-						newWeekMedians.set(week, median);
-					}
+			for (let i = 0; i < allWeeks.length; i++) {
+				const week = allWeeks[i];
+				const wm = new Map<number, number>();
+				const groups = new Map<number, number[]>();
 
-					newWeekScoreMap.set(week, wm);
-					newWeekMatchupPairs.set(
-						week,
-						[...groups.values()].filter((p) => p.length === 2).map((p) => [p[0], p[1]])
-					);
-				}
-
-				weekScoreMap = newWeekScoreMap;
-				weekMatchupPairs = newWeekMatchupPairs;
-				weekMedians = newWeekMedians;
-
-				// Build future schedule
-				futureSchedule = futureDataArr.map((weekData) => {
-					const groups = new Map<number, number[]>();
-					for (const m of weekData) {
+				for (const m of allHistDataArr[i]) {
+					const pts = m.points ?? 0;
+					wm.set(m.roster_id, pts);
+					if (m.matchup_id != null) {
 						if (!groups.has(m.matchup_id)) groups.set(m.matchup_id, []);
 						groups.get(m.matchup_id)!.push(m.roster_id);
 					}
-					return [...groups.values()]
-						.filter((p) => p.length === 2)
-						.map((p) => [p[0], p[1]] as [number, number]);
-				});
+				}
 
-			} catch (e: any) {
-				if (data.leagueId !== leagueId) return;
-				error = e.message;
-			} finally {
-				if (data.leagueId !== leagueId) return;
-				loading = false;
+				const sorted = [...wm.values()].filter((p) => p > 0).sort((a, b) => a - b);
+				if (sorted.length > 0) {
+					const mid = Math.floor(sorted.length / 2);
+					const median = sorted.length % 2 === 0
+						? (sorted[mid - 1] + sorted[mid]) / 2
+						: sorted[mid];
+					newWeekMedians.set(week, median);
+				}
+
+				newWeekScoreMap.set(week, wm);
+				newWeekMatchupPairs.set(
+					week,
+					[...groups.values()].filter((p) => p.length === 2).map((p) => [p[0], p[1]])
+				);
 			}
-		})();
-	});
+
+			weekScoreMap = newWeekScoreMap;
+			weekMatchupPairs = newWeekMatchupPairs;
+			weekMedians = newWeekMedians;
+
+			futureSchedule = futureDataArr.map((weekData) => {
+				const groups = new Map<number, number[]>();
+				for (const m of weekData) {
+					if (!groups.has(m.matchup_id)) groups.set(m.matchup_id, []);
+					groups.get(m.matchup_id)!.push(m.roster_id);
+				}
+				return [...groups.values()]
+					.filter((p) => p.length === 2)
+					.map((p) => [p[0], p[1]] as [number, number]);
+			});
+
+		} catch (e: any) {
+			if (viewLeagueId !== lid) return;
+			error = e.message;
+		} finally {
+			if (viewLeagueId !== lid) return;
+			loading = false;
+		}
+	}
+
+	function selectSeason(lid: string) {
+		if (viewLeagueId === lid) return;
+		viewLeagueId = lid;
+		loadPowerRankings(lid);
+	}
 
 	// ── Reactive rankings ─────────────────────────────────────────────────────
 
@@ -291,7 +319,6 @@
 
 		const rosterIds = rosterBaseData.map((r) => r.rosterId);
 
-		// Pre-season: no matchup data yet
 		if (weekScoreMap.size === 0) {
 			const rows: PowerRank[] = rosterBaseData.map((r) => ({
 				...r,
@@ -327,7 +354,6 @@
 		});
 		rows.sort((a, b) => a.rank - b.rank);
 
-		// Playoff odds for any selected week
 		if (selectedWeek > 0) {
 			const historicalFutureWeeks = Array.from(
 				{ length: currentWeek - selectedWeek },
@@ -340,7 +366,6 @@
 			let oddsMap: Map<number, number> | null = null;
 
 			if (totalRemainingFromHere > 0 && scheduleFromHere.some((w) => w.length > 0)) {
-				// Use avg weekly PF as the expected score for simulation (not the cumulative power score)
 				const simInput = rows.map((r) => ({
 					rosterId: r.rosterId,
 					wins: r.wins,
@@ -350,7 +375,6 @@
 				}));
 				oddsMap = simulateOdds(simInput, scheduleFromHere, playoffSpots);
 
-				// Override simulation with mathematical clinch / elimination
 				const remGames = new Map<number, number>(rows.map((r) => [r.rosterId, 0]));
 				for (const week of scheduleFromHere) {
 					for (const [a, b] of week) {
@@ -362,7 +386,6 @@
 					const maxWins = row.wins + (remGames.get(row.rosterId) ?? 0);
 					const others = rows.filter((r) => r.rosterId !== row.rosterId);
 
-					// Clinched: fewer than playoffSpots others can even tie row's win floor
 					const canMatch = others.filter(
 						(o) => o.wins + (remGames.get(o.rosterId) ?? 0) >= row.wins
 					).length;
@@ -371,14 +394,12 @@
 						continue;
 					}
 
-					// Eliminated: playoffSpots+ others already exceed row's best possible wins
 					const definitelyAhead = others.filter((o) => o.wins > maxWins).length;
 					if (definitelyAhead >= playoffSpots) {
 						oddsMap.set(row.rosterId, 0);
 					}
 				}
 			} else if (totalRemainingFromHere === 0) {
-				// Season complete — use official Sleeper records (includes median wins) for qualification
 				const officialRanked = rosterBaseData
 					.slice()
 					.sort((a, b) => b.wins - a.wins || b.totalPF - a.totalPF);
@@ -482,6 +503,20 @@
 		{/if}
 	</div>
 
+	{#if seasons.length > 1}
+		<div class="flex mb-6 border-b border-navy-700 flex-wrap">
+			{#each seasons as s}
+				<button
+					onclick={() => selectSeason(s.leagueId)}
+					class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+					       {viewLeagueId === s.leagueId ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
+				>
+					{s.season}
+				</button>
+			{/each}
+		</div>
+	{/if}
+
 	{#if loading}
 		<div class="space-y-2">
 			{#each Array(10) as _}
@@ -528,7 +563,7 @@
 						<th class="px-4 py-3 text-left">Team</th>
 						<th class="px-4 py-3 text-center">Record</th>
 						<th class="px-4 py-3 text-right">Total PF</th>
-						<th class="px-4 py-3 text-right">Score<FaabEasterEgg eggId="5" leagueId={data.leagueId} loggedIn={!!data.user} /></th>
+						<th class="px-4 py-3 text-right">Score{#if viewLeagueId === data.leagueId}<FaabEasterEgg eggId="5" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</th>
 						<th class="px-4 py-3 text-right">Playoff %</th>
 					</tr>
 				</thead>

@@ -53,6 +53,63 @@
 	const cachedCount = $derived(seedResults.filter(r => r.status === 'already_cached').length);
 	const errorCount  = $derived(seedResults.filter(r => r.status === 'error').length);
 
+	// ── Superlatives ─────────────────────────────────────────────────────────────
+	let supRunning = $state(false);
+	let supResult = $state<Array<{ season: string; computed: number }>>([]);
+	let supError = $state('');
+	let supDone = $state(false);
+
+	let supDeleteSeason = $state('');
+	let supDeleting = $state(false);
+	let supDeleteError = $state('');
+	let supDeleteDone = $state(false);
+
+	async function deleteSuperlativeSeason() {
+		const season = supDeleteSeason.trim();
+		if (!/^\d{4}$/.test(season)) return;
+		supDeleting = true;
+		supDeleteError = '';
+		supDeleteDone = false;
+		try {
+			const res = await fetch(`/api/superlatives/${encodeURIComponent(data.leagueId)}`, {
+				method: 'DELETE',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ season }),
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				throw new Error(body.message ?? `HTTP ${res.status}`);
+			}
+			supDeleteDone = true;
+			supDeleteSeason = '';
+		} catch (e: any) {
+			supDeleteError = e.message;
+		} finally {
+			supDeleting = false;
+		}
+	}
+
+	async function runSuperlatives() {
+		supRunning = true;
+		supResult = [];
+		supError = '';
+		supDone = false;
+		try {
+			const res = await fetch(`/api/superlatives/${encodeURIComponent(data.leagueId)}`, { method: 'PUT' });
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				throw new Error(body.message ?? `HTTP ${res.status}`);
+			}
+			const { seasons } = await res.json();
+			supResult = seasons ?? [];
+			supDone = true;
+		} catch (e: any) {
+			supError = e.message;
+		} finally {
+			supRunning = false;
+		}
+	}
+
 	// ── FAAB bonuses ─────────────────────────────────────────────────────────────
 	let faabBonuses = $state<Record<string, number>>({ ...(data.faabBonuses ?? {}) });
 
@@ -193,6 +250,85 @@
 		{:else if done}
 			<p class="mt-3 text-sm text-slate-500">No completed drafts found in this league's history.</p>
 		{/if}
+	</section>
+
+	<!-- ── Superlatives ── -->
+	<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
+		<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1 flex items-center gap-2"><span class="text-amber-400">◆</span>Superlatives</h2>
+		<p class="text-sm text-slate-400 mb-4">
+			Compute this season's superlatives from matchup history and save to Firestore.
+			The Superlatives page reads exclusively from this cache — run this to update it.
+		</p>
+
+		<button
+			onclick={runSuperlatives}
+			disabled={supRunning}
+			class="px-4 py-2 text-sm font-bold bg-amber-500 hover:bg-amber-400 disabled:opacity-40
+			       text-slate-900 rounded-lg transition-colors"
+		>
+			{supRunning ? 'Computing…' : 'Run Superlatives'}
+		</button>
+
+		{#if supError}
+			<p class="mt-3 text-sm text-red-400">{supError}</p>
+		{/if}
+
+		{#if supRunning}
+			<p class="mt-3 text-sm text-slate-500 animate-pulse">Fetching matchups and writing to Firestore…</p>
+		{/if}
+
+		{#if supDone}
+			{#if supResult.length > 0}
+				<div class="mt-4 rounded-lg border border-navy-700 overflow-hidden">
+					<table class="w-full text-sm">
+						<thead>
+							<tr class="bg-navy-900 text-left">
+								<th class="px-4 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider">Season</th>
+								<th class="px-4 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider text-right">Computed</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-navy-700/60">
+							{#each supResult as r}
+								<tr class="hover:bg-navy-800">
+									<td class="px-4 py-2.5 text-slate-300 font-medium">{r.season}</td>
+									<td class="px-4 py-2.5 text-slate-400 text-right font-mono">{r.computed}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{:else}
+				<p class="mt-3 text-sm text-slate-500">No seasons computed.</p>
+			{/if}
+		{/if}
+
+		<div class="mt-6 pt-5 border-t border-navy-700">
+			<p class="text-xs font-semibold text-navy-500 uppercase tracking-wider mb-3">Delete a Season</p>
+			<div class="flex items-center gap-3">
+				<input
+					type="text"
+					bind:value={supDeleteSeason}
+					placeholder="YYYY"
+					maxlength="4"
+					class="w-24 bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white
+					       placeholder-navy-500 focus:outline-none focus:border-red-700 font-mono transition-colors"
+				/>
+				<button
+					onclick={deleteSuperlativeSeason}
+					disabled={supDeleting || !/^\d{4}$/.test(supDeleteSeason.trim())}
+					class="px-4 py-2 text-sm font-bold bg-red-800 hover:bg-red-700 disabled:opacity-40
+					       text-white rounded-lg transition-colors"
+				>
+					{supDeleting ? 'Deleting…' : 'Delete'}
+				</button>
+				{#if supDeleteDone}
+					<span class="text-xs text-green-400">Deleted.</span>
+				{/if}
+				{#if supDeleteError}
+					<span class="text-xs text-red-400">{supDeleteError}</span>
+				{/if}
+			</div>
+		</div>
 	</section>
 
 	<!-- ── FAAB Bonuses ── -->

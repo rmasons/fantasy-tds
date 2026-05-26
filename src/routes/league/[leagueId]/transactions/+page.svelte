@@ -2,9 +2,11 @@
 	import type { LayoutData } from '../$types';
 	import type { SlimPlayer } from '$lib/types';
 
-	import { fetchLeagueCore, fetchNflState, fetchTransactions as fetchWeekTransactions, buildRosterInfoMap, fetchDisplayNameOverrides, type RosterInfo } from '$lib/sleeper';
+	import { fetchLeague, fetchLeagueCore, fetchNflState, fetchTransactions as fetchWeekTransactions, buildRosterInfoMap, fetchDisplayNameOverrides, type RosterInfo } from '$lib/sleeper';
 
 	let { data } = $props<{ data: LayoutData }>();
+
+	interface SeasonEntry { leagueId: string; season: string }
 
 	type TxType = 'all' | 'trade' | 'waiver' | 'free_agent';
 
@@ -28,75 +30,117 @@
 	let filter = $state<TxType>('all');
 	let loading = $state(true);
 	let error = $state('');
+	let seasons = $state<SeasonEntry[]>([]);
+	let viewLeagueId = $state(data.leagueId);
 
 	let rosterInfoMap = $state(new Map<number, RosterInfo>());
 	let players = $state<Record<string, SlimPlayer>>({});
 
 	$effect(() => {
-		const leagueId = data.leagueId;
+		const urlLeagueId = data.leagueId;
+		viewLeagueId = urlLeagueId;
+		seasons = [];
+		transactions = [];
+		filter = 'all';
+		loading = true;
+		error = '';
+		rosterInfoMap = new Map();
+		players = {};
+
+		loadTransactions(urlLeagueId);
+		walkSeasons(urlLeagueId);
+	});
+
+	async function walkSeasons(urlLeagueId: string) {
+		let curId: string | null = urlLeagueId;
+		while (curId && curId !== '0') {
+			try {
+				const league = await fetchLeague(curId);
+				if (data.leagueId !== urlLeagueId) return;
+				seasons = [...seasons, { leagueId: curId, season: league.season }];
+				curId = league.previous_league_id ?? null;
+			} catch {
+				return;
+			}
+		}
+	}
+
+	async function loadTransactions(lid: string) {
 		transactions = [];
 		loading = true;
 		error = '';
 		rosterInfoMap = new Map();
 		players = {};
 
-		(async () => {
-			try {
-				const [{ league, rosters, users }, nfl, playersData] = await Promise.all([
-					fetchLeagueCore(leagueId),
-					fetchNflState(),
-					fetch('/api/players').then((r) => r.json()) as Promise<Record<string, SlimPlayer>>,
-				]);
+		try {
+			const [{ league, rosters, users }, nfl, playersData] = await Promise.all([
+				fetchLeagueCore(lid),
+				fetchNflState(),
+				fetch('/api/players').then((r) => r.json()) as Promise<Record<string, SlimPlayer>>,
+			]);
 
-				if (data.leagueId !== leagueId) return;
+			if (viewLeagueId !== lid) return;
 
-				players = playersData;
-				const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
-				rosterInfoMap = buildRosterInfoMap(rosters, users, overrides);
+			players = playersData;
+			const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+			if (viewLeagueId !== lid) return;
+			rosterInfoMap = buildRosterInfoMap(rosters, users, overrides);
 
-				let week = nfl.season_type === 'regular' ? nfl.week : nfl.season_type === 'post' ? 18 : 1;
+			// For complete seasons, fetch all 18 weeks; otherwise use nfl state
+			let week: number;
+			if (league.status === 'complete') {
+				week = 18;
+			} else {
+				week = nfl.season_type === 'regular' ? nfl.week : nfl.season_type === 'post' ? 18 : 1;
 				week = Math.max(week, 1);
-
-				const weekNums = Array.from({ length: week }, (_, i) => i + 1);
-				const txWeeks: any[][] = await Promise.all(
-					weekNums.map((w) => fetchWeekTransactions(leagueId, w))
-				);
-
-				if (data.leagueId !== leagueId) return;
-
-				const raw = txWeeks.flat().filter((t) => t.status === 'complete');
-				raw.sort((a, b) => b.status_updated - a.status_updated);
-
-				transactions = raw.map((t) => {
-					const moves: TxMove[] = [];
-
-					for (const [pid, rid] of Object.entries(t.adds ?? {})) {
-						moves.push({ type: 'add', player: pid, rosterId: rid as number });
-					}
-					for (const [pid, rid] of Object.entries(t.drops ?? {})) {
-						moves.push({ type: 'drop', player: pid, rosterId: rid as number });
-					}
-					for (const pick of t.draft_picks ?? []) {
-						moves.push({ type: 'pick', round: pick.round, season: pick.season, rosterId: pick.owner_id });
-					}
-
-					return {
-						id: t.transaction_id,
-						type: t.type,
-						date: formatDate(t.status_updated),
-						rosterIds: t.roster_ids as number[],
-						moves
-					};
-				});
-			} catch (e: any) {
-				if (data.leagueId !== leagueId) return;
-				error = e.message;
-			} finally {
-				if (data.leagueId !== leagueId) return;
-				loading = false;
 			}
-		})();
-	});
+
+			const weekNums = Array.from({ length: week }, (_, i) => i + 1);
+			const txWeeks: any[][] = await Promise.all(
+				weekNums.map((w) => fetchWeekTransactions(lid, w))
+			);
+
+			if (viewLeagueId !== lid) return;
+
+			const raw = txWeeks.flat().filter((t) => t.status === 'complete');
+			raw.sort((a, b) => b.status_updated - a.status_updated);
+
+			transactions = raw.map((t) => {
+				const moves: TxMove[] = [];
+
+				for (const [pid, rid] of Object.entries(t.adds ?? {})) {
+					moves.push({ type: 'add', player: pid, rosterId: rid as number });
+				}
+				for (const [pid, rid] of Object.entries(t.drops ?? {})) {
+					moves.push({ type: 'drop', player: pid, rosterId: rid as number });
+				}
+				for (const pick of t.draft_picks ?? []) {
+					moves.push({ type: 'pick', round: pick.round, season: pick.season, rosterId: pick.owner_id });
+				}
+
+				return {
+					id: t.transaction_id,
+					type: t.type,
+					date: formatDate(t.status_updated),
+					rosterIds: t.roster_ids as number[],
+					moves
+				};
+			});
+		} catch (e: any) {
+			if (viewLeagueId !== lid) return;
+			error = e.message;
+		} finally {
+			if (viewLeagueId !== lid) return;
+			loading = false;
+		}
+	}
+
+	function selectSeason(lid: string) {
+		if (viewLeagueId === lid) return;
+		viewLeagueId = lid;
+		filter = 'all';
+		loadTransactions(lid);
+	}
 
 	function formatDate(ts: number) {
 		return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -107,6 +151,14 @@
 	}
 	function playerPos(id: string) {
 		return players[id]?.pos ?? '?';
+	}
+	function playerNumber(id: string): number | undefined {
+		return players[id]?.number;
+	}
+	function teamLogoUrl(id: string): string | null {
+		const team = players[id]?.team;
+		if (!team || team === 'FA' || team === '?') return null;
+		return `https://sleepercdn.com/images/team_logos/nfl/${team.toLowerCase()}.png`;
 	}
 
 	const typeLabel: Record<string, string> = { trade: 'Trade', waiver: 'Waiver', free_agent: 'Free Agent' };
@@ -141,6 +193,20 @@
 			<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Transactions</h1>
 		</div>
 	</div>
+
+	{#if seasons.length > 1}
+		<div class="flex mb-4 border-b border-navy-700 flex-wrap">
+			{#each seasons as s}
+				<button
+					onclick={() => selectSeason(s.leagueId)}
+					class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+					       {viewLeagueId === s.leagueId ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
+				>
+					{s.season}
+				</button>
+			{/each}
+		</div>
+	{/if}
 
 	<div class="flex mb-6 border-b border-navy-700">
 		{#each (['all', 'trade', 'waiver', 'free_agent'] as TxType[]) as f}
@@ -198,7 +264,13 @@
 									{#each side.players as move}
 										<div class="flex items-center gap-1.5 text-sm mb-0.5">
 											<span class="text-[10px] w-6 text-center text-navy-500 shrink-0 font-medium">{playerPos(move.player!)}</span>
+											{#if teamLogoUrl(move.player!)}
+												<img src={teamLogoUrl(move.player!)} alt="" class="w-4 h-4 shrink-0 object-contain" />
+											{/if}
 											<span class="text-slate-200 truncate">{playerName(move.player!)}</span>
+											{#if playerNumber(move.player!) != null}
+												<span class="text-[10px] text-navy-500 shrink-0 font-mono">#{playerNumber(move.player!)}</span>
+											{/if}
 										</div>
 									{/each}
 									{#each side.picks as pick}
@@ -229,14 +301,26 @@
 									<div class="flex items-center gap-2 text-sm">
 										<span class="text-green-500 text-xs w-3">+</span>
 										<span class="text-xs text-slate-600 w-5">{playerPos(move.player)}</span>
+										{#if teamLogoUrl(move.player)}
+											<img src={teamLogoUrl(move.player)} alt="" class="w-4 h-4 shrink-0 object-contain" />
+										{/if}
 										<span class="text-slate-200">{playerName(move.player)}</span>
+										{#if playerNumber(move.player) != null}
+											<span class="text-[10px] text-navy-500 font-mono">#{playerNumber(move.player)}</span>
+										{/if}
 										<span class="text-xs text-slate-500 ml-auto">{rosterInfoMap.get(move.rosterId)?.teamName}</span>
 									</div>
 								{:else if move.type === 'drop' && move.player}
 									<div class="flex items-center gap-2 text-sm">
 										<span class="text-red-500 text-xs w-3">−</span>
 										<span class="text-xs text-slate-600 w-5">{playerPos(move.player)}</span>
+										{#if teamLogoUrl(move.player)}
+											<img src={teamLogoUrl(move.player)} alt="" class="w-4 h-4 shrink-0 object-contain" />
+										{/if}
 										<span class="text-slate-400">{playerName(move.player)}</span>
+										{#if playerNumber(move.player) != null}
+											<span class="text-[10px] text-navy-500 font-mono">#{playerNumber(move.player)}</span>
+										{/if}
 										<span class="text-xs text-slate-500 ml-auto">{rosterInfoMap.get(move.rosterId)?.teamName}</span>
 									</div>
 								{/if}

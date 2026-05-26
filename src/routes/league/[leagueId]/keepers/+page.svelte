@@ -96,22 +96,36 @@
 		}
 	}
 
-	let expandedRosterId = $state<number | null>(null);
+	let expandedRow = $state<number | null>(null);
+	let colCount = $state(1);
 
 	onMount(async () => {
+		function updateCols() {
+			const next = window.innerWidth >= 1280 ? 3 : window.innerWidth >= 768 ? 2 : 1;
+			if (next !== colCount) {
+				colCount = next;
+				expandedRow = null;
+			}
+		}
+		updateCols();
+		window.addEventListener('resize', updateCols);
+
 		await load();
 		if (data.user?.sleeperUserId) {
-			const mine = rosters.find(r => r.ownerUserId === data.user!.sleeperUserId);
-			if (mine) expandedRosterId = mine.rosterId;
+			const idx = rosters.findIndex(r => r.ownerUserId === data.user!.sleeperUserId);
+			if (idx !== -1) expandedRow = Math.floor(idx / colCount);
 		}
+
+		return () => window.removeEventListener('resize', updateCols);
 	});
 
-	function toggle(rosterId: number) {
-		expandedRosterId = expandedRosterId === rosterId ? null : rosterId;
+	function toggle(i: number) {
+		const row = Math.floor(i / colCount);
+		expandedRow = expandedRow === row ? null : row;
 	}
 
-	function isExpanded(rosterId: number): boolean {
-		return expandedRosterId === rosterId;
+	function isExpanded(i: number): boolean {
+		return Math.floor(i / colCount) === expandedRow;
 	}
 
 	// ── Derived totals ─────────────────────────────────────────────────────
@@ -398,7 +412,7 @@
 	{:else}
 		<!-- ── Roster grid ── -->
 		<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-			{#each rosters as roster (roster.rosterId)}
+			{#each rosters as roster, i (roster.rosterId)}
 				{@const total = rosterTotal(roster)}
 				{@const count = rosterKeeperCount(roster)}
 				{@const faabLeft = rosterFaabAfter(roster)}
@@ -407,9 +421,9 @@
 				<div class="bg-navy-850 rounded-lg border {isMyRoster ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-navy-700'} overflow-hidden">
 					<!-- Roster header -->
 					<button
-						onclick={() => toggle(roster.rosterId)}
+						onclick={() => toggle(i)}
 						class="w-full flex items-center gap-2.5 px-4 py-3 bg-navy-900 hover:bg-navy-800 transition-colors text-left
-						       {isExpanded(roster.rosterId) ? 'border-b border-navy-700' : ''}"
+						       {isExpanded(i) ? 'border-b border-navy-700' : ''}"
 					>
 						{#if roster.ownerAvatar}
 							<img src={roster.ownerAvatar} alt="" class="w-7 h-7 rounded-full object-cover ring-1 ring-slate-700 shrink-0" />
@@ -427,11 +441,11 @@
 							{:else}
 								<span class="text-xs text-slate-600">pending</span>
 							{/if}
-							<span class="text-navy-500 text-xs ml-1">{isExpanded(roster.rosterId) ? '▲' : '▼'}</span>
+							<span class="text-navy-500 text-xs ml-1">{isExpanded(i) ? '▲' : '▼'}</span>
 						</div>
 					</button>
 
-					{#if isExpanded(roster.rosterId)}
+					{#if isExpanded(i)}
 						<!-- Player rows -->
 						<div class="divide-y divide-navy-700/40">
 							{#each roster.players as player}

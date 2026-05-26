@@ -1,0 +1,6 @@
+{
+  "redirects": [
+    { "source": "/league/:leagueId/playoff-bracket", "destination": "/league/:leagueId/history", "permanent": true },
+    { "source": "/league/:leagueId/awards", "destination": "/league/:leagueId/history", "permanent": true }
+  ]
+}

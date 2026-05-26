@@ -1,64 +1,96 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { StandingRow } from '$lib/types';
-	import { fetchLeagueCore, buildRosterInfoMap, fetchDisplayNameOverrides, combineFpts } from '$lib/sleeper';
+	import { fetchLeague, fetchLeagueCore, buildRosterInfoMap, fetchDisplayNameOverrides, combineFpts } from '$lib/sleeper';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
+
+	interface SeasonEntry { leagueId: string; season: string }
 
 	let standings = $state<StandingRow[]>([]);
 	let loading = $state(true);
 	let error = $state('');
 	let season = $state('');
+	let seasons = $state<SeasonEntry[]>([]);
+	let viewLeagueId = $state(data.leagueId);
 
 	$effect(() => {
-		const leagueId = data.leagueId;
+		const urlLeagueId = data.leagueId;
+		viewLeagueId = urlLeagueId;
+		seasons = [];
 		standings = [];
 		loading = true;
 		error = '';
 		season = '';
 
-		(async () => {
-			try {
-				const { league, rosters, users } = await fetchLeagueCore(leagueId);
-
-				if (data.leagueId !== leagueId) return;
-
-				season = league.season;
-
-				const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
-				const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
-
-				const rows: StandingRow[] = rosters.map((roster) => {
-					const info = rosterInfo.get(roster.roster_id)!;
-					return {
-						rank: 0,
-						rosterId: roster.roster_id,
-						teamName: info.teamName,
-						ownerName: info.ownerName,
-						avatar: info.avatar,
-						wins: roster.settings.wins ?? 0,
-						losses: roster.settings.losses ?? 0,
-						ties: roster.settings.ties ?? 0,
-						fpts: combineFpts(roster.settings.fpts, roster.settings.fpts_decimal),
-						fptsAgainst: combineFpts(roster.settings.fpts_against, roster.settings.fpts_against_decimal),
-						streak: roster.metadata?.streak ?? '–'
-					};
-				});
-
-				rows.sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
-				rows.forEach((r, i) => (r.rank = i + 1));
-
-				standings = rows;
-			} catch (e: any) {
-				if (data.leagueId !== leagueId) return;
-				error = e.message;
-			} finally {
-				if (data.leagueId !== leagueId) return;
-				loading = false;
-			}
-		})();
+		loadStandings(urlLeagueId);
+		walkSeasons(urlLeagueId);
 	});
+
+	async function walkSeasons(urlLeagueId: string) {
+		let curId: string | null = urlLeagueId;
+		while (curId && curId !== '0') {
+			try {
+				const league = await fetchLeague(curId);
+				if (data.leagueId !== urlLeagueId) return;
+				seasons = [...seasons, { leagueId: curId, season: league.season }];
+				curId = league.previous_league_id ?? null;
+			} catch {
+				return;
+			}
+		}
+	}
+
+	async function loadStandings(lid: string) {
+		standings = [];
+		loading = true;
+		error = '';
+		season = '';
+
+		try {
+			const { league, rosters, users } = await fetchLeagueCore(lid);
+			if (viewLeagueId !== lid) return;
+
+			season = league.season;
+			const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+			if (viewLeagueId !== lid) return;
+			const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
+
+			const rows: StandingRow[] = rosters.map((roster) => {
+				const info = rosterInfo.get(roster.roster_id)!;
+				return {
+					rank: 0,
+					rosterId: roster.roster_id,
+					teamName: info.teamName,
+					ownerName: info.ownerName,
+					avatar: info.avatar,
+					wins: roster.settings.wins ?? 0,
+					losses: roster.settings.losses ?? 0,
+					ties: roster.settings.ties ?? 0,
+					fpts: combineFpts(roster.settings.fpts, roster.settings.fpts_decimal),
+					fptsAgainst: combineFpts(roster.settings.fpts_against, roster.settings.fpts_against_decimal),
+					streak: roster.metadata?.streak ?? '–'
+				};
+			});
+
+			rows.sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
+			rows.forEach((r, i) => (r.rank = i + 1));
+			standings = rows;
+		} catch (e: any) {
+			if (viewLeagueId !== lid) return;
+			error = e.message;
+		} finally {
+			if (viewLeagueId !== lid) return;
+			loading = false;
+		}
+	}
+
+	function selectSeason(lid: string) {
+		if (viewLeagueId === lid) return;
+		viewLeagueId = lid;
+		loadStandings(lid);
+	}
 
 	function rankStyle(rank: number) {
 		if (rank === 1) return 'text-amber-400 font-bold';
@@ -86,6 +118,20 @@
 		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">Standings</h1>
 		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">{season} Season</p>
 	</div>
+
+	{#if seasons.length > 1}
+		<div class="flex mb-6 border-b border-navy-700 flex-wrap">
+			{#each seasons as s}
+				<button
+					onclick={() => selectSeason(s.leagueId)}
+					class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+					       {viewLeagueId === s.leagueId ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
+				>
+					{s.season}
+				</button>
+			{/each}
+		</div>
+	{/if}
 
 	{#if loading}
 		<div class="space-y-2">
@@ -117,7 +163,7 @@
 							<th class="px-4 py-3 text-center">T</th>
 						{/if}
 						<th class="px-4 py-3 text-right">PF</th>
-						<th class="px-4 py-3 text-right">PA<FaabEasterEgg eggId="1" leagueId={data.leagueId} loggedIn={!!data.user} /></th>
+						<th class="px-4 py-3 text-right">PA{#if viewLeagueId === data.leagueId}<FaabEasterEgg eggId="1" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</th>
 						<th class="px-4 py-3 text-center">Streak</th>
 					</tr>
 				</thead>

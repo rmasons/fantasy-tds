@@ -90,7 +90,9 @@ export function computeForSeason(
 				? ['QB', 'WR', 'RB', 'TE']
 				: flexType === 'REC_FLEX'
 					? ['WR', 'TE']
-					: ['WR', 'RB', 'TE'];
+					: flexType === 'WRRB_FLEX'
+						? ['WR', 'RB']
+						: ['WR', 'RB', 'TE']; // FLEX
 			const candidates = eligible
 				.flatMap(p => (byPos[p] ?? []).filter(x => !used.has(x.pid)))
 				.sort((a, b) => b.pts - a.pts);
@@ -254,8 +256,9 @@ export function computeForSeason(
 	{
 		let best: { rid: number; streak: number } | null = null;
 		for (const r of rosters) {
-			const streak = (r.metadata?.record ?? '').split('L').reduce((mx, s) => Math.max(mx, s.length), 0);
-			if (!best || streak > best.streak) best = { rid: r.roster_id, streak };
+			let streak = 0, max = 0;
+			for (const c of (r.metadata?.record ?? '')) { if (c === 'W') { max = Math.max(max, ++streak); } else streak = 0; }
+			if (!best || max > best.streak) best = { rid: r.roster_id, streak: max };
 		}
 		if (best && best.streak > 0) set('on_fire', toEntry(best.rid, `${best.streak} straight wins`), best.rid);
 	}
@@ -308,8 +311,9 @@ export function computeForSeason(
 	{
 		let best: { rid: number; streak: number } | null = null;
 		for (const r of rosters) {
-			const streak = (r.metadata?.record ?? '').split('W').reduce((mx, s) => Math.max(mx, s.length), 0);
-			if (!best || streak > best.streak) best = { rid: r.roster_id, streak };
+			let streak = 0, max = 0;
+			for (const c of (r.metadata?.record ?? '')) { if (c === 'L') { max = Math.max(max, ++streak); } else streak = 0; }
+			if (!best || max > best.streak) best = { rid: r.roster_id, streak: max };
 		}
 		if (best && best.streak > 0) set('not_good', toEntry(best.rid, `${best.streak} straight losses`), best.rid);
 	}

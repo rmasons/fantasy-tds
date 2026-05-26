@@ -1,18 +1,7 @@
 <script lang="ts">
 	import type { LayoutData } from '../$types';
-	import type { SlimPlayer } from '$lib/types';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
-	import {
-		fetchLeagueCore,
-		fetchNflState,
-		fetchMatchups,
-		fetchTransactions,
-		buildRosterInfoMap,
-		fetchDisplayNameOverrides,
-		fetchUser,
-		avatarUrl,
-	} from '$lib/sleeper';
-	import { computeForSeason } from '$lib/superlativesEngine';
+	import { fetchDisplayNameOverrides, fetchUser, avatarUrl } from '$lib/sleeper';
 
 	let { data } = $props<{ data: LayoutData }>();
 
@@ -60,7 +49,6 @@
 	// ── State ─────────────────────────────────────────────────────────────────
 
 	let loading = $state(true);
-	let loadingStatus = $state('Loading…');
 	let error = $state('');
 	let superlatives = $state<Superlative[]>([]);
 	let failedVideos = $state(new Set<string>());
@@ -68,29 +56,19 @@
 	$effect(() => {
 		const leagueId = data.leagueId;
 		loading = true;
-		loadingStatus = 'Loading…';
 		error = '';
 		superlatives = [];
 
 		(async () => {
 			try {
-				loadingStatus = 'Fetching league data…';
-				const [{ league, rosters, users }, nfl, playersData, historicalRes] = await Promise.all([
-					fetchLeagueCore(leagueId),
-					fetchNflState(),
-					fetch('/api/players').then(r => r.json()) as Promise<Record<string, SlimPlayer>>,
-					fetch(`/api/superlatives/${leagueId}`).then(r => r.ok ? r.json() : { history: [] }),
-				]);
+				const historicalRes = await fetch(`/api/superlatives/${leagueId}`).then(r => r.ok ? r.json() : { history: [] });
 				if (data.leagueId !== leagueId) return;
 
 				const supMap = new Map<string, SeasonEntry[]>();
-
-				// ── Historical seasons from Firestore ─────────────────
 				type StoredEntry = { ownerId?: string; teamName?: string; stat: string; sub?: string };
 				const history: Array<{ season: string; awards: Record<string, StoredEntry> }> =
 					historicalRes?.history ?? [];
 
-				// Resolve Sleeper usernames → display name + avatar
 				const uniqueOwnerIds = [...new Set(
 					history.flatMap(h => Object.values(h.awards).map(a => a.ownerId).filter(Boolean))
 				)] as string[];
@@ -116,7 +94,6 @@
 				}
 
 				for (const { season, awards } of history) {
-					if (season === league.season) continue;
 					for (const [key, entry] of Object.entries(awards)) {
 						const resolved = entry.ownerId ? ownerDisplayMap.get(entry.ownerId) : null;
 						const arr = supMap.get(key) ?? [];
@@ -128,34 +105,6 @@
 							sub: entry.sub,
 						});
 						supMap.set(key, arr);
-					}
-				}
-
-				// ── Current season from Sleeper ────────────────────────
-				if (nfl.season_type !== 'pre') {
-					const playoffStart: number = league.settings?.playoff_week_start ?? 15;
-					const maxWeek = Math.min(nfl.week, playoffStart - 1);
-
-					if (maxWeek >= 1) {
-						loadingStatus = `Loading ${league.season}…`;
-						const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
-						if (data.leagueId !== leagueId) return;
-
-						const rosterInfoMap = buildRosterInfoMap(rosters, users, overrides);
-						const weeks = Array.from({ length: maxWeek }, (_, i) => i + 1);
-
-						const [matchupWeeks, txWeeks] = await Promise.all([
-							Promise.all(weeks.map(w => fetchMatchups(leagueId, w).catch(() => []))),
-							Promise.all(weeks.map(w => fetchTransactions(leagueId, w).catch(() => []))),
-						]);
-						if (data.leagueId !== leagueId) return;
-
-						const seasonResult = computeForSeason(league, rosters, rosterInfoMap, matchupWeeks, txWeeks, playersData);
-						for (const [key, entry] of seasonResult) {
-							const arr = supMap.get(key) ?? [];
-							arr.push({ season: league.season, teamName: entry.teamName, avatar: entry.avatar, stat: entry.stat, sub: entry.sub });
-							supMap.set(key, arr);
-						}
 					}
 				}
 
@@ -204,7 +153,6 @@
 				</div>
 			{/each}
 		</div>
-		<p class="text-navy-500 text-sm mt-4 italic">{loadingStatus}</p>
 	{:else if error}
 		<p class="text-red-400">Failed to load superlatives: {error}</p>
 	{:else if superlatives.length === 0}

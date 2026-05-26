@@ -2,10 +2,12 @@
 	import { onMount } from 'svelte';
 	import type { LayoutData } from '../$types';
 	import type { SlimPlayer } from '$lib/types';
-	import { fetchLeagueCore, buildRosterInfoMap, fetchDisplayNameOverrides } from '$lib/sleeper';
+	import { fetchLeague, fetchLeagueCore, buildRosterInfoMap, fetchDisplayNameOverrides } from '$lib/sleeper';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: LayoutData }>();
+
+	interface SeasonEntry { leagueId: string; season: string }
 
 	interface RosterTeam {
 		rosterId: number;
@@ -23,6 +25,11 @@
 	let error = $state('');
 	let expandedRow = $state<number | null>(null);
 	let colCount = $state(1);
+	let seasons = $state<SeasonEntry[]>([]);
+	let viewLeagueId = $state(data.leagueId);
+
+	let playersCache: Record<string, SlimPlayer> = {};
+	let playersCacheReady = false;
 
 	onMount(() => {
 		function updateCols() {
@@ -34,6 +41,13 @@
 		}
 		updateCols();
 		window.addEventListener('resize', updateCols);
+
+		// Pre-fetch players once
+		fetch('/api/players').then(r => r.ok ? r.json() : {}).then(p => {
+			playersCache = p;
+			playersCacheReady = true;
+		});
+
 		return () => window.removeEventListener('resize', updateCols);
 	});
 
@@ -56,58 +70,97 @@
 		return p ? { id, name: p.name, pos: p.pos, team: p.team } : { id, name: id, pos: '?', team: 'FA' };
 	}
 
-	const posOrder = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'SUPER_FLEX', 'K', 'DEF', 'IDP_FLEX', 'BN', 'IR'];
-
 	$effect(() => {
-		const leagueId = data.leagueId;
+		const urlLeagueId = data.leagueId;
+		viewLeagueId = urlLeagueId;
+		seasons = [];
 		teams = [];
 		loading = true;
 		error = '';
 		expandedRow = null;
 
-		(async () => {
-			try {
-				const [{ league, rosters, users }, players] = await Promise.all([
-					fetchLeagueCore(leagueId),
-					fetch('/api/players').then((r) => r.json()) as Promise<Record<string, SlimPlayer>>,
-				]);
-
-				if (data.leagueId !== leagueId) return;
-
-				const starterSlots: string[] = (league as any).roster_positions ?? [];
-				const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
-				const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
-
-				teams = rosters.map((r) => {
-					const info = rosterInfo.get(r.roster_id)!;
-					const starterIds = new Set((r as any).starters ?? []);
-					const irIds = new Set(r.reserve ?? []);
-					const allIds: string[] = r.players ?? [];
-
-					return {
-						rosterId: r.roster_id,
-						teamName: info.teamName,
-						ownerName: info.ownerName,
-						avatar: info.avatar,
-						starterSlots,
-						starters: [...starterIds].map((id) => playerInfo(id as string, players)),
-						bench: allIds
-							.filter((id) => !starterIds.has(id) && !irIds.has(id))
-							.map((id) => playerInfo(id, players)),
-						ir: [...irIds].map((id) => playerInfo(id as string, players))
-					};
-				});
-
-				teams.sort((a, b) => a.teamName.localeCompare(b.teamName));
-			} catch (e: any) {
-				if (data.leagueId !== leagueId) return;
-				error = e.message;
-			} finally {
-				if (data.leagueId !== leagueId) return;
-				loading = false;
-			}
-		})();
+		loadRosters(urlLeagueId);
+		walkSeasons(urlLeagueId);
 	});
+
+	async function walkSeasons(urlLeagueId: string) {
+		let curId: string | null = urlLeagueId;
+		while (curId && curId !== '0') {
+			try {
+				const league = await fetchLeague(curId);
+				if (data.leagueId !== urlLeagueId) return;
+				seasons = [...seasons, { leagueId: curId, season: league.season }];
+				curId = league.previous_league_id ?? null;
+			} catch {
+				return;
+			}
+		}
+	}
+
+	async function loadRosters(lid: string) {
+		teams = [];
+		loading = true;
+		error = '';
+		expandedRow = null;
+
+		try {
+			// Fetch players alongside league data (or use cache if ready)
+			const playersPromise = playersCacheReady
+				? Promise.resolve(playersCache)
+				: fetch('/api/players').then((r) => r.json()) as Promise<Record<string, SlimPlayer>>;
+
+			const [{ league, rosters, users }, players] = await Promise.all([
+				fetchLeagueCore(lid),
+				playersPromise,
+			]);
+
+			if (viewLeagueId !== lid) return;
+
+			if (!playersCacheReady) {
+				playersCache = players;
+				playersCacheReady = true;
+			}
+
+			const starterSlots: string[] = (league as any).roster_positions ?? [];
+			const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+			if (viewLeagueId !== lid) return;
+			const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
+
+			teams = rosters.map((r) => {
+				const info = rosterInfo.get(r.roster_id)!;
+				const starterIds = new Set((r as any).starters ?? []);
+				const irIds = new Set(r.reserve ?? []);
+				const allIds: string[] = r.players ?? [];
+
+				return {
+					rosterId: r.roster_id,
+					teamName: info.teamName,
+					ownerName: info.ownerName,
+					avatar: info.avatar,
+					starterSlots,
+					starters: [...starterIds].map((id) => playerInfo(id as string, players)),
+					bench: allIds
+						.filter((id) => !starterIds.has(id) && !irIds.has(id))
+						.map((id) => playerInfo(id, players)),
+					ir: [...irIds].map((id) => playerInfo(id as string, players))
+				};
+			});
+
+			teams.sort((a, b) => a.teamName.localeCompare(b.teamName));
+		} catch (e: any) {
+			if (viewLeagueId !== lid) return;
+			error = e.message;
+		} finally {
+			if (viewLeagueId !== lid) return;
+			loading = false;
+		}
+	}
+
+	function selectSeason(lid: string) {
+		if (viewLeagueId === lid) return;
+		viewLeagueId = lid;
+		loadRosters(lid);
+	}
 
 	const posColor: Record<string, string> = {
 		QB: 'bg-red-900/60 text-red-300',
@@ -122,6 +175,20 @@
 
 <div>
 	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Rosters</h1>
+
+	{#if seasons.length > 1}
+		<div class="flex mb-6 border-b border-navy-700 flex-wrap">
+			{#each seasons as s}
+				<button
+					onclick={() => selectSeason(s.leagueId)}
+					class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+					       {viewLeagueId === s.leagueId ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
+				>
+					{s.season}
+				</button>
+			{/each}
+		</div>
+	{/if}
 
 	{#if loading}
 		<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -182,7 +249,7 @@
 							<!-- Bench -->
 							{#if team.bench.length}
 								<div>
-									<p class="font-sport font-bold text-[10px] uppercase tracking-widest text-slate-300 mb-2 flex items-center gap-1.5"><span class="text-amber-400">◆</span>Bench{#if i === teams.length - 1}<FaabEasterEgg eggId="7" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</p>
+									<p class="font-sport font-bold text-[10px] uppercase tracking-widest text-slate-300 mb-2 flex items-center gap-1.5"><span class="text-amber-400">◆</span>Bench{#if i === teams.length - 1 && viewLeagueId === data.leagueId}<FaabEasterEgg eggId="7" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</p>
 									<div class="space-y-1">
 										{#each team.bench as p}
 											{@const logo = teamLogoUrl(p.team)}

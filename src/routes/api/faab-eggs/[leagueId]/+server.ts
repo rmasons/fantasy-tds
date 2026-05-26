@@ -57,7 +57,8 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		won = true;
 	});
 
-	if (!won && existingClaim?.claimedBy === uid && existingClaim.claimedAt === '') {
+	const ec = existingClaim as EggClaim | null;
+	if (!won && ec !== null && ec.claimedBy === uid && ec.claimedAt === '') {
 		throw error(409, 'Claim limit reached');
 	}
 
