@@ -179,5 +179,5 @@ export const GET: RequestHandler = async ({ params }) => {
 		}
 	}
 
-	return json(records);
+	return json(records, { headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600' } });
 };

@@ -135,7 +135,7 @@
 		{:else}
 			<a
 				href="/login"
-				class="flex items-center px-3 py-2 rounded-lg text-xs text-navy-500 hover:text-slate-300 hover:bg-navy-800 transition-colors"
+				class="block w-full px-3 py-2.5 rounded-lg text-sm font-bold text-center bg-amber-500 hover:bg-amber-400 text-navy-900 transition-colors"
 			>
 				Sign in
 			</a>
@@ -164,29 +164,15 @@
 		</a>
 
 		<!-- Right side -->
-		<div class="ml-auto flex items-center gap-2 shrink-0">
-			{#if page.data.user}
-				<a
-					href="/"
-					class="text-xs text-slate-500 hover:text-slate-300 transition-colors hidden sm:block whitespace-nowrap"
-				>
-					Switch league
-				</a>
-				<button
-					onclick={signOut}
-					class="text-xs text-slate-500 hover:text-red-400 transition-colors"
-				>
-					Sign out
-				</button>
-			{:else}
-				<a
-					href="/login"
-					class="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-				>
-					Sign in
-				</a>
-			{/if}
-
+		<div class="ml-auto flex items-center shrink-0">
+			<button
+				onclick={() => (menuOpen = !menuOpen)}
+				class="flex items-center justify-center w-10 h-10 rounded-lg transition-colors
+				       {menuOpen ? 'text-amber-400 bg-amber-400/10' : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'}"
+				aria-label="Toggle navigation"
+			>
+				<span class="text-xl leading-none">☰</span>
+			</button>
 		</div>
 	</div>
 
@@ -217,7 +203,12 @@
 					<a href="/" class="text-xs text-navy-500 hover:text-slate-300">Switch league</a>
 					<button onclick={signOut} class="text-xs text-navy-500 hover:text-red-400">Sign out</button>
 				{:else}
-					<a href="/login" class="text-xs text-navy-500 hover:text-slate-300">Sign in</a>
+					<a
+						href="/login"
+						class="w-full px-4 py-3 rounded-lg text-sm font-bold text-center bg-amber-500 hover:bg-amber-400 text-navy-900 transition-colors"
+					>
+						Sign in
+					</a>
 				{/if}
 			</div>
 		</div>
@@ -230,7 +221,17 @@
 		class="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-navy-900 border-t border-white/[0.07]"
 		style="padding-bottom: env(safe-area-inset-bottom)"
 	>
-		<div class="grid h-14" style="grid-template-columns: repeat({bottomTabs.length + 1}, 1fr)">
+		{#if !page.data.user}
+			<div class="px-4 py-2 border-b border-white/[0.07]">
+				<a
+					href="/login"
+					class="w-full block px-4 py-2.5 rounded-lg text-sm font-bold text-center bg-amber-500 hover:bg-amber-400 text-navy-900 transition-colors"
+				>
+					Sign in
+				</a>
+			</div>
+		{/if}
+		<div class="grid h-14" style="grid-template-columns: repeat({bottomTabs.length}, 1fr)">
 			{#each bottomTabs as tab}
 				<a
 					href="/league/{leagueId}/{tab.href}"
@@ -243,16 +244,6 @@
 					<span class="text-[9px] font-bold uppercase tracking-wider">{tab.label}</span>
 				</a>
 			{/each}
-			<!-- More button opens the full nav drawer -->
-			<button
-				onclick={() => (menuOpen = !menuOpen)}
-				class="flex flex-col items-center justify-center gap-0.5 transition-colors
-				       {menuOpen ? 'text-amber-400' : 'text-navy-500 hover:text-slate-300'}"
-				aria-label="More navigation"
-			>
-				<span class="text-xl leading-none">☰</span>
-				<span class="text-[9px] font-bold uppercase tracking-wider">More</span>
-			</button>
 		</div>
 	</nav>
 {/if}

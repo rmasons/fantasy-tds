@@ -14,12 +14,13 @@ export const GET: RequestHandler = async ({ url }) => {
 	const draftId = url.searchParams.get('draftId');
 
 	try {
+		const cacheHeader = { headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600' } };
 		if (draftId) {
 			const picks = await getCachedDraftPicks(validateParam(draftId, 'draftId'));
-			return json({ picks });
+			return json({ picks }, cacheHeader);
 		}
 		const drafts = await getCachedDraftList(leagueId);
-		return json({ drafts });
+		return json({ drafts }, cacheHeader);
 	} catch (e) {
 		console.error('[drafts] GET failed:', e);
 		throw error(502, 'Failed to load draft data');

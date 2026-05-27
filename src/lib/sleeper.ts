@@ -2,6 +2,9 @@ import type { SleeperLeague, SleeperLeagueUser, SleeperNflState, SleeperRoster }
 
 const BASE = 'https://api.sleeper.app/v1';
 
+const _clientCache = new Map<string, { data: unknown; ts: number }>();
+const _CACHE_TTL = 5 * 60 * 1000; // 5 min — deduplicates repeated calls within a session
+
 // ── Shared types ──────────────────────────────────────────────────────────────
 
 export interface RosterInfo {
@@ -80,12 +83,18 @@ export async function fetchDisplayNameOverrides(userIds: string[]): Promise<Map<
 // ── Internal fetch helper ─────────────────────────────────────────────────────
 
 async function sleeperGet<T>(url: string): Promise<T> {
+	if (typeof window !== 'undefined') {
+		const hit = _clientCache.get(url);
+		if (hit && Date.now() - hit.ts < _CACHE_TTL) return hit.data as T;
+	}
 	const res = await fetch(url);
 	if (!res.ok) throw new Error(`Sleeper API ${res.status}: ${url}`);
 	if (!res.headers.get('content-type')?.includes('application/json')) {
 		throw new Error(`Unexpected content-type from Sleeper API: ${url}`);
 	}
-	return res.json() as Promise<T>;
+	const data = await res.json() as T;
+	if (typeof window !== 'undefined') _clientCache.set(url, { data, ts: Date.now() });
+	return data;
 }
 
 // ── Individual fetch wrappers ─────────────────────────────────────────────────
