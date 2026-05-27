@@ -28,7 +28,7 @@ export const PUT: RequestHandler = async ({ params, request, locals, url }) => {
 		if (key in body) {
 			const val = typeof body[key] === 'string' ? body[key].trim() : '';
 			if (val.length > max) throw error(400, `${key} exceeds ${max} characters`);
-			update[key] = key === 'twitterHandle' ? val.replace(/^@/, '') || undefined : val || undefined;
+			update[key] = val || undefined;
 		}
 	}
 
