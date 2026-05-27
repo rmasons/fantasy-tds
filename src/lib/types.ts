@@ -105,10 +105,10 @@ export interface ManagerProfile {
 	email?: string;           // written automatically on first login
 	bio?: string;             // max 280 chars
 	location?: string;        // max 60 chars
-	favoriteNFLTeam?: string; // max 60 chars
-	favoritePlayer?: string;  // max 60 chars
-	funFact?: string;         // max 200 chars
-	twitterHandle?: string;   // max 50 chars, no @ prefix stored
+	favoriteNFLTeam?: string;  // max 60 chars — full team name, e.g. "Kansas City Chiefs"
+	favoritePlayer?: string;   // max 60 chars — player display name
+	favoritePlayerId?: string; // max 10 chars — Sleeper player ID for photo lookup
+	preferredContact?: string; // max 60 chars — how to reach this person
 	updatedAt?: number;
 }
 

@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import { fetchLeague, fetchRosters, fetchUsers, fetchWinnersBracket, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
 	import type { ManagerProfile, ManagerLeagueProfile } from '$lib/types';
+	import { teamAbbrByName, teamLogoUrl, playerThumbUrl } from '$lib/nflTeams';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -192,7 +193,7 @@
 
 	const hasAnyProfile = $derived(
 		!!(profile?.bio || profile?.location || profile?.favoriteNFLTeam ||
-		   profile?.favoritePlayer || profile?.funFact || profile?.twitterHandle ||
+		   profile?.favoritePlayer || profile?.preferredContact ||
 		   leagueProfile?.joinedYear)
 	);
 
@@ -208,8 +209,7 @@
 	let ceLocation        = $state('');
 	let ceFavoriteNFLTeam = $state('');
 	let ceFavoritePlayer  = $state('');
-	let ceFunFact         = $state('');
-	let ceTwitterHandle   = $state('');
+	let cePreferredContact = $state('');
 	let ceJoinedYear      = $state('');
 
 	function openCommishEdit() {
@@ -219,8 +219,7 @@
 		ceLocation        = profile?.location ?? '';
 		ceFavoriteNFLTeam = profile?.favoriteNFLTeam ?? '';
 		ceFavoritePlayer  = profile?.favoritePlayer ?? '';
-		ceFunFact         = profile?.funFact ?? '';
-		ceTwitterHandle   = profile?.twitterHandle ?? '';
+		cePreferredContact = profile?.preferredContact ?? '';
 		ceJoinedYear      = leagueProfile?.joinedYear?.toString() ?? '';
 		commishError   = '';
 		commishSuccess = false;
@@ -242,8 +241,7 @@
 					location: ceLocation,
 					favoriteNFLTeam: ceFavoriteNFLTeam,
 					favoritePlayer: ceFavoritePlayer,
-					funFact: ceFunFact,
-					twitterHandle: ceTwitterHandle,
+					preferredContact: cePreferredContact,
 					joinedYear: ceJoinedYear ? parseInt(ceJoinedYear, 10) : null,
 				}),
 			});
@@ -461,15 +459,19 @@
 					</div>
 				</div>
 				<div>
-					<label class="block text-xs text-navy-500 mb-1">Fun Fact / Trash Talk</label>
-					<input type="text" maxlength="200" bind:value={ceFunFact} placeholder="One thing your league needs to know…" class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500" />
-				</div>
-				<div>
-					<label class="block text-xs text-navy-500 mb-1">X / Twitter Handle</label>
-					<div class="flex items-center">
-						<span class="bg-navy-900 border border-r-0 border-navy-700 rounded-l-lg px-3 py-2 text-navy-500 text-sm select-none">@</span>
-						<input type="text" maxlength="50" bind:value={ceTwitterHandle} placeholder="yourhandle" class="flex-1 bg-navy-800 border border-navy-700 rounded-r-lg px-3 py-2 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500" />
-					</div>
+					<label class="block text-xs text-navy-500 mb-1">Preferred Trade Contact</label>
+					<select bind:value={cePreferredContact} class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 appearance-none">
+						<option value="">— Select —</option>
+						<option value="iMessage">iMessage</option>
+						<option value="Phone Call">Phone Call</option>
+						<option value="Signal">Signal</option>
+						<option value="Instagram DM">Instagram DM</option>
+						<option value="Snapchat">Snapchat</option>
+						<option value="Discord">Discord</option>
+						<option value="Email">Email</option>
+						<option value="Smoke Signal">Smoke Signal</option>
+						<option value="Don't contact me">Don't contact me</option>
+					</select>
 				</div>
 				<div class="pt-1">
 					<button
@@ -516,36 +518,39 @@
 						</div>
 					{/if}
 					{#if profile?.favoriteNFLTeam}
+						{@const abbr = teamAbbrByName(profile.favoriteNFLTeam)}
 						<div>
-							<p class="text-xs text-slate-600 uppercase tracking-wider mb-0.5">Favorite Team</p>
-							<p class="text-slate-300">{profile.favoriteNFLTeam}</p>
+							<p class="text-xs text-slate-600 uppercase tracking-wider mb-1">Favorite Team</p>
+							<div class="flex items-center gap-2">
+								{#if abbr}
+									<img src={teamLogoUrl(abbr)} alt={profile.favoriteNFLTeam} class="w-6 h-6 object-contain shrink-0" />
+								{/if}
+								<p class="text-slate-300 leading-tight">{profile.favoriteNFLTeam}</p>
+							</div>
 						</div>
 					{/if}
 					{#if profile?.favoritePlayer}
 						<div>
-							<p class="text-xs text-slate-600 uppercase tracking-wider mb-0.5">Favorite Player</p>
-							<p class="text-slate-300">{profile.favoritePlayer}</p>
+							<p class="text-xs text-slate-600 uppercase tracking-wider mb-1">Favorite Player</p>
+							<div class="flex items-center gap-2">
+								{#if profile.favoritePlayerId}
+									<img
+										src={playerThumbUrl(profile.favoritePlayerId)}
+										alt={profile.favoritePlayer}
+										class="w-7 h-7 rounded-full object-cover object-top bg-navy-700 shrink-0"
+									/>
+								{/if}
+								<p class="text-slate-300 leading-tight">{profile.favoritePlayer}</p>
+							</div>
 						</div>
 					{/if}
-					{#if profile?.twitterHandle}
+					{#if profile?.preferredContact}
 						<div>
-							<p class="text-xs text-navy-500 uppercase tracking-wider mb-0.5">X / Twitter</p>
-							<a
-								href="https://x.com/{profile.twitterHandle}"
-								target="_blank"
-								rel="noopener noreferrer"
-								class="text-amber-400 hover:text-amber-300 transition-colors"
-							>@{profile.twitterHandle}</a>
+							<p class="text-xs text-slate-600 uppercase tracking-wider mb-0.5">Trade Contact</p>
+							<p class="text-slate-300">{profile.preferredContact}</p>
 						</div>
 					{/if}
 				</div>
-
-				{#if profile?.funFact}
-					<div class="pt-3 border-t border-navy-700">
-						<p class="text-xs text-slate-600 uppercase tracking-wider mb-1">Fun Fact</p>
-						<p class="text-slate-300 text-sm italic">"{profile.funFact}"</p>
-					</div>
-				{/if}
 			</div>
 		{:else if isOwnProfile && !loading}
 			<div class="mb-4 p-4 bg-navy-850 rounded-xl border border-dashed border-navy-700 flex items-center justify-between gap-4">

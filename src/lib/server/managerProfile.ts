@@ -10,8 +10,8 @@ export const PROFILE_MAX_LENGTHS: Record<string, number> = {
 	location: 60,
 	favoriteNFLTeam: 60,
 	favoritePlayer: 60,
-	funFact: 200,
-	twitterHandle: 50,
+	favoritePlayerId: 10,
+	preferredContact: 60,
 };
 
 export async function getManagerProfile(sleeperUserId: string): Promise<ManagerProfile | null> {

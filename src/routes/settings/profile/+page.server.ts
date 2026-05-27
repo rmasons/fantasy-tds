@@ -23,19 +23,32 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 };
 
 export const actions: Actions = {
-	saveGlobal: async ({ request, locals }) => {
+	saveGlobal: async ({ request, locals, url }) => {
 		if (!locals.user?.sleeperUserId) return fail(401, { error: 'Not authenticated' });
 
 		const data = await request.formData();
+		const leagueId = url.searchParams.get('leagueId');
 
 		const update: Record<string, string | undefined> = {};
 		for (const [key, max] of Object.entries(PROFILE_MAX_LENGTHS)) {
 			const raw = (data.get(key) as string | null)?.trim() ?? '';
 			if (raw.length > max) return fail(400, { error: `${key} exceeds ${max} characters` });
-			update[key] = key === 'twitterHandle' ? raw.replace(/^@/, '') || undefined : raw || undefined;
+			update[key] = raw || undefined;
 		}
 
 		await upsertManagerProfile(locals.user.sleeperUserId, update);
+
+		if (leagueId) {
+			const rawYear = (data.get('joinedYear') as string | null)?.trim() ?? '';
+			const joinedYear = rawYear ? parseInt(rawYear, 10) : undefined;
+			if (joinedYear !== undefined && (isNaN(joinedYear) || joinedYear < 1990 || joinedYear > 2100)) {
+				return fail(400, { error: 'Invalid year' });
+			}
+			await upsertManagerLeagueProfile(locals.user.sleeperUserId, leagueId, {
+				joinedYear: joinedYear || undefined,
+			});
+		}
+
 		return { success: true, section: 'global' };
 	},
 
