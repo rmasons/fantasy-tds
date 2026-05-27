@@ -38,9 +38,9 @@ export const GET: RequestHandler = async ({ params }) => {
 		}
 	}
 
-	const cacheHeader = { headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600' } };
+	if (!doc.exists) return json({ history: [] }, { headers: { 'Cache-Control': 'no-store' } });
 
-	if (!doc.exists) return json({ history: [] }, cacheHeader);
+	const cacheHeader = { headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600' } };
 
 	const raw = (doc.data()?.seasons ?? {}) as Record<string, Record<string, StoredAwardEntry>>;
 	const history = Object.entries(raw)

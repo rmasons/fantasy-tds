@@ -220,55 +220,6 @@ export async function getKeeperData(leagueId: string): Promise<{
 	return { rosters, planningYear, maxKeepers, faabBudget };
 }
 
-export async function setPlayerOverride(
-	leagueId: string,
-	playerId: string,
-	patch: { yearsKept?: number; baseOverride?: number | null },
-) {
-	const ref = adminDb
-		.collection('keeperData')
-		.doc(leagueId)
-		.collection('players')
-		.doc(playerId);
-
-	const update: Record<string, unknown> = {};
-	if (patch.yearsKept !== undefined) update.yearsKept = patch.yearsKept;
-	if ('baseOverride' in patch) update.baseOverride = patch.baseOverride ?? null;
-
-	await ref.set(update, { merge: true });
-}
-
-export async function importPlayers(
-	leagueId: string,
-	entries: { playerId: string; baseCost?: number | null; yearsKept?: number }[],
-) {
-	const batch = adminDb.batch();
-	const col = adminDb.collection('keeperData').doc(leagueId).collection('players');
-
-	for (const entry of entries) {
-		const ref = col.doc(entry.playerId);
-		const data: Record<string, unknown> = {};
-		if (entry.baseCost !== undefined) data.baseOverride = entry.baseCost ?? null;
-		if (entry.yearsKept !== undefined) data.yearsKept = entry.yearsKept;
-		if (Object.keys(data).length) batch.set(ref, data, { merge: true });
-	}
-
-	await batch.commit();
-}
-
-export function resetPlayerOverride(leagueId: string, playerId: string) {
-	return adminDb
-		.collection('keeperData')
-		.doc(leagueId)
-		.collection('players')
-		.doc(playerId)
-		.delete();
-}
-
-export function invalidateDraftCache(leagueId: string) {
-	return adminDb.collection('keeperDraftHistory').doc(leagueId).delete();
-}
-
 export interface KeeperSelection {
 	ownerUserId: string;
 	rosterId: number;

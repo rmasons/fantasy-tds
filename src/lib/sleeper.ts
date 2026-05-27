@@ -3,7 +3,7 @@ import type { SleeperLeague, SleeperLeagueUser, SleeperNflState, SleeperRoster }
 const BASE = 'https://api.sleeper.app/v1';
 
 const _clientCache = new Map<string, { data: unknown; ts: number }>();
-const _CACHE_TTL = 24 * 60 * 60 * 1000;
+const _CACHE_TTL = 5 * 60 * 1000; // 5 min — deduplicates repeated calls within a session
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
