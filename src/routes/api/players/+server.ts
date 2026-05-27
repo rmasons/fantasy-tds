@@ -4,5 +4,5 @@ import { getPlayers } from '$lib/server/players';
 
 export const GET: RequestHandler = async () => {
 	const players = await getPlayers();
-	return json(players);
+	return json(players, { headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600' } });
 };

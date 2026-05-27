@@ -38,14 +38,16 @@ export const GET: RequestHandler = async ({ params }) => {
 		}
 	}
 
-	if (!doc.exists) return json({ history: [] });
+	const cacheHeader = { headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600' } };
+
+	if (!doc.exists) return json({ history: [] }, cacheHeader);
 
 	const raw = (doc.data()?.seasons ?? {}) as Record<string, Record<string, StoredAwardEntry>>;
 	const history = Object.entries(raw)
 		.map(([season, awards]) => ({ season, awards }))
 		.sort((a, b) => b.season.localeCompare(a.season));
 
-	return json({ history });
+	return json({ history }, cacheHeader);
 };
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
