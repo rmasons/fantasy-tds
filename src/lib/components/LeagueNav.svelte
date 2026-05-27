@@ -135,7 +135,7 @@
 		{:else}
 			<a
 				href="/login"
-				class="flex items-center px-3 py-2 rounded-lg text-xs text-navy-500 hover:text-slate-300 hover:bg-navy-800 transition-colors"
+				class="block w-full px-3 py-2.5 rounded-lg text-sm font-bold text-center bg-amber-500 hover:bg-amber-400 text-navy-900 transition-colors"
 			>
 				Sign in
 			</a>
