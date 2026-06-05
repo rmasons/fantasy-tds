@@ -1,85 +1,32 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { fetchRosters, fetchUsers, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
 	import type { ManagerProfile } from '$lib/types';
+	import type { ManagerCard } from '$lib/server/managers';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
-	interface ManagerCard {
-		userId: string;
-		displayName: string;
-		teamName: string;
-		avatar: string | null;
-		rosterId: number;
-		wins: number;
-		losses: number;
-		ties: number;
-		fpts: number;
-		fptsAgainst: number;
-	}
-
-	let managers = $state<ManagerCard[]>([]);
+	let managers = $state<ManagerCard[]>(data.managers);
 	let profiles = $state<Record<string, ManagerProfile>>({});
-	let loading = $state(true);
-	let error = $state('');
+	let loading = $state(false);
+	let error = $state(data.loadFailed ? 'Failed to load managers.' : '');
 
 	$effect(() => {
 		const leagueId = data.leagueId;
-		managers = [];
+		managers = data.managers;
+		error = data.loadFailed ? 'Failed to load managers.' : '';
 		profiles = {};
-		loading = true;
-		error = '';
 
-		(async () => {
-			try {
-				const [rosters, users] = await Promise.all([
-					fetchRosters(leagueId),
-					fetchUsers(leagueId),
-				]);
-
-				if (data.leagueId !== leagueId) return;
-
-				const rosterInfo = buildRosterInfoMap(rosters, users);
-
-				const built = rosters
-					.filter(r => r.owner_id)
-					.map(r => {
-						const info = rosterInfo.get(r.roster_id)!;
-						return {
-							userId: r.owner_id,
-							displayName: info.ownerName ?? info.teamName,
-							teamName: info.teamName,
-							avatar: info.avatar,
-							rosterId: r.roster_id,
-							wins: r.settings.wins ?? 0,
-							losses: r.settings.losses ?? 0,
-							ties: r.settings.ties ?? 0,
-							fpts: combineFpts(r.settings.fpts, r.settings.fpts_decimal),
-							fptsAgainst: combineFpts(r.settings.fpts_against, r.settings.fpts_against_decimal),
-						};
-					})
-					.sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
-
-				managers = built;
-
-				// Fetch profiles in background — don't block card render
-				const ids = built.map(m => m.userId).join(',');
-				fetch(`/api/profiles?ids=${ids}&leagueId=${leagueId}`)
-					.then(r => r.json())
-					.then(p => {
-						if (data.leagueId !== leagueId) return;
-						profiles = p;
-					})
-					.catch(() => {});
-			} catch (e: any) {
-				if (data.leagueId !== leagueId) return;
-				error = e.message;
-			} finally {
-				if (data.leagueId !== leagueId) return;
-				loading = false;
-			}
-		})();
+		// Enrich with manager profiles via our own gated endpoint (not Sleeper).
+		if (data.managers.length) {
+			const ids = data.managers.map((m: ManagerCard) => m.userId).join(',');
+			fetch(`/api/profiles?ids=${ids}&leagueId=${leagueId}`)
+				.then((r) => r.json())
+				.then((p) => {
+					if (data.leagueId === leagueId) profiles = p;
+				})
+				.catch(() => {});
+		}
 	});
 </script>
 
