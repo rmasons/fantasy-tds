@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { upsertUserProfile } from '$lib/server/user';
+import { upsertUserProfile, getUidBySleeperId } from '$lib/server/user';
 import { upsertManagerProfile } from '$lib/server/managerProfile';
 import type { SleeperUser } from '$lib/types';
 
@@ -24,6 +24,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	const sleeperUser: SleeperUser = await res.json();
+
+	const existingUid = await getUidBySleeperId(sleeperUser.user_id);
+	if (existingUid && existingUid !== locals.user.uid) {
+		return json({ error: 'This Sleeper account is already linked to another user.' }, { status: 409 });
+	}
 
 	await upsertUserProfile(locals.user.uid, {
 		sleeperUserId: sleeperUser.user_id,

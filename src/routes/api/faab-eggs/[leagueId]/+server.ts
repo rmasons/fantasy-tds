@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { adminDb } from '$lib/firebase/admin';
 import { validateLeagueId } from '$lib/server/leagueId';
+import { assertLeagueMember } from '$lib/server/membership';
 
 export interface EggClaim {
 	claimedBy: string;
@@ -28,6 +29,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	if (!eggId || !VALID_EGG_IDS.has(eggId)) throw error(400, 'Invalid eggId');
 
 	const leagueId = validateLeagueId(params.leagueId);
+	await assertLeagueMember(locals.user, leagueId);
 	const docRef = adminDb().collection('faabEggs').doc(leagueId);
 	const uid = locals.user.sleeperUserId ?? locals.user.uid;
 

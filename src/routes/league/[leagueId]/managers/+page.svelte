@@ -65,7 +65,7 @@
 
 				// Fetch profiles in background — don't block card render
 				const ids = built.map(m => m.userId).join(',');
-				fetch(`/api/profiles?ids=${ids}`)
+				fetch(`/api/profiles?ids=${ids}&leagueId=${leagueId}`)
 					.then(r => r.json())
 					.then(p => {
 						if (data.leagueId !== leagueId) return;

@@ -6,6 +6,7 @@ import {
 	clearKeeperSelection,
 } from '$lib/server/keepers';
 import { validateLeagueId } from '$lib/server/leagueId';
+import { assertLeagueMember } from '$lib/server/membership';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');
@@ -29,6 +30,8 @@ export const PUT: RequestHandler = async ({ url, request, locals }) => {
 	) {
 		throw error(400, 'Invalid playerIds');
 	}
+
+	await assertLeagueMember(locals.user, leagueId, body.rosterId);
 
 	const selection = await setKeeperSelection(leagueId, ownerUserId, body.rosterId, body.playerIds);
 	return json({ ok: true, selection });

@@ -14,6 +14,16 @@ export const PROFILE_MAX_LENGTHS: Record<string, number> = {
 	preferredContact: 60,
 };
 
+// Fields kept off public responses; only returned to authenticated league-mates.
+const PRIVATE_PROFILE_FIELDS = ['email', 'firstName', 'lastName', 'preferredContact'] as const;
+
+/** Strip personally-identifying fields, leaving the public subset. */
+export function redactManagerProfile(profile: ManagerProfile): ManagerProfile {
+	const out = { ...profile };
+	for (const f of PRIVATE_PROFILE_FIELDS) delete out[f];
+	return out;
+}
+
 export async function getManagerProfile(sleeperUserId: string): Promise<ManagerProfile | null> {
 	const doc = await adminDb().collection('managerProfiles').doc(sleeperUserId).get();
 	if (!doc.exists) return null;

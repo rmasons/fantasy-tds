@@ -34,21 +34,50 @@ async function fetchAndSlimFromSleeper(): Promise<Record<string, SlimPlayer>> {
 	);
 }
 
+// The slimmed active-player set is too large for a single Firestore doc (1 MB
+// ceiling), so it is sharded across N chunk docs plus a manifest doc.
+const CHUNK_SIZE = 1000; // entries per chunk doc — well under the 1 MB limit
+const MANIFEST_ID = 'players_nfl';
+const chunkId = (i: number) => `${MANIFEST_ID}_${i}`;
+
+async function readChunks(chunkCount: number): Promise<Record<string, SlimPlayer>> {
+	const col = adminDb().collection('playersCache');
+	const refs = Array.from({ length: chunkCount }, (_, i) => col.doc(chunkId(i)));
+	const docs = await adminDb().getAll(...refs);
+	const merged: Record<string, SlimPlayer> = {};
+	for (const d of docs) {
+		if (!d.exists) throw new Error(`players cache missing chunk ${d.id}`);
+		Object.assign(merged, JSON.parse(d.data()!.data));
+	}
+	return merged;
+}
+
+async function writeChunks(slim: Record<string, SlimPlayer>, date: string): Promise<void> {
+	const col = adminDb().collection('playersCache');
+	const entries = Object.entries(slim);
+	const chunkCount = Math.max(1, Math.ceil(entries.length / CHUNK_SIZE));
+	const batch = adminDb().batch();
+	for (let i = 0; i < chunkCount; i++) {
+		const slice = Object.fromEntries(entries.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
+		batch.set(col.doc(chunkId(i)), { data: JSON.stringify(slice) });
+	}
+	batch.set(col.doc(MANIFEST_ID), { chunkCount, cachedDate: date, schemaVersion: SCHEMA_VERSION });
+	await batch.commit();
+}
+
 export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
 	const date = today();
 
 	if (memCache && memCacheDate === date) return memCache;
 
-	const docRef = adminDb().collection('playersCache').doc('players_nfl');
-
 	try {
-		const doc = await docRef.get();
-		if (doc.exists) {
-			const cached = doc.data()!;
-			if (cached.cachedDate === date && cached.schemaVersion === SCHEMA_VERSION) {
-				memCache = JSON.parse(cached.data);
+		const manifest = await adminDb().collection('playersCache').doc(MANIFEST_ID).get();
+		if (manifest.exists) {
+			const m = manifest.data()!;
+			if (m.cachedDate === date && m.schemaVersion === SCHEMA_VERSION && typeof m.chunkCount === 'number') {
+				memCache = await readChunks(m.chunkCount);
 				memCacheDate = date;
-				return memCache!;
+				return memCache;
 			}
 		}
 	} catch (e) {
@@ -56,10 +85,8 @@ export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
 	}
 
 	const slim = await fetchAndSlimFromSleeper();
-	const jsonStr = JSON.stringify(slim);
-	console.log(`[players] Cache payload size: ${(jsonStr.length / 1024).toFixed(1)} KB`);
 	try {
-		await docRef.set({ data: jsonStr, cachedDate: date, schemaVersion: SCHEMA_VERSION });
+		await writeChunks(slim, date);
 	} catch (e) {
 		console.error('[players] Failed to write to Firestore:', e);
 	}

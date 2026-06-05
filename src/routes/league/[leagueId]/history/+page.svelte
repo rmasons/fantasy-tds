@@ -197,7 +197,7 @@
 						.map(e => e.ownerId)
 				)];
 				if (ownerIds.length) {
-					fetch(`/api/profiles?ids=${ownerIds.join(',')}`)
+					fetch(`/api/profiles?ids=${ownerIds.join(',')}&leagueId=${leagueId}`)
 						.then(r => r.json())
 						.then(p => { if (data.leagueId === leagueId) profiles = p; })
 						.catch(() => {});
