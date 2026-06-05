@@ -55,6 +55,7 @@ export interface SleeperRoster {
 	owner_id: string;
 	co_owners: string[] | null;
 	players: string[] | null;   // all rostered player IDs
+	starters: string[] | null;  // starting-lineup player IDs (in slot order)
 	reserve: string[] | null;   // IR slot player IDs
 	settings: {
 		wins: number;
