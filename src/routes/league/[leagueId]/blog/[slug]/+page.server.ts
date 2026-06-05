@@ -67,5 +67,11 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 	const ogImage = findFirstImage(item.fields.body, assetMap) ?? leagueAvatar;
 	const ogDescription = getTextExcerpt(item.fields.body).trim();
 
-	return { slug, ogTitle, ogImage, ogDescription };
+	// Check if this is the most recent post so we can show a hidden egg
+	const latestParams = new URLSearchParams({ ...Object.fromEntries(baseParams), order: '-sys.createdAt', limit: '1', select: 'sys.id' });
+	const latestRes = await fetch(`https://cdn.contentful.com/spaces/${spaceId}/entries?${latestParams}`);
+	const latestData = latestRes.ok ? await latestRes.json() : null;
+	const isLatestPost = latestData?.items?.[0]?.sys?.id === item.sys.id;
+
+	return { slug, ogTitle, ogImage, ogDescription, isLatestPost };
 };
