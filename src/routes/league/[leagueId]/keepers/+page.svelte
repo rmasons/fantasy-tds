@@ -292,19 +292,9 @@
 						{:else}
 							<div class="w-7 h-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-xs shrink-0">🏈</div>
 						{/if}
-						<span class="font-semibold text-white text-sm truncate flex-1">{roster.ownerName}</span>
-						<div class="flex items-center gap-2 shrink-0">
-							{#if mySelection}
-								<span class="text-xs text-green-400 font-semibold">✓ {mySelection.playerIds.length}</span>
-							{:else if isMyRoster}
-								<span class="text-xs {count > 0 ? 'text-amber-400 font-semibold' : 'text-slate-500'}">
-									{count > 0 ? `${count} sel.` : 'pick keepers'}
-								</span>
-							{:else}
-								<span class="text-xs text-slate-600">pending</span>
-							{/if}
-							<span class="text-navy-500 text-xs ml-1">{isExpanded(i) ? '▲' : '▼'}</span>
-						</div>
+						<span class="font-semibold text-white text-sm truncate min-w-0">{roster.ownerName}</span>
+						<span class="text-xs font-bold text-amber-400 shrink-0 ml-auto">${roster.faabRemaining}</span>
+						<span class="text-navy-500 text-xs shrink-0">{isExpanded(i) ? '▲' : '▼'}</span>
 					</button>
 
 					{#if isExpanded(i)}
