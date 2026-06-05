@@ -17,6 +17,7 @@ export const load: LayoutServerLoad = async ({ locals, params }) => {
 		user: locals.user,
 		leagueId: params.leagueId,
 		leagueName: league?.name ?? null,
+		leagueAvatar: league?.avatar ? `https://sleepercdn.com/avatars/${league.avatar}` : null,
 		hasBlog: !!(leagueConfig.contentfulSpaceId && leagueConfig.contentfulAccessToken),
 		enabledNavItems: leagueConfig.enabledNavItems ?? null,
 	};

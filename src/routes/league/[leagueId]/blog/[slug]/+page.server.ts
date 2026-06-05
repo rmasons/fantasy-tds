@@ -26,8 +26,9 @@ function getTextExcerpt(node: any, maxLen = 160): string {
 	return (node.content ?? []).map((c: any) => getTextExcerpt(c)).join('').slice(0, maxLen);
 }
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, parent }) => {
 	const { leagueId, slug } = params;
+	const { leagueAvatar } = await parent();
 	const config = await getLeagueConfig(leagueId);
 	const spaceId = config.contentfulSpaceId ?? '';
 	const token = config.contentfulAccessToken ?? '';
@@ -63,7 +64,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	}
 
 	const ogTitle: string = item.fields.title ?? '';
-	const ogImage = findFirstImage(item.fields.body, assetMap);
+	const ogImage = findFirstImage(item.fields.body, assetMap) ?? leagueAvatar;
 	const ogDescription = getTextExcerpt(item.fields.body).trim();
 
 	return { slug, ogTitle, ogImage, ogDescription };
