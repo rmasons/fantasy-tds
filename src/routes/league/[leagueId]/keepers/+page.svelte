@@ -25,6 +25,10 @@
 		}
 	}
 
+	onMount(() => {
+		if (new URLSearchParams(window.location.search).get('hunt') === '1') openHunt();
+	});
+
 	// ── State ──────────────────────────────────────────────────────────────
 	let rosters = $state<KeeperRosterData[]>([]);
 	let planningYear = $state('');
