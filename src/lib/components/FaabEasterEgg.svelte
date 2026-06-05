@@ -136,9 +136,10 @@
 	<div class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(0,0,0,0.85);backdrop-filter:blur(4px)">
 		<div class="bg-navy-850 border border-amber-500/40 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
 			<div class="text-5xl mb-5">🎉</div>
-			<h2 class="font-sport font-black text-3xl uppercase text-amber-400 leading-tight mb-3">Congratulations!</h2>
+			<h2 class="font-sport font-black text-3xl uppercase text-amber-400 leading-tight mb-3">FINALLY.</h2>
 			<p class="text-white text-lg leading-relaxed mb-2">You found <span class="text-amber-400 font-bold">$5 of extra FAAB!</span></p>
-			<p class="text-slate-400 text-sm mb-8">Send this screenshot to the league group text to claim.</p>
+			<p class="text-slate-400 text-sm mb-2">This has been sitting here for two weeks. <span class="text-slate-300 italic">Two weeks.</span> And you're the first one to find it. Remarkable.</p>
+			<p class="text-slate-500 text-xs mb-6">Take a screenshot and send it to the league group text to collect. Don't forget to check the <a href="/league/{leagueId}/keepers?hunt=1" onclick={() => { open = false; }} class="text-amber-400 hover:underline">hunt page</a> for the rest.</p>
 			<button
 				onclick={() => { open = false; }}
 				class="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-navy-950 font-sport font-bold uppercase tracking-wide rounded-xl transition-colors text-sm"
