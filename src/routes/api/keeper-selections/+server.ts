@@ -5,12 +5,7 @@ import {
 	setKeeperSelection,
 	clearKeeperSelection,
 } from '$lib/server/keepers';
-
-function validateLeagueId(id: string | null): string {
-	if (!id) throw error(400, 'Missing leagueId');
-	if (!/^[\w-]+$/.test(id)) throw error(400, 'Invalid leagueId');
-	return id;
-}
+import { validateLeagueId } from '$lib/server/leagueId';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');

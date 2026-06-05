@@ -1,4 +1,13 @@
-import type { SleeperLeague, SleeperLeagueUser, SleeperNflState, SleeperRoster } from './types';
+import type {
+	SleeperLeague,
+	SleeperLeagueUser,
+	SleeperNflState,
+	SleeperRoster,
+	SleeperBracketMatch,
+	SleeperTransaction,
+	SleeperDraft,
+	SleeperDraftPick,
+} from './types';
 
 const BASE = 'https://api.sleeper.app/v1';
 
@@ -123,23 +132,23 @@ export function fetchMatchups(leagueId: string, week: number): Promise<RawMatchu
 	return sleeperGet(`${BASE}/league/${leagueId}/matchups/${week}`);
 }
 
-export function fetchWinnersBracket(leagueId: string): Promise<any[]> {
+export function fetchWinnersBracket(leagueId: string): Promise<SleeperBracketMatch[]> {
 	return sleeperGet(`${BASE}/league/${leagueId}/winners_bracket`);
 }
 
-export function fetchLosersBracket(leagueId: string): Promise<any[]> {
+export function fetchLosersBracket(leagueId: string): Promise<SleeperBracketMatch[]> {
 	return sleeperGet(`${BASE}/league/${leagueId}/losers_bracket`);
 }
 
-export function fetchTransactions(leagueId: string, week: number): Promise<any[]> {
+export function fetchTransactions(leagueId: string, week: number): Promise<SleeperTransaction[]> {
 	return sleeperGet(`${BASE}/league/${leagueId}/transactions/${week}`);
 }
 
-export function fetchDrafts(leagueId: string): Promise<any[]> {
+export function fetchDrafts(leagueId: string): Promise<SleeperDraft[]> {
 	return sleeperGet(`${BASE}/league/${leagueId}/drafts`);
 }
 
-export function fetchDraftPicks(draftId: string): Promise<any[]> {
+export function fetchDraftPicks(draftId: string): Promise<SleeperDraftPick[]> {
 	return sleeperGet(`${BASE}/draft/${draftId}/picks`);
 }
 

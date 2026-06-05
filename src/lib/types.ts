@@ -83,6 +83,75 @@ export interface SleeperLeagueUser {
 	};
 }
 
+export interface SleeperBracketMatch {
+	r: number;                              // round number
+	m: number;                              // match id within the bracket
+	t1: number | null;                      // roster_id of team 1 (null until resolved)
+	t2: number | null;                      // roster_id of team 2
+	w: number | null;                       // roster_id of the winner
+	l: number | null;                       // roster_id of the loser
+	t1_from?: { w?: number; l?: number };   // which prior match feeds slot t1
+	t2_from?: { w?: number; l?: number };
+	p?: number;                             // placement this match decides (1 = championship)
+}
+
+export interface SleeperTransactionDraftPick {
+	season: string;
+	round: number;
+	roster_id: number;          // roster that originally owned the pick
+	previous_owner_id: number;
+	owner_id: number;           // roster_id receiving the pick
+}
+
+export interface SleeperTransaction {
+	transaction_id: string;
+	type: string;               // 'trade' | 'waiver' | 'free_agent' | 'commissioner'
+	status: string;             // 'complete' | 'failed' | 'pending'
+	status_updated: number;     // epoch ms
+	created: number;            // epoch ms
+	leg: number;                // week
+	roster_ids: number[];
+	consenter_ids?: number[] | null;
+	adds: Record<string, number> | null;   // player_id → roster_id
+	drops: Record<string, number> | null;
+	draft_picks: SleeperTransactionDraftPick[];
+	waiver_budget: { sender: number; receiver: number; amount: number }[];
+	settings: { waiver_bid?: number; seq?: number } | null;
+	metadata: { notes?: string } | null;
+	creator: string;
+}
+
+export interface SleeperDraft {
+	draft_id: string;
+	league_id: string;
+	status: string;             // 'complete' | 'drafting' | 'pre_draft' | 'paused'
+	type: string;               // 'snake' | 'auction' | 'linear'
+	season: string;
+	season_type: string;
+	start_time: number;
+	created: number;
+	draft_order: Record<string, number> | null;       // user_id → draft slot
+	slot_to_roster_id: Record<string, number> | null; // slot → roster_id
+	settings: {
+		rounds: number;
+		teams: number;
+		[key: string]: number | undefined;
+	};
+	metadata?: Record<string, string>;
+}
+
+export interface SleeperDraftPick {
+	draft_id: string;
+	pick_no: number;
+	round: number;
+	draft_slot: number;
+	roster_id: number;
+	player_id: string;
+	picked_by: string;          // user_id
+	is_keeper: boolean | null;
+	metadata?: Record<string, string | undefined>;
+}
+
 export interface StandingRow {
 	rank: number;
 	rosterId: number;

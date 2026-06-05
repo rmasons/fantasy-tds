@@ -3,6 +3,8 @@ import type { RequestHandler } from './$types';
 import { adminDb } from '$lib/firebase/admin';
 import { fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
+import { validateLeagueId } from '$lib/server/leagueId';
+import { cachedFetch } from '$lib/server/cache';
 import type { SeasonRecords, RosterSummary, RecordGame, RecordScore } from '$lib/types';
 
 // Bump when SeasonRecords shape changes to invalidate the Firestore cache.
@@ -129,32 +131,16 @@ async function buildRecords(leagueId: string): Promise<SeasonRecords> {
 
 export const GET: RequestHandler = async ({ params }) => {
 
-	const { leagueId } = params;
-	const docRef = adminDb.collection('recordsCache').doc(leagueId);
+	const leagueId = validateLeagueId(params.leagueId);
 
-	let records: SeasonRecords | null = null;
-
-	try {
-		const doc = await docRef.get();
-		if (doc.exists) {
-			const data = doc.data()!;
-			if (data.schemaVersion === SCHEMA_VERSION && (data.status === 'complete' || data.cachedDate === today())) {
-				const { cachedDate: _, schemaVersion: _v, ...cached } = data;
-				records = cached as SeasonRecords;
-			}
-		}
-	} catch {
-		// cache miss — fall through to Sleeper
-	}
-
-	if (!records) {
-		records = await buildRecords(leagueId);
-		try {
-			await docRef.set({ ...records, cachedDate: today(), schemaVersion: SCHEMA_VERSION });
-		} catch (e) {
-			console.error('[records] Failed to write cache:', e);
-		}
-	}
+	// Completed seasons are immutable; in-progress seasons refresh daily.
+	const records = await cachedFetch<SeasonRecords>(adminDb().collection('recordsCache').doc(leagueId), {
+		schemaVersion: SCHEMA_VERSION,
+		isFresh: (env) =>
+			env.schemaVersion === SCHEMA_VERSION &&
+			(env.value.status === 'complete' || new Date(env.cachedAt).toISOString().split('T')[0] === today()),
+		fetcher: () => buildRecords(leagueId),
+	});
 
 	// Re-apply current display name overrides on every response so profile
 	// changes are reflected immediately even for permanently-cached complete seasons.

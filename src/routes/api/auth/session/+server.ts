@@ -13,7 +13,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
 	let decoded;
 	try {
-		decoded = await adminAuth.verifyIdToken(idToken);
+		decoded = await adminAuth().verifyIdToken(idToken);
 	} catch {
 		return json({ error: 'Invalid or expired token' }, { status: 401 });
 	}

@@ -11,6 +11,7 @@ import {
 import { getCachedMatchups, getCachedTransactions } from '$lib/server/sleeperCache';
 import { computeForSeason } from '$lib/superlativesEngine';
 import { getPlayers } from '$lib/server/players';
+import { validateLeagueId } from '$lib/server/leagueId';
 
 export interface StoredAwardEntry {
 	ownerId?: string;   // Sleeper username — preferred; resolved to display name + avatar at render time
@@ -23,15 +24,15 @@ export interface StoredAwardEntry {
 // { seasons: { "2024": { big_hairy: { teamName, stat, sub? }, ... }, ... } }
 
 export const GET: RequestHandler = async ({ params }) => {
-	const { leagueId } = params;
+	const leagueId = validateLeagueId(params.leagueId);
 
 	// Try the current leagueId first, then fall back one hop for new-season transitions.
-	let doc = await adminDb.collection('superlativeHistory').doc(leagueId).get();
+	let doc = await adminDb().collection('superlativeHistory').doc(leagueId).get();
 	if (!doc.exists) {
 		try {
 			const league = await fetchLeague(leagueId);
 			if (league.previous_league_id) {
-				doc = await adminDb.collection('superlativeHistory').doc(league.previous_league_id).get();
+				doc = await adminDb().collection('superlativeHistory').doc(league.previous_league_id).get();
 			}
 		} catch {
 			// ignore — return empty
@@ -54,7 +55,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');
 	if (!locals.user.isAdmin) throw error(403, 'Forbidden');
 
-	const { leagueId } = params;
+	const leagueId = validateLeagueId(params.leagueId);
 	const body = await request.json().catch(() => null);
 
 	if (
@@ -82,7 +83,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		};
 	}
 
-	await adminDb
+	await adminDb()
 		.collection('superlativeHistory')
 		.doc(leagueId)
 		.set({ seasons: { [body.season]: awards } }, { merge: true });
@@ -96,9 +97,9 @@ export const PUT: RequestHandler = async ({ params, locals }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');
 	if (!locals.user.isAdmin) throw error(403, 'Forbidden');
 
-	const { leagueId } = params;
+	const leagueId = validateLeagueId(params.leagueId);
 	const playersData = await getPlayers();
-	const docRef = adminDb.collection('superlativeHistory').doc(leagueId);
+	const docRef = adminDb().collection('superlativeHistory').doc(leagueId);
 
 	// Walk backwards through the previous_league_id chain, collecting all leagues.
 	const leagues: import('$lib/types').SleeperLeague[] = [];
@@ -186,14 +187,14 @@ export const DELETE: RequestHandler = async ({ params, request, locals }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');
 	if (!locals.user.isAdmin) throw error(403, 'Forbidden');
 
-	const { leagueId } = params;
+	const leagueId = validateLeagueId(params.leagueId);
 	const body = await request.json().catch(() => null);
 
 	if (!body || typeof body.season !== 'string' || !/^\d{4}$/.test(body.season)) {
 		throw error(400, 'Body must be { season: "YYYY" }');
 	}
 
-	const docRef = adminDb.collection('superlativeHistory').doc(leagueId);
+	const docRef = adminDb().collection('superlativeHistory').doc(leagueId);
 	await docRef.update({ [`seasons.${body.season}`]: FieldValue.delete() });
 
 	return json({ ok: true, deleted: body.season });

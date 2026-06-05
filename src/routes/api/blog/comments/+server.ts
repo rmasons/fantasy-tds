@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { adminDb } from '$lib/firebase/admin';
 import { getLeagueConfig } from '$lib/server/config';
 import { checkRateLimit } from '$lib/server/rateLimit';
+import { validateLeagueId } from '$lib/server/leagueId';
 
 const COMMENT_RATE_LIMIT_MS = 30_000;
 
@@ -11,11 +12,9 @@ export const GET: RequestHandler = async ({ url, getClientAddress }) => {
 	if (!checkRateLimit(`comments:${getClientAddress()}`)) {
 		return new Response('Too many requests.', { status: 429, headers: { 'Retry-After': '60' } });
 	}
-	const leagueId = url.searchParams.get('leagueId') ?? '';
+	const leagueId = validateLeagueId(url.searchParams.get('leagueId'));
 	const postId = url.searchParams.get('postId');
 
-	if (!leagueId) throw error(400, 'Missing leagueId');
-	if (!/^[\w-]+$/.test(leagueId)) throw error(400, 'Invalid leagueId.');
 	if (!postId) throw error(400, 'Missing postId');
 
 	const config = await getLeagueConfig(leagueId);
@@ -51,8 +50,9 @@ export const POST: RequestHandler = async ({ request, locals, getClientAddress }
 	if (!body?.leagueId || !body?.postId || !body?.comment?.trim()) {
 		throw error(400, 'leagueId, postId, and comment are required.');
 	}
+	const leagueId = validateLeagueId(body.leagueId);
 
-	const config = await getLeagueConfig(body.leagueId);
+	const config = await getLeagueConfig(leagueId);
 	const spaceId = config.contentfulSpaceId ?? '';
 	const mgmtToken = config.contentfulManagementToken ?? '';
 
@@ -61,7 +61,7 @@ export const POST: RequestHandler = async ({ request, locals, getClientAddress }
 	}
 
 	// Rate limit: one comment per 30 seconds per user
-	const userRef = adminDb.collection('users').doc(locals.user.uid);
+	const userRef = adminDb().collection('users').doc(locals.user.uid);
 	const userSnap = await userRef.get();
 	const lastAt: number = userSnap.data()?.lastCommentAt ?? 0;
 	if (Date.now() - lastAt < COMMENT_RATE_LIMIT_MS) {
