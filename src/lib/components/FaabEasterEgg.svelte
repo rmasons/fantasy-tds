@@ -28,6 +28,7 @@
 	let claimedBy = $state('');
 	let open = $state(false);
 	let alreadyOpen = $state(false);
+	let loginOpen = $state(false);
 	let claiming = $state(false);
 	let claimError = $state('');
 
@@ -46,6 +47,10 @@
 	});
 
 	async function trigger() {
+		if (!loggedIn) {
+			loginOpen = true;
+			return;
+		}
 		if (claiming) return;
 		claiming = true;
 		claimError = '';
@@ -82,7 +87,7 @@
 	}
 </script>
 
-{#if status === 'unclaimed' && loggedIn}
+{#if status === 'unclaimed'}
 	<button
 		onclick={trigger}
 		disabled={claiming}
@@ -128,6 +133,26 @@
 				onclick={() => { alreadyOpen = false; }}
 				class="px-8 py-3 bg-navy-700 hover:bg-navy-600 text-white font-sport font-bold uppercase tracking-wide rounded-xl transition-colors text-sm"
 			>Dang!</button>
+		</div>
+	</div>
+{/if}
+
+{#if loginOpen}
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(0,0,0,0.85);backdrop-filter:blur(4px)">
+		<div class="bg-navy-850 border border-amber-500/40 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
+			<div class="text-5xl mb-5">🥚</div>
+			<h2 class="font-sport font-black text-2xl uppercase text-amber-400 leading-tight mb-3">You Found an Egg!</h2>
+			<p class="text-slate-300 leading-relaxed mb-8">Sign in to claim <span class="text-amber-400 font-bold">$5 of extra FAAB</span>.</p>
+			<div class="flex gap-3 justify-center">
+				<button
+					onclick={() => { loginOpen = false; }}
+					class="px-6 py-3 bg-navy-700 hover:bg-navy-600 text-white font-sport font-bold uppercase tracking-wide rounded-xl transition-colors text-sm"
+				>Not Now</button>
+				<a
+					href="/login"
+					class="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-navy-950 font-sport font-bold uppercase tracking-wide rounded-xl transition-colors text-sm"
+				>Sign In</a>
+			</div>
 		</div>
 	</div>
 {/if}
