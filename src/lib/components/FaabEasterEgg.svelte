@@ -18,7 +18,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	let { eggId, leagueId, loggedIn } = $props<{ eggId: string; leagueId: string; loggedIn: boolean }>();
+	let { eggId, leagueId, loggedIn, large = false } = $props<{ eggId: string; leagueId: string; loggedIn: boolean; large?: boolean }>();
 
 	const STORAGE_KEY = `faab_egg_${eggId}`;
 
@@ -87,23 +87,49 @@
 	}
 </script>
 
-{#if status === 'unclaimed'}
-	<button
-		onclick={trigger}
-		disabled={claiming}
-		aria-label="secret"
-		class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full border border-amber-400/50 bg-amber-400/10 text-amber-400 text-[10px] font-bold uppercase tracking-wide cursor-pointer hover:bg-amber-400/20 hover:border-amber-400 transition-colors select-none disabled:opacity-50"
-	>💰 $5</button>
-{:else if status === 'other'}
-	<button
-		onclick={() => { alreadyOpen = true; }}
-		aria-label="already claimed"
-		class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full border border-navy-600 bg-navy-800 text-navy-500 text-[10px] font-bold uppercase tracking-wide cursor-pointer hover:text-slate-400 transition-colors select-none"
-	>💰 claimed</button>
-{/if}
-
-{#if claimError}
-	<span class="ml-1 text-[10px] text-red-400">{claimError}</span>
+{#if large}
+	{#if status === 'unclaimed'}
+		<button
+			onclick={trigger}
+			disabled={claiming}
+			aria-label="secret egg"
+			class="flex flex-col items-center gap-2 w-full py-6 my-6 rounded-2xl border-2 border-amber-400/50 bg-amber-400/10 hover:bg-amber-400/20 hover:border-amber-400 transition-all cursor-pointer select-none disabled:opacity-50 animate-pulse"
+		>
+			<span class="text-6xl">🥚</span>
+			<span class="text-amber-400 font-sport font-black text-xl uppercase tracking-wide">Hidden Egg — $5 FAAB</span>
+			<span class="text-amber-400/70 text-sm">Tap to claim</span>
+		</button>
+	{:else if status === 'other'}
+		<button
+			onclick={() => { alreadyOpen = true; }}
+			aria-label="already claimed"
+			class="flex flex-col items-center gap-2 w-full py-6 my-6 rounded-2xl border-2 border-navy-700 bg-navy-850 cursor-pointer select-none"
+		>
+			<span class="text-6xl opacity-40">🥚</span>
+			<span class="text-navy-500 font-sport font-black text-xl uppercase tracking-wide">Already Claimed</span>
+		</button>
+	{/if}
+	{#if claimError}
+		<p class="text-center text-sm text-red-400 -mt-4 mb-4">{claimError}</p>
+	{/if}
+{:else}
+	{#if status === 'unclaimed'}
+		<button
+			onclick={trigger}
+			disabled={claiming}
+			aria-label="secret"
+			class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full border border-amber-400/50 bg-amber-400/10 text-amber-400 text-[10px] font-bold uppercase tracking-wide cursor-pointer hover:bg-amber-400/20 hover:border-amber-400 transition-colors select-none disabled:opacity-50"
+		>💰 $5</button>
+	{:else if status === 'other'}
+		<button
+			onclick={() => { alreadyOpen = true; }}
+			aria-label="already claimed"
+			class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full border border-navy-600 bg-navy-800 text-navy-500 text-[10px] font-bold uppercase tracking-wide cursor-pointer hover:text-slate-400 transition-colors select-none"
+		>💰 claimed</button>
+	{/if}
+	{#if claimError}
+		<span class="ml-1 text-[10px] text-red-400">{claimError}</span>
+	{/if}
 {/if}
 
 {#if open}
