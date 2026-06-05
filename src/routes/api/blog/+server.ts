@@ -5,7 +5,7 @@ import { checkRateLimit } from '$lib/server/rateLimit';
 import { validateLeagueId } from '$lib/server/leagueId';
 
 export const GET: RequestHandler = async ({ url, getClientAddress }) => {
-	if (!checkRateLimit(`blog:${getClientAddress()}`)) {
+	if (!(await checkRateLimit(`blog:${getClientAddress()}`))) {
 		return new Response('Too many requests.', { status: 429, headers: { 'Retry-After': '60' } });
 	}
 	const leagueId = validateLeagueId(url.searchParams.get('leagueId'));

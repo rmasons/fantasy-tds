@@ -6,7 +6,7 @@ import type { ManagerProfile } from '$lib/types';
 
 export const PUT: RequestHandler = async ({ request, locals, getClientAddress }) => {
 	if (!locals.user?.sleeperUserId) throw error(401, 'Not authenticated');
-	if (!checkRateLimit(`profile-put:${getClientAddress()}`, 10, 60_000)) {
+	if (!(await checkRateLimit(`profile-put:${getClientAddress()}`, 10, 60_000))) {
 		return new Response('Too many requests.', { status: 429, headers: { 'Retry-After': '60' } });
 	}
 

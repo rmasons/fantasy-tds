@@ -9,7 +9,7 @@ const COMMENT_RATE_LIMIT_MS = 30_000;
 
 // GET /api/blog/comments?leagueId=<id>&postId=<contentful-entry-id>
 export const GET: RequestHandler = async ({ url, getClientAddress }) => {
-	if (!checkRateLimit(`comments:${getClientAddress()}`)) {
+	if (!(await checkRateLimit(`comments:${getClientAddress()}`))) {
 		return new Response('Too many requests.', { status: 429, headers: { 'Retry-After': '60' } });
 	}
 	const leagueId = validateLeagueId(url.searchParams.get('leagueId'));
@@ -41,7 +41,7 @@ export const GET: RequestHandler = async ({ url, getClientAddress }) => {
 
 // POST /api/blog/comments  body: { leagueId, postId, comment }
 export const POST: RequestHandler = async ({ request, locals, getClientAddress }) => {
-	if (!checkRateLimit(`comments-post:${getClientAddress()}`, 10)) {
+	if (!(await checkRateLimit(`comments-post:${getClientAddress()}`, 10))) {
 		return new Response('Too many requests.', { status: 429, headers: { 'Retry-After': '60' } });
 	}
 	if (!locals.user) throw error(401, 'You must be signed in to comment.');
