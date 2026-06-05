@@ -28,7 +28,7 @@ function getTextExcerpt(node: any, maxLen = 160): string {
 
 export const load: PageServerLoad = async ({ params, parent }) => {
 	const { leagueId, slug } = params;
-	const { leagueAvatar } = await parent();
+	const { leagueAvatar, leagueName } = await parent();
 	const config = await getLeagueConfig(leagueId);
 	const spaceId = config.contentfulSpaceId ?? '';
 	const token = config.contentfulAccessToken ?? '';
@@ -63,7 +63,8 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 		assetMap.set(asset.sys.id, asset);
 	}
 
-	const ogTitle: string = item.fields.title ?? '';
+	const postTitle: string = item.fields.title ?? '';
+	const ogTitle = leagueName ? `${postTitle} | ${leagueName}` : postTitle;
 	const ogImage = findFirstImage(item.fields.body, assetMap) ?? leagueAvatar;
 	const ogDescription = getTextExcerpt(item.fields.body).trim();
 
