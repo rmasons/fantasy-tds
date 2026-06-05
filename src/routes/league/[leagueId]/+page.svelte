@@ -200,6 +200,22 @@
 	});
 </script>
 
+<svelte:head>
+	{#if data.leagueName}
+		<meta property="og:title" content={data.leagueName} />
+		<meta property="og:description" content="Fantasy football league hub — standings, matchups, blog, and more." />
+		{#if data.leagueAvatar}
+			<meta property="og:image" content={data.leagueAvatar} />
+			<meta name="twitter:card" content="summary_large_image" />
+			<meta name="twitter:image" content={data.leagueAvatar} />
+		{:else}
+			<meta name="twitter:card" content="summary" />
+		{/if}
+		<meta name="twitter:title" content={data.leagueName} />
+		<meta name="twitter:description" content="Fantasy football league hub — standings, matchups, blog, and more." />
+	{/if}
+</svelte:head>
+
 {#if loading}
 	<div class="space-y-4 animate-pulse">
 		<div class="h-36 bg-navy-850 rounded-xl"></div>
