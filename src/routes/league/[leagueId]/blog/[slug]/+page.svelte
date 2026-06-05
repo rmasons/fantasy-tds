@@ -191,6 +191,29 @@
 	});
 </script>
 
+<svelte:head>
+	{#if data.ogTitle}
+		<title>{data.ogTitle}</title>
+		<meta property="og:title" content={data.ogTitle} />
+		<meta property="og:type" content="article" />
+		{#if data.ogDescription}
+			<meta property="og:description" content={data.ogDescription} />
+			<meta name="description" content={data.ogDescription} />
+		{/if}
+		{#if data.ogImage}
+			<meta property="og:image" content={data.ogImage} />
+			<meta name="twitter:card" content="summary_large_image" />
+			<meta name="twitter:image" content={data.ogImage} />
+		{:else}
+			<meta name="twitter:card" content="summary" />
+		{/if}
+		<meta name="twitter:title" content={data.ogTitle} />
+		{#if data.ogDescription}
+			<meta name="twitter:description" content={data.ogDescription} />
+		{/if}
+	{/if}
+</svelte:head>
+
 <div>
 	<a href="/league/{data.leagueId}/blog" class="text-slate-500 hover:text-slate-300 text-sm mb-6 inline-flex items-center gap-1 transition-colors">
 		← Blog

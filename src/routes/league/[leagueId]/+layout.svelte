@@ -5,6 +5,17 @@
 	let { data, children } = $props<{ data: LayoutData; children: any }>();
 </script>
 
+<svelte:head>
+	{#if data.leagueName}
+		<title>{data.leagueName}</title>
+		<meta property="og:title" content={data.leagueName} />
+		<meta property="og:description" content="Fantasy football league hub — standings, matchups, blog, and more." />
+		<meta name="twitter:card" content="summary" />
+		<meta name="twitter:title" content={data.leagueName} />
+		<meta name="twitter:description" content="Fantasy football league hub — standings, matchups, blog, and more." />
+	{/if}
+</svelte:head>
+
 <div class="min-h-screen bg-navy-950 text-white">
 	<LeagueNav leagueId={data.leagueId} />
 	<!-- lg: offset for fixed sidebar; mobile: offset for sticky top nav -->
