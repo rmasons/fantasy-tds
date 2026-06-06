@@ -1,11 +1,9 @@
 <script lang="ts">
-	import type { LayoutData } from '../$types';
-	import { fetchLeague, fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap, fetchDisplayNameOverrides, combineFpts } from '$lib/sleeper';
+	import type { PageData } from './$types';
+	import type { PowerRankingsData } from '$lib/server/powerRankings';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
-	let { data } = $props<{ data: LayoutData }>();
-
-	interface SeasonEntry { leagueId: string; season: string }
+	let { data } = $props<{ data: PageData }>();
 
 	interface PowerRank {
 		rosterId: number;
@@ -33,7 +31,12 @@
 		totalPF: number;  // official season total PF
 	}
 
-	let rosterBaseData = $state<RosterBase[]>([]);
+	let loading = $state(false);
+	let error = $state(data.loadFailed ? 'Failed to load power rankings.' : '');
+	let seasons = $state(data.seasons);
+	let viewLeagueId = $state(data.leagueId);
+
+	let rosterBaseData = $state<RosterBase[]>(data.power?.rosterBaseData ?? []);
 	let weekScoreMap = $state<Map<number, Map<number, number>>>(new Map());
 	let weekMatchupPairs = $state<Map<number, [number, number][]>>(new Map());
 	let weekMedians = $state<Map<number, number>>(new Map());
@@ -42,12 +45,21 @@
 	let currentWeek = $state(0);
 	let weeksRemaining = $state(0);
 	let playoffSpots = $state(0);
-	let loading = $state(true);
-	let error = $state('');
-	let seasons = $state<SeasonEntry[]>([]);
-	let viewLeagueId = $state(data.leagueId);
 
 	const SIM_COUNT = 10_000;
+
+	// Server returns array-encoded data (JSON-safe); reconstruct the Maps here.
+	function applyBundle(d: PowerRankingsData | null) {
+		rosterBaseData = d?.rosterBaseData ?? [];
+		weekScoreMap = new Map((d?.weekScores ?? []).map(([w, arr]) => [w, new Map(arr)]));
+		weekMatchupPairs = new Map(d?.weekPairs ?? []);
+		weekMedians = new Map(d?.weekMedians ?? []);
+		futureSchedule = d?.futureSchedule ?? [];
+		currentWeek = d?.currentWeek ?? 0;
+		weeksRemaining = d?.weeksRemaining ?? 0;
+		playoffSpots = d?.playoffSpots ?? 0;
+		selectedWeek = d?.currentWeek ?? 0;
+	}
 
 	// ── Power score computation ────────────────────────────────────────────────
 
@@ -147,169 +159,41 @@
 
 	// ── Main data load ─────────────────────────────────────────────────────────
 
+	// Reset to the route league's server-rendered data whenever we navigate.
 	$effect(() => {
-		const urlLeagueId = data.leagueId;
-		viewLeagueId = urlLeagueId;
-		seasons = [];
-		rosterBaseData = [];
-		weekScoreMap = new Map();
-		weekMatchupPairs = new Map();
-		weekMedians = new Map();
-		futureSchedule = [];
-		selectedWeek = 0;
-		currentWeek = 0;
-		weeksRemaining = 0;
-		playoffSpots = 0;
-		loading = true;
-		error = '';
-
-		loadPowerRankings(urlLeagueId);
-		walkSeasons(urlLeagueId);
+		viewLeagueId = data.leagueId;
+		seasons = data.seasons;
+		loading = false;
+		error = data.loadFailed ? 'Failed to load power rankings.' : '';
+		applyBundle(data.power);
 	});
 
-	async function walkSeasons(urlLeagueId: string) {
-		let curId: string | null = urlLeagueId;
-		while (curId && curId !== '0') {
-			try {
-				const league = await fetchLeague(curId);
-				if (data.leagueId !== urlLeagueId) return;
-				seasons = [...seasons, { leagueId: curId, season: league.season }];
-				curId = league.previous_league_id ?? null;
-			} catch {
-				return;
-			}
-		}
-	}
+	async function selectSeason(lid: string) {
+		if (viewLeagueId === lid) return;
+		viewLeagueId = lid;
 
-	async function loadPowerRankings(lid: string) {
-		rosterBaseData = [];
-		weekScoreMap = new Map();
-		weekMatchupPairs = new Map();
-		weekMedians = new Map();
-		futureSchedule = [];
-		selectedWeek = 0;
-		currentWeek = 0;
-		weeksRemaining = 0;
-		playoffSpots = 0;
+		// The route league's data already came down with the page (SSR).
+		if (lid === data.leagueId) {
+			applyBundle(data.power);
+			error = data.loadFailed ? 'Failed to load power rankings.' : '';
+			return;
+		}
+
 		loading = true;
 		error = '';
-
 		try {
-			const [{ league, rosters, users }, nfl] = await Promise.all([
-				fetchLeagueCore(lid),
-				fetchNflState(),
-			]);
-
+			const res = await fetch(`/api/power-rankings/${lid}`);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const result: PowerRankingsData = await res.json();
 			if (viewLeagueId !== lid) return;
-
-			const playoffStart: number = league.settings.playoff_week_start ?? 15;
-			const spots = league.settings.playoff_teams ?? 6;
-			playoffSpots = spots;
-
-			let completedWeeks = 0;
-			if (nfl.season_type === 'regular') {
-				completedWeeks = Math.max(0, nfl.display_week - 1);
-			} else if (nfl.season_type === 'post' || league.status === 'complete') {
-				completedWeeks = playoffStart - 1;
-			}
-			completedWeeks = Math.min(completedWeeks, playoffStart - 1);
-			currentWeek = completedWeeks;
-			selectedWeek = completedWeeks;
-
-			const remaining = Math.max(0, playoffStart - 1 - completedWeeks);
-			weeksRemaining = remaining;
-
-			const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
-			if (viewLeagueId !== lid) return;
-			const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
-			rosterBaseData = rosters.map((r) => {
-				const info = rosterInfo.get(r.roster_id)!;
-				return {
-					rosterId: r.roster_id,
-					teamName: info.teamName,
-					ownerName: info.ownerName,
-					avatar: info.avatar,
-					wins: r.settings.wins ?? 0,
-					losses: r.settings.losses ?? 0,
-					ties: r.settings.ties ?? 0,
-					totalPF: combineFpts(r.settings.fpts, r.settings.fpts_decimal),
-				};
-			});
-
-			if (completedWeeks === 0) return;
-
-			const allWeeks = Array.from({ length: completedWeeks }, (_, i) => i + 1);
-			const futureWeeks = Array.from({ length: remaining }, (_, i) => completedWeeks + 1 + i);
-
-			const [allHistDataArr, futureDataArr] = await Promise.all([
-				Promise.all(allWeeks.map((w) => fetchMatchups(lid, w))),
-				Promise.all(futureWeeks.map((w) => fetchMatchups(lid, w))),
-			]);
-
-			if (viewLeagueId !== lid) return;
-
-			const newWeekScoreMap = new Map<number, Map<number, number>>();
-			const newWeekMatchupPairs = new Map<number, [number, number][]>();
-			const newWeekMedians = new Map<number, number>();
-
-			for (let i = 0; i < allWeeks.length; i++) {
-				const week = allWeeks[i];
-				const wm = new Map<number, number>();
-				const groups = new Map<number, number[]>();
-
-				for (const m of allHistDataArr[i]) {
-					const pts = m.points ?? 0;
-					wm.set(m.roster_id, pts);
-					if (m.matchup_id != null) {
-						if (!groups.has(m.matchup_id)) groups.set(m.matchup_id, []);
-						groups.get(m.matchup_id)!.push(m.roster_id);
-					}
-				}
-
-				const sorted = [...wm.values()].filter((p) => p > 0).sort((a, b) => a - b);
-				if (sorted.length > 0) {
-					const mid = Math.floor(sorted.length / 2);
-					const median = sorted.length % 2 === 0
-						? (sorted[mid - 1] + sorted[mid]) / 2
-						: sorted[mid];
-					newWeekMedians.set(week, median);
-				}
-
-				newWeekScoreMap.set(week, wm);
-				newWeekMatchupPairs.set(
-					week,
-					[...groups.values()].filter((p) => p.length === 2).map((p) => [p[0], p[1]])
-				);
-			}
-
-			weekScoreMap = newWeekScoreMap;
-			weekMatchupPairs = newWeekMatchupPairs;
-			weekMedians = newWeekMedians;
-
-			futureSchedule = futureDataArr.map((weekData) => {
-				const groups = new Map<number, number[]>();
-				for (const m of weekData) {
-					if (!groups.has(m.matchup_id)) groups.set(m.matchup_id, []);
-					groups.get(m.matchup_id)!.push(m.roster_id);
-				}
-				return [...groups.values()]
-					.filter((p) => p.length === 2)
-					.map((p) => [p[0], p[1]] as [number, number]);
-			});
-
+			applyBundle(result);
 		} catch (e: any) {
 			if (viewLeagueId !== lid) return;
 			error = e.message;
+			applyBundle(null);
 		} finally {
-			if (viewLeagueId !== lid) return;
-			loading = false;
+			if (viewLeagueId === lid) loading = false;
 		}
-	}
-
-	function selectSeason(lid: string) {
-		if (viewLeagueId === lid) return;
-		viewLeagueId = lid;
-		loadPowerRankings(lid);
 	}
 
 	// ── Reactive rankings ─────────────────────────────────────────────────────
