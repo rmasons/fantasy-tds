@@ -1,12 +1,9 @@
 <script lang="ts">
-	import type { LayoutData } from '../$types';
+	import type { PageData } from './$types';
 	import type { SlimPlayer } from '$lib/types';
+	import type { RosterInfo } from '$lib/sleeper';
 
-	import { fetchLeague, fetchLeagueCore, fetchNflState, fetchTransactions as fetchWeekTransactions, buildRosterInfoMap, fetchDisplayNameOverrides, type RosterInfo } from '$lib/sleeper';
-
-	let { data } = $props<{ data: LayoutData }>();
-
-	interface SeasonEntry { leagueId: string; season: string }
+	let { data } = $props<{ data: PageData }>();
 
 	type TxType = 'all' | 'trade' | 'waiver' | 'free_agent';
 
@@ -21,125 +18,64 @@
 	interface Transaction {
 		id: string;
 		type: 'trade' | 'waiver' | 'free_agent';
-		date: string;
+		date: number;
 		rosterIds: number[];
 		moves: TxMove[];
 	}
 
-	let transactions = $state<Transaction[]>([]);
+	let transactions = $state<Transaction[]>(data.transactions);
 	let filter = $state<TxType>('all');
-	let loading = $state(true);
-	let error = $state('');
-	let seasons = $state<SeasonEntry[]>([]);
+	let loading = $state(false);
+	let error = $state(data.loadFailed ? 'Failed to load transactions.' : '');
+	let seasons = $state(data.seasons);
 	let viewLeagueId = $state(data.leagueId);
 
-	let rosterInfoMap = $state(new Map<number, RosterInfo>());
-	let players = $state<Record<string, SlimPlayer>>({});
+	let rosterInfoMap = $state(new Map(Object.entries(data.rosterInfo).map(([k, v]) => [Number(k), v as RosterInfo])));
+	let players = $state<Record<string, SlimPlayer>>(data.players);
 
+	// Reset to the route league's server-rendered data whenever we navigate.
 	$effect(() => {
-		const urlLeagueId = data.leagueId;
-		viewLeagueId = urlLeagueId;
-		seasons = [];
-		transactions = [];
+		viewLeagueId = data.leagueId;
+		seasons = data.seasons;
+		transactions = data.transactions;
+		rosterInfoMap = new Map(Object.entries(data.rosterInfo).map(([k, v]) => [Number(k), v as RosterInfo]));
+		players = data.players;
 		filter = 'all';
-		loading = true;
-		error = '';
-		rosterInfoMap = new Map();
-		players = {};
-
-		loadTransactions(urlLeagueId);
-		walkSeasons(urlLeagueId);
+		loading = false;
+		error = data.loadFailed ? 'Failed to load transactions.' : '';
 	});
 
-	async function walkSeasons(urlLeagueId: string) {
-		let curId: string | null = urlLeagueId;
-		while (curId && curId !== '0') {
-			try {
-				const league = await fetchLeague(curId);
-				if (data.leagueId !== urlLeagueId) return;
-				seasons = [...seasons, { leagueId: curId, season: league.season }];
-				curId = league.previous_league_id ?? null;
-			} catch {
-				return;
-			}
-		}
-	}
+	async function selectSeason(lid: string) {
+		if (viewLeagueId === lid) return;
+		viewLeagueId = lid;
+		filter = 'all';
 
-	async function loadTransactions(lid: string) {
+		// The route league's transactions already came down with the page (SSR).
+		if (lid === data.leagueId) {
+			transactions = data.transactions;
+			rosterInfoMap = new Map(Object.entries(data.rosterInfo).map(([k, v]) => [Number(k), v as RosterInfo]));
+			players = data.players;
+			error = data.loadFailed ? 'Failed to load transactions.' : '';
+			return;
+		}
+
 		transactions = [];
 		loading = true;
 		error = '';
-		rosterInfoMap = new Map();
-		players = {};
-
 		try {
-			const [{ league, rosters, users }, nfl, playersData] = await Promise.all([
-				fetchLeagueCore(lid),
-				fetchNflState(),
-				fetch('/api/players').then((r) => r.json()) as Promise<Record<string, SlimPlayer>>,
-			]);
-
+			const res = await fetch(`/api/transactions/${lid}`);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const result = await res.json();
 			if (viewLeagueId !== lid) return;
-
-			players = playersData;
-			const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
-			if (viewLeagueId !== lid) return;
-			rosterInfoMap = buildRosterInfoMap(rosters, users, overrides);
-
-			// For complete seasons, fetch all 18 weeks; otherwise use nfl state
-			let week: number;
-			if (league.status === 'complete') {
-				week = 18;
-			} else {
-				week = nfl.season_type === 'regular' ? nfl.week : nfl.season_type === 'post' ? 18 : 1;
-				week = Math.max(week, 1);
-			}
-
-			const weekNums = Array.from({ length: week }, (_, i) => i + 1);
-			const txWeeks: any[][] = await Promise.all(
-				weekNums.map((w) => fetchWeekTransactions(lid, w))
-			);
-
-			if (viewLeagueId !== lid) return;
-
-			const raw = txWeeks.flat().filter((t) => t.status === 'complete');
-			raw.sort((a, b) => b.status_updated - a.status_updated);
-
-			transactions = raw.map((t) => {
-				const moves: TxMove[] = [];
-
-				for (const [pid, rid] of Object.entries(t.adds ?? {})) {
-					moves.push({ type: 'add', player: pid, rosterId: rid as number });
-				}
-				for (const [pid, rid] of Object.entries(t.drops ?? {})) {
-					moves.push({ type: 'drop', player: pid, rosterId: rid as number });
-				}
-				for (const pick of t.draft_picks ?? []) {
-					moves.push({ type: 'pick', round: pick.round, season: pick.season, rosterId: pick.owner_id });
-				}
-
-				return {
-					id: t.transaction_id,
-					type: t.type,
-					date: formatDate(t.status_updated),
-					rosterIds: t.roster_ids as number[],
-					moves
-				};
-			});
+			transactions = result.transactions;
+			rosterInfoMap = new Map(Object.entries(result.rosterInfo).map(([k, v]) => [Number(k), v as RosterInfo]));
+			players = result.players;
 		} catch (e: any) {
 			if (viewLeagueId !== lid) return;
 			error = e.message;
 		} finally {
-			if (viewLeagueId !== lid) return;
-			loading = false;
+			if (viewLeagueId === lid) loading = false;
 		}
-	}
-
-	function selectSeason(lid: string) {
-		if (viewLeagueId === lid) return;
-		viewLeagueId = lid;
-		filter = 'all';
-		loadTransactions(lid);
 	}
 
 	function formatDate(ts: number) {
@@ -244,7 +180,7 @@
 					<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden">
 						<div class="flex items-center gap-2 px-4 py-2.5 border-b border-navy-700/60">
 							<span class="text-xs px-2 py-0.5 rounded-full font-semibold {typeBadge.trade}">Trade</span>
-							<span class="text-xs text-slate-500">{tx.date}</span>
+							<span class="text-xs text-slate-500">{formatDate(tx.date)}</span>
 						</div>
 						<div class="grid divide-x divide-navy-700/50"
 						     style="grid-template-columns: repeat({sides.length}, 1fr)">
@@ -292,7 +228,7 @@
 							<span class="text-xs px-2 py-0.5 rounded-full font-semibold {typeBadge[tx.type] ?? 'bg-slate-700 text-slate-300'}">
 								{typeLabel[tx.type] ?? tx.type}
 							</span>
-							<span class="text-xs text-slate-500">{tx.date}</span>
+							<span class="text-xs text-slate-500">{formatDate(tx.date)}</span>
 						</div>
 
 						<div class="space-y-1">

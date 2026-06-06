@@ -128,10 +128,13 @@ async function buildPowerRankings(leagueId: string): Promise<PowerRankingsData> 
 	return { rosterBaseData, weekScores, weekPairs, weekMedians, futureSchedule, currentWeek, weeksRemaining, playoffSpots };
 }
 
-export function getPowerRankings(leagueId: string): Promise<PowerRankingsData> {
-	return cachedFetch<PowerRankingsData>(adminDb().collection('powerRankingsCache').doc(leagueId), {
+export async function getPowerRankings(leagueId: string): Promise<PowerRankingsData> {
+	// The week maps are encoded as nested arrays, which Firestore can't store,
+	// so the cached value is a JSON string.
+	const jsonStr = await cachedFetch<string>(adminDb().collection('powerRankingsCache').doc(leagueId), {
 		schemaVersion: SCHEMA_VERSION,
 		ttlMs: TTL_MS,
-		fetcher: () => buildPowerRankings(leagueId),
+		fetcher: async () => JSON.stringify(await buildPowerRankings(leagueId)),
 	});
+	return JSON.parse(jsonStr) as PowerRankingsData;
 }
