@@ -9,8 +9,9 @@
 	let linkStatus = $state<'idle' | 'loading' | 'error'>('idle');
 	let linkError = $state('');
 
-	let leagues = $state<SleeperLeague[]>([]);
-	let leaguesLoading = $state(false);
+	// The user's leagues are resolved server-side (see +page.server.ts).
+	const leagues = $derived((data.leagues ?? []) as SleeperLeague[]);
+	const leaguesLoading = false;
 
 	async function linkSleeper() {
 		linkStatus = 'loading';
@@ -29,47 +30,9 @@
 		window.location.reload();
 	}
 
-	let cachedNflSeason: string | null = null;
-	async function getNflSeason(): Promise<string> {
-		if (cachedNflSeason) return cachedNflSeason;
-		try {
-			const res = await fetch('https://api.sleeper.app/v1/state/nfl');
-			const state = res.ok ? await res.json() : null;
-			cachedNflSeason = state?.season ?? String(new Date().getFullYear());
-		} catch {
-			cachedNflSeason = String(new Date().getFullYear());
-		}
-		return cachedNflSeason;
-	}
-
-	async function loadLeagues() {
-		if (!data.user?.sleeperUserId) return;
-		leaguesLoading = true;
-		const season = await getNflSeason();
-		const res = await fetch(
-			`https://api.sleeper.app/v1/user/${data.user.sleeperUserId}/leagues/nfl/${season}`
-		);
-		if (!res.ok) {
-			leaguesLoading = false;
-			return;
-		}
-		leagues = await res.json();
-		leaguesLoading = false;
-
-		if (leagues.length === 1) {
-			selectLeague(leagues[0].league_id);
-		}
-	}
-
 	function selectLeague(leagueId: string) {
 		goto(`/league/${leagueId}`);
 	}
-
-	$effect(() => {
-		if (data.user?.sleeperUserId) {
-			loadLeagues();
-		}
-	});
 </script>
 
 <div class="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
