@@ -1,155 +1,39 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { fetchLeague, fetchRosters, fetchUsers, fetchWinnersBracket, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
+	import type { PlayoffFinish, SeasonStat, ManagerInfo } from '$lib/server/managerCareer';
 	import type { ManagerProfile, ManagerLeagueProfile } from '$lib/types';
 	import { teamAbbrByName, teamLogoUrl, playerThumbUrl } from '$lib/nflTeams';
 
 	let { data } = $props<{ data: PageData }>();
 
-	type PlayoffFinish = 'champion' | 'runner-up' | '3rd' | 'playoffs' | null;
-
-	// Sleeper bracket match shape: https://docs.sleeper.com/#get-winners-bracket-for-a-league
-	interface BracketMatch {
-		r: number;
-		t1: number | null;
-		t2: number | null;
-		w: number | null;
-		t1_from?: { w?: number; l?: number };
-		t2_from?: { w?: number; l?: number };
-	}
-
-	interface SeasonStat {
-		season: string;
-		teamName: string;
-		wins: number;
-		losses: number;
-		ties: number;
-		fpts: number;
-		fptsAgainst: number;
-		rosterId: number;
-		playoffFinish: PlayoffFinish;
-	}
-
-	interface ManagerInfo {
-		ownerId: string;
-		displayName: string;
-		teamName: string;
-		avatar: string | null;
-	}
-
-	let manager = $state<ManagerInfo | null>(null);
-	let seasons = $state<SeasonStat[]>([]);
-	let loading = $state(true);
-	let loadingStatus = $state('Loading…');
-	let error = $state('');
+	let manager = $state<ManagerInfo | null>(data.manager);
+	let seasons = $state<SeasonStat[]>(data.seasons);
+	let loading = $state(false);
+	let loadingStatus = $state('');
+	let error = $state(data.loadFailed ? 'Failed to load career.' : '');
 
 	let profile = $state<ManagerProfile | null>(null);
 	let leagueProfile = $state<ManagerLeagueProfile | null>(null);
 
-	function getPlayoffFinish(
-		rosterId: number,
-		winners: BracketMatch[]
-	): PlayoffFinish {
-		if (!winners?.length) return null;
-		const appearsInWinners = winners.some(e => e.t1 === rosterId || e.t2 === rosterId);
-		if (!appearsInWinners) return null;
-
-		const maxR = Math.max(...winners.map(e => e.r));
-		const lastRound = Math.max(
-			...winners.filter(e => e.t1 === rosterId || e.t2 === rosterId).map(e => e.r)
-		);
-
-		if (lastRound < maxR) return 'playoffs';
-
-		const finalMatch = winners.find(e => e.r === maxR && (e.t1 === rosterId || e.t2 === rosterId));
-		if (!finalMatch) return 'playoffs';
-
-		// Sleeper places both the championship and the 3rd-place game in the final round of
-		// the winners bracket. The championship match has t1_from.w populated (the slot was
-		// seeded by winning the semi); the 3rd-place match has t1_from.l (seeded by losing).
-		const isChampionship = finalMatch.t1_from?.w != null;
-		if (!isChampionship) return finalMatch.w === rosterId ? '3rd' : 'playoffs';
-		return finalMatch.w === rosterId ? 'champion' : 'runner-up';
-	}
-
+	// Career is server-rendered; the profile is loaded from our own gated
+	// endpoint (also re-fetched after a commissioner edit).
 	$effect(() => {
 		const leagueId = data.leagueId;
 		const userId = data.userId;
-		manager = null;
-		seasons = [];
+		manager = data.manager;
+		seasons = data.seasons;
+		error = data.loadFailed ? 'Failed to load career.' : '';
 		profile = null;
 		leagueProfile = null;
-		loading = true;
-		loadingStatus = 'Loading…';
-		error = '';
 
-		(async () => {
-			try {
-				const [, profileRes] = await Promise.all([
-					(async () => {
-						let curId: string | null = leagueId;
-						const result: SeasonStat[] = [];
-
-						while (curId && curId !== '0') {
-							const [leagueData, users, rosters, winnersData] = await Promise.all([
-								fetchLeague(curId),
-								fetchUsers(curId),
-								fetchRosters(curId),
-								fetchWinnersBracket(curId).catch(() => []),
-							]);
-
-							if (data.leagueId !== leagueId || data.userId !== userId) return;
-							loadingStatus = `Loaded ${leagueData.season}…`;
-
-							const rosterInfo = buildRosterInfoMap(rosters, users);
-							const roster = rosters.find(r => r.owner_id === userId);
-
-							if (roster) {
-								const info = rosterInfo.get(roster.roster_id)!;
-								if (!manager) {
-									manager = {
-										ownerId: userId,
-										displayName: info.ownerName ?? info.teamName,
-										teamName: info.teamName,
-										avatar: info.avatar,
-									};
-								}
-
-								result.push({
-									season: leagueData.season,
-									teamName: info.teamName,
-									wins: roster.settings?.wins ?? 0,
-									losses: roster.settings?.losses ?? 0,
-									ties: roster.settings?.ties ?? 0,
-									fpts: combineFpts(roster.settings?.fpts, roster.settings?.fpts_decimal),
-									fptsAgainst: combineFpts(roster.settings?.fpts_against, roster.settings?.fpts_against_decimal),
-									rosterId: roster.roster_id,
-									playoffFinish: getPlayoffFinish(roster.roster_id, winnersData),
-								});
-							}
-
-							curId = leagueData.previous_league_id ?? null;
-						}
-
-						if (data.leagueId !== leagueId || data.userId !== userId) return;
-						seasons = result;
-					})(),
-					fetch(`/api/profile/${userId}?leagueId=${leagueId}`)
-						.then(r => r.json())
-						.catch(() => ({ global: null, league: null })),
-				]);
-
+		fetch(`/api/profile/${userId}?leagueId=${leagueId}`)
+			.then((r) => r.json())
+			.then((res) => {
 				if (data.leagueId !== leagueId || data.userId !== userId) return;
-				profile = profileRes?.global ?? null;
-				leagueProfile = profileRes?.league ?? null;
-			} catch (e: any) {
-				if (data.leagueId !== leagueId || data.userId !== userId) return;
-				error = e.message;
-			} finally {
-				if (data.leagueId !== leagueId || data.userId !== userId) return;
-				loading = false;
-			}
-		})();
+				profile = res?.global ?? null;
+				leagueProfile = res?.league ?? null;
+			})
+			.catch(() => {});
 	});
 
 	// ── Career stats ───────────────────────────────────────────────────────
