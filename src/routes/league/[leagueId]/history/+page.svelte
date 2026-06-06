@@ -1,31 +1,12 @@
 <script lang="ts">
-	import type { LayoutData } from '../$types';
+	import type { PageData } from './$types';
 	import type { SeasonRecords, RecordGame, RecordScore, ManagerProfile } from '$lib/types';
-	import {
-		fetchLeague, fetchLeagueCore, fetchWinnersBracket, fetchLosersBracket,
-		fetchMatchups, buildRosterInfoMap, combineFpts,
-	} from '$lib/sleeper';
+	import type { Podium, ManagerEntry } from '$lib/server/historyPodiums';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
-	let { data } = $props<{ data: LayoutData }>();
+	let { data } = $props<{ data: PageData }>();
 
 	let tab = $state<'season' | 'alltime' | number>('season');
-
-	interface ManagerEntry {
-		rosterId: number;
-		ownerId: string;
-		teamName: string;
-		ownerName: string;
-		avatar: string | null;
-	}
-
-	interface Podium {
-		season: string;
-		champion: ManagerEntry;
-		second: ManagerEntry | null;
-		third: ManagerEntry | null;
-		toilet: ManagerEntry | null;
-	}
 
 	interface AllTimeStat {
 		userId: string;
@@ -51,13 +32,13 @@
 		seasonLeaders: { team: string; avatar: string | null; fpts: number }[];
 	}
 
-	let podiums = $state<Podium[]>([]);
+	let podiums = $state<Podium[]>(data.podiums);
 	let profiles = $state<Record<string, ManagerProfile>>({});
-	let awardsLoading = $state(true);
-	let awardsStatus = $state('Fetching league history…');
-	let awardsError = $state('');
+	let awardsLoading = $state(false);
+	let awardsStatus = $state('');
+	let awardsError = $state(data.loadFailed ? 'Failed to load league history.' : '');
 
-	let seasonLidMap = $state<Record<string, string>>({});
+	let seasonLidMap = $state<Record<string, string>>(data.seasonLidMap);
 	let yearRecordsCache = $state<Record<string, YearData>>({});
 
 	let blowouts = $state<RecordGame[]>([]);
@@ -86,12 +67,12 @@
 		const leagueId = data.leagueId;
 
 		tab = 'season';
-		podiums = [];
+		// Podiums + season map are server-rendered.
+		podiums = data.podiums;
+		seasonLidMap = data.seasonLidMap;
+		awardsLoading = false;
+		awardsError = data.loadFailed ? 'Failed to load league history.' : '';
 		profiles = {};
-		awardsLoading = true;
-		awardsStatus = 'Fetching league history…';
-		awardsError = '';
-		seasonLidMap = {};
 		yearRecordsCache = {};
 		blowouts = [];
 		closest = [];
@@ -113,116 +94,26 @@
 		atLowCombined = [];
 		atError = '';
 
-		(async () => {
-			try {
-				const current = await fetchLeague(leagueId);
-				if (data.leagueId !== leagueId) return;
+		// Enrich podium owners via our gated profiles endpoint.
+		const ownerIds = [...new Set(
+			data.podiums.flatMap((p: Podium) => [p.champion, p.second, p.third, p.toilet])
+				.filter((e: ManagerEntry | null): e is ManagerEntry => !!e && !!e.ownerId)
+				.map((e: ManagerEntry) => e.ownerId)
+		)];
+		if (ownerIds.length) {
+			fetch(`/api/profiles?ids=${ownerIds.join(',')}&leagueId=${leagueId}`)
+				.then(r => r.json())
+				.then(p => { if (data.leagueId === leagueId) profiles = p; })
+				.catch(() => {});
+		}
 
-				let curId: string | null = current.status === 'complete'
-					? current.league_id
-					: current.previous_league_id;
-
-				const seasonCache: Array<{
-					lid: string;
-					season: string;
-					playoffStart: number;
-					rInfo: Map<number, any>;
-					rosters: any[];
-				}> = [];
-
-				while (curId && curId !== '0') {
-					const [{ league: leagueData, rosters, users }, winners, losers] = await Promise.all([
-						fetchLeagueCore(curId),
-						fetchWinnersBracket(curId),
-						fetchLosersBracket(curId),
-					]);
-
-					if (data.leagueId !== leagueId) return;
-
-					awardsStatus = `Loaded ${leagueData.season}…`;
-
-					const rosterInfo = buildRosterInfoMap(rosters, users);
-
-					function toEntry(rid: number): ManagerEntry {
-						const info = rosterInfo.get(rid);
-						return {
-							rosterId: rid,
-							ownerId: info?.ownerId ?? '',
-							teamName: info?.teamName ?? `Team ${rid}`,
-							ownerName: info?.ownerName ?? info?.teamName ?? `Team ${rid}`,
-							avatar: info?.avatar ?? null,
-						};
-					}
-
-					const wb: any[] = Array.isArray(winners) ? winners : [];
-					const lb: any[] = Array.isArray(losers) ? losers : [];
-
-					if (wb.length > 0) {
-						const playoffRounds = Math.max(...wb.map((m: any) => m.r));
-						const toiletRounds = lb.length ? Math.max(...lb.map((m: any) => m.r)) : 0;
-
-						const finalsMatch = wb.find(m => m.r === playoffRounds && m.t1_from?.w != null);
-						const runnersUpMatch = wb.find(m => m.r === playoffRounds && m.t1_from?.l != null);
-						const toiletMatch = lb.length
-							? lb.find(m => m.r === toiletRounds && (!m.t1_from || m.t1_from?.w != null))
-							: null;
-
-						if (finalsMatch?.w) {
-							podiums = [...podiums, {
-								season: leagueData.season,
-								champion: toEntry(finalsMatch.w),
-								second: finalsMatch.l ? toEntry(finalsMatch.l) : null,
-								third: runnersUpMatch?.w ? toEntry(runnersUpMatch.w) : null,
-								toilet: toiletMatch?.w ? toEntry(toiletMatch.w) : null,
-							}];
-						}
-					}
-
-					seasonCache.push({
-						lid: curId,
-						season: leagueData.season,
-						playoffStart: leagueData.settings?.playoff_week_start ?? 15,
-						rInfo: rosterInfo,
-						rosters,
-					});
-
-					curId = leagueData.previous_league_id ?? null;
-				}
-
-				if (data.leagueId !== leagueId) return;
-
-				const ownerIds = [...new Set(
-					podiums.flatMap(p => [p.champion, p.second, p.third, p.toilet])
-						.filter((e): e is ManagerEntry => !!e && !!e.ownerId)
-						.map(e => e.ownerId)
-				)];
-				if (ownerIds.length) {
-					fetch(`/api/profiles?ids=${ownerIds.join(',')}&leagueId=${leagueId}`)
-						.then(r => r.json())
-						.then(p => { if (data.leagueId === leagueId) profiles = p; })
-						.catch(() => {});
-				}
-
-				const newMap: Record<string, string> = {};
-				for (const sd of seasonCache) { newMap[sd.season] = sd.lid; }
-				seasonLidMap = newMap;
-
-				// Eagerly load records for the default tab (first historical year)
-				if (podiums.length > 0) {
-					const defaultSeason = podiums[0].season;
-					if (newMap[defaultSeason]) {
-						loadYearRecords(defaultSeason, newMap[defaultSeason]);
-					}
-				}
-
-			} catch (e: any) {
-				if (data.leagueId !== leagueId) return;
-				awardsError = e.message;
-			} finally {
-				if (data.leagueId !== leagueId) return;
-				awardsLoading = false;
+		// Eagerly load records for the default tab (first historical year).
+		if (data.podiums.length > 0) {
+			const defaultSeason = data.podiums[0].season;
+			if (data.seasonLidMap[defaultSeason]) {
+				loadYearRecords(defaultSeason, data.seasonLidMap[defaultSeason]);
 			}
-		})();
+		}
 
 		(async () => {
 			try {
