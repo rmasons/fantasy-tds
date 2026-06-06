@@ -1,15 +1,10 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import type { RosterInfo } from '$lib/sleeper';
+	import type { RosterInfo, RawMatchup } from '$lib/sleeper';
+	import type { MatchupsMeta, SeasonBracket, BracketMatch } from '$lib/server/matchups';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
-	import {
-		fetchLeague, fetchLeagueCore, fetchNflState, fetchMatchups as fetchWeekMatchups,
-		fetchWinnersBracket, fetchLosersBracket, buildRosterInfoMap, fetchDisplayNameOverrides
-	} from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
-
-	interface SeasonEntry { leagueId: string; season: string }
 
 	interface MatchupTeam {
 		rosterId: number;
@@ -21,33 +16,13 @@
 	}
 	interface Matchup { id: number; home: MatchupTeam; away: MatchupTeam }
 
-	interface BracketSide {
-		rosterId: number | null;
-		teamName: string | null;
-		avatar: string | null;
-		points: number | null;
-		won: boolean;
-		bye: boolean;
-	}
-	interface BracketMatch {
-		round: number;
-		matchId: number;
-		t1: BracketSide;
-		t2: BracketSide;
-		label: string;
-	}
-	interface SeasonBracket {
-		season: string;
-		leagueId: string;
-		winnersRounds: BracketMatch[][];
-		losersRounds: BracketMatch[][];
-	}
-
 	let allMatchups = $state<Record<number, Matchup[]>>({});
 	let selectedWeek = $state(1);
+	let currentWeek = $state(1);
 	let maxWeek = $state(1);
 	let regularSeasonLength = $state(17);
-	let loading = $state(true);
+	let status = $state('');
+	let loading = $state(false);
 	let weekLoading = $state(false);
 	let error = $state('');
 	let season = $state('');
@@ -58,116 +33,87 @@
 	let bracketLoaded = $state(false);
 	let playoffStart = $state(15);
 
-	let seasons = $state<SeasonEntry[]>([]);
+	let seasons = $state(data.seasons);
 	let viewLeagueId = $state(data.leagueId);
 
 	let userMap = new Map<number, RosterInfo>();
-	let savedOverrides: Map<string, string> = new Map();
 	let bracketStartLeagueId = '';
 
-	$effect(() => {
-		const urlLeagueId = data.leagueId;
-		viewLeagueId = urlLeagueId;
-		seasons = [];
-		allMatchups = {};
-		selectedWeek = 1;
-		maxWeek = 1;
-		loading = true;
-		error = '';
-		season = '';
-		view = 'weekly';
-		bracketLoaded = false;
-		bracketSeasons = [];
-		userMap = new Map();
-		savedOverrides = new Map();
-		bracketStartLeagueId = '';
-
-		loadMatchups(urlLeagueId);
-		walkSeasons(urlLeagueId);
-	});
-
-	async function walkSeasons(urlLeagueId: string) {
-		let curId: string | null = urlLeagueId;
-		while (curId && curId !== '0') {
-			try {
-				const league = await fetchLeague(curId);
-				if (data.leagueId !== urlLeagueId) return;
-				seasons = [...seasons, { leagueId: curId, season: league.season }];
-				curId = league.previous_league_id ?? null;
-			} catch {
-				return;
-			}
+	function groupWeek(raw: RawMatchup[]): Matchup[] {
+		const grouped: Record<number, MatchupTeam[]> = {};
+		for (const m of raw) {
+			if (!grouped[m.matchup_id]) grouped[m.matchup_id] = [];
+			const info = userMap.get(m.roster_id) ?? { teamName: `Team ${m.roster_id}`, ownerName: null, avatar: null, ownerId: '' };
+			grouped[m.matchup_id].push({ rosterId: m.roster_id, ...info, points: m.points ?? 0, starters: m.starters ?? [] });
 		}
+		return Object.values(grouped)
+			.filter((pair) => pair.length === 2)
+			.map((pair) => ({ id: pair[0].rosterId * 100 + pair[1].rosterId, home: pair[0], away: pair[1] }));
 	}
 
-	async function loadMatchups(lid: string) {
-		allMatchups = {};
-		selectedWeek = 1;
-		maxWeek = 1;
-		loading = true;
-		error = '';
-		season = '';
+	function applyMeta(meta: MatchupsMeta | null, currentWeekRaw: RawMatchup[]) {
 		view = 'weekly';
 		bracketLoaded = false;
 		bracketSeasons = [];
-		userMap = new Map();
-		savedOverrides = new Map();
-		bracketStartLeagueId = '';
+		if (!meta) {
+			season = '';
+			status = '';
+			userMap = new Map();
+			allMatchups = {};
+			bracketStartLeagueId = '';
+			return;
+		}
+		season = meta.season;
+		status = meta.status;
+		playoffStart = meta.playoffStart;
+		regularSeasonLength = meta.regularSeasonLength;
+		maxWeek = meta.maxWeek;
+		currentWeek = meta.currentWeek;
+		selectedWeek = meta.currentWeek;
+		bracketStartLeagueId = meta.bracketStartLeagueId;
+		userMap = new Map(Object.entries(meta.rosterInfo).map(([k, v]) => [Number(k), v as RosterInfo]));
+		allMatchups = { [meta.currentWeek]: groupWeek(currentWeekRaw) };
+	}
 
+	// Reset to the route league's server-rendered data whenever we navigate.
+	$effect(() => {
+		viewLeagueId = data.leagueId;
+		seasons = data.seasons;
+		loading = false;
+		error = data.loadFailed ? 'Failed to load matchups.' : '';
+		applyMeta(data.meta, data.currentWeekRaw);
+	});
+
+	async function selectSeason(lid: string) {
+		if (viewLeagueId === lid) return;
+		viewLeagueId = lid;
+
+		if (lid === data.leagueId) {
+			applyMeta(data.meta, data.currentWeekRaw);
+			error = data.loadFailed ? 'Failed to load matchups.' : '';
+			return;
+		}
+
+		loading = true;
+		error = '';
 		try {
-			const [{ league, rosters, users }, nfl] = await Promise.all([
-				fetchLeagueCore(lid),
-				fetchNflState(),
-			]);
-
+			const metaRes = await fetch(`/api/matchups/${lid}/meta`);
+			if (!metaRes.ok) throw new Error(`HTTP ${metaRes.status}`);
+			const meta: MatchupsMeta = await metaRes.json();
 			if (viewLeagueId !== lid) return;
 
-			season = league.season;
-			playoffStart = league.settings?.playoff_week_start ?? 15;
-			const pType = league.settings?.playoff_round_type ?? 0;
-			regularSeasonLength = playoffStart - 1;
-
-			if (league.status === 'pre_draft' || league.status === 'drafting') {
-				bracketStartLeagueId = '';
-			} else {
-				bracketStartLeagueId = lid;
-			}
-
-			const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
+			const live = meta.status !== 'complete';
+			const wRes = await fetch(`/api/matchups/${lid}/week/${meta.currentWeek}${live ? '?live=1' : ''}`);
+			const raw: RawMatchup[] = wRes.ok ? await wRes.json() : [];
 			if (viewLeagueId !== lid) return;
-			savedOverrides = overrides;
-			userMap = buildRosterInfoMap(rosters, users, overrides);
 
-			const playoffTeams = league.settings?.playoff_teams ?? 4;
-			const numRounds = Math.ceil(Math.log2(Math.max(playoffTeams, 2)));
-			const weeksPerRound = pType === 2 ? 2 : 1;
-			const lastPlayoffWeek = playoffStart + numRounds * weeksPerRound - 1;
-
-			let week = 1;
-			if (league.status === 'complete') {
-				week = lastPlayoffWeek; maxWeek = lastPlayoffWeek;
-			} else if (nfl.season_type === 'regular') {
-				week = Math.min(nfl.display_week, regularSeasonLength);
-				maxWeek = week;
-			} else if (nfl.season_type === 'post') {
-				week = regularSeasonLength; maxWeek = lastPlayoffWeek;
-			}
-			selectedWeek = week;
-
-			await loadWeek(week);
+			applyMeta(meta, raw);
 		} catch (e: any) {
 			if (viewLeagueId !== lid) return;
 			error = e.message;
 		} finally {
-			if (viewLeagueId !== lid) return;
-			loading = false;
+			if (viewLeagueId === lid) loading = false;
 		}
-	}
-
-	function selectSeason(lid: string) {
-		if (viewLeagueId === lid) return;
-		viewLeagueId = lid;
-		loadMatchups(lid);
 	}
 
 	async function loadWeek(week: number) {
@@ -175,129 +121,38 @@
 		if (allMatchups[week]) { selectedWeek = week; return; }
 		weekLoading = true;
 		try {
-			const raw = await fetchWeekMatchups(lid, week);
+			const live = status !== 'complete' && week >= currentWeek;
+			const res = await fetch(`/api/matchups/${lid}/week/${week}${live ? '?live=1' : ''}`);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const raw: RawMatchup[] = await res.json();
 			if (viewLeagueId !== lid) return;
 
-			const grouped: Record<number, MatchupTeam[]> = {};
-			for (const m of raw) {
-				if (!grouped[m.matchup_id]) grouped[m.matchup_id] = [];
-				const info = userMap.get(m.roster_id) ?? { teamName: `Team ${m.roster_id}`, ownerName: null, avatar: null, ownerId: '' };
-				grouped[m.matchup_id].push({ rosterId: m.roster_id, ...info, points: m.points ?? 0, starters: m.starters ?? [] });
-			}
-
-			allMatchups = {
-				...allMatchups,
-				[week]: Object.values(grouped)
-					.filter((pair) => pair.length === 2)
-					.map((pair) => ({ id: pair[0].rosterId * 100 + pair[1].rosterId, home: pair[0], away: pair[1] }))
-			};
+			allMatchups = { ...allMatchups, [week]: groupWeek(raw) };
 			selectedWeek = week;
 		} finally {
 			if (viewLeagueId === lid) weekLoading = false;
 		}
 	}
 
-	function roundLabel(r: number, maxR: number, entry: any, losers: boolean): string {
-		if (losers) return r === maxR ? 'Toilet Bowl' : `Round ${r}`;
-		if (r === maxR) return (entry.t1_from?.w != null) ? 'Championship' : '3rd Place';
-		if (r === maxR - 1) return 'Semifinals';
-		return `Round ${r}`;
-	}
-
 	async function loadBracket() {
-		if (bracketLoaded) { view = 'bracket'; return; }
-		if (!bracketStartLeagueId) { view = 'bracket'; return; }
+		if (bracketLoaded || !bracketStartLeagueId) { view = 'bracket'; return; }
 
 		bracketLoading = true;
 		const viewLid = viewLeagueId;
 		const lid = bracketStartLeagueId;
 
 		try {
-			const [{ league, rosters, users }, winnersData, losersData] = await Promise.all([
-				fetchLeagueCore(lid),
-				fetchWinnersBracket(lid),
-				fetchLosersBracket(lid),
-			]);
-
+			const res = await fetch(`/api/matchups/${lid}/bracket`);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const result: SeasonBracket[] = await res.json();
 			if (viewLeagueId !== viewLid) return;
-
-			const rosterInfo = buildRosterInfoMap(rosters, users, savedOverrides);
-			const pStart = league.settings?.playoff_week_start ?? 15;
-			const pType = league.settings?.playoff_round_type ?? 0;
-			const pTeams = league.settings?.playoff_teams ?? 4;
-			const nRounds = Math.ceil(Math.log2(Math.max(pTeams, 2)));
-			const wpr = pType === 2 ? 2 : 1;
-
-			const playoffWeeks: number[] = [];
-			for (let r = 0; r < nRounds; r++) {
-				for (let w = 0; w < wpr; w++) {
-					playoffWeeks.push(pStart + r * wpr + w);
-				}
-			}
-
-			const weekDataArr = await Promise.all(
-				playoffWeeks.map(w => fetchWeekMatchups(lid, w).catch(() => []))
-			);
-			if (viewLeagueId !== viewLid) return;
-
-			const weekPoints = new Map<number, Map<number, number>>();
-			for (let i = 0; i < playoffWeeks.length; i++) {
-				const rp = new Map<number, number>();
-				for (const m of weekDataArr[i] ?? []) rp.set(m.roster_id, m.points ?? 0);
-				weekPoints.set(playoffWeeks[i], rp);
-			}
-
-			function getPoints(rosterId: number, round: number): number | null {
-				const week = pStart + (round - 1);
-				const pts = weekPoints.get(week)?.get(rosterId) ?? null;
-				if (pts === null) return null;
-				if (pType === 2) return pts + (weekPoints.get(week + 1)?.get(rosterId) ?? 0);
-				return pts;
-			}
-
-			function teamSide(rosterId: number | null, winnerId: number | null, round: number): BracketSide {
-				const info = rosterId ? rosterInfo.get(rosterId) : null;
-				return {
-					rosterId,
-					teamName: info?.teamName ?? (rosterId ? `Team ${rosterId}` : null),
-					avatar: info?.avatar ?? null,
-					points: rosterId ? getPoints(rosterId, round) : null,
-					won: !!rosterId && rosterId === winnerId,
-					bye: !rosterId,
-				};
-			}
-
-			function processBracket(raw: any[], losers: boolean): BracketMatch[][] {
-				if (!raw?.length) return [];
-				const maxR = Math.max(...raw.map((m: any) => m.r));
-				const byRound: BracketMatch[][] = [];
-				for (let r = 1; r <= maxR; r++) {
-					byRound.push(
-						raw
-							.filter((e: any) => e.r === r)
-							.sort((a: any, b: any) => a.m - b.m)
-							.map((e: any) => ({
-								round: r,
-								matchId: e.m,
-								t1: teamSide(e.t1 ?? null, e.w ?? null, r),
-								t2: teamSide(e.t2 ?? null, e.w ?? null, r),
-								label: roundLabel(r, maxR, e, losers),
-							}))
-					);
-				}
-				return byRound;
-			}
-
-			const winnersRounds = processBracket(winnersData, false);
-			const losersRounds = processBracket(losersData, true);
-			bracketSeasons = [{ season: league.season, leagueId: lid, winnersRounds, losersRounds }];
+			bracketSeasons = result;
 			bracketLoaded = true;
 		} catch (e: any) {
 			if (viewLeagueId !== viewLid) return;
 			error = e.message;
 		} finally {
-			if (viewLeagueId !== viewLid) return;
-			bracketLoading = false;
+			if (viewLeagueId === viewLid) bracketLoading = false;
 		}
 		view = 'bracket';
 	}
