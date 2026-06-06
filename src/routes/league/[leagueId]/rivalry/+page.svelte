@@ -1,16 +1,8 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { fetchRosters, fetchUsers, fetchLeague, fetchMatchups as fetchWeekMatchups, buildRosterInfoMap, fetchDisplayNameOverrides } from '$lib/sleeper';
-
+	import type { ManagerOption } from '$lib/server/rivalry';
 
 	let { data } = $props<{ data: PageData }>();
-
-	interface ManagerOption {
-		userId: string;
-		displayName: string;
-		teamName: string;
-		avatar: string | null;
-	}
 
 	interface H2HMatchup {
 		season: string;
@@ -32,54 +24,22 @@
 		matchups: H2HMatchup[];
 	}
 
-	let managers = $state<ManagerOption[]>([]);
+	let managers = $state<ManagerOption[]>(data.managers);
 	let userOneId = $state('');
 	let userTwoId = $state('');
 	let rivalry = $state<Rivalry | null>(null);
 	let analysing = $state(false);
 	let analyseStatus = $state('');
-	let loadingManagers = $state(true);
-	let error = $state('');
+	const loadingManagers = false;
+	let error = $state(data.loadFailed ? 'Failed to load managers.' : '');
 
+	// Reset to the route league's server-rendered managers on navigation.
 	$effect(() => {
-		const leagueId = data.leagueId;
-		managers = [];
+		managers = data.managers;
 		userOneId = '';
 		userTwoId = '';
 		rivalry = null;
-		loadingManagers = true;
-		error = '';
-
-		(async () => {
-			try {
-				const [rosters, users] = await Promise.all([
-					fetchRosters(leagueId),
-					fetchUsers(leagueId),
-				]);
-				if (data.leagueId !== leagueId) return;
-
-				const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
-				const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
-				managers = rosters
-					.filter(r => r.owner_id)
-					.map(r => {
-						const info = rosterInfo.get(r.roster_id)!;
-						return {
-							userId: r.owner_id,
-							displayName: info.ownerName ?? info.teamName,
-							teamName: info.teamName,
-							avatar: info.avatar,
-						};
-					})
-					.sort((a, b) => a.teamName.localeCompare(b.teamName));
-			} catch (e: any) {
-				if (data.leagueId !== leagueId) return;
-				error = e.message;
-			} finally {
-				if (data.leagueId !== leagueId) return;
-				loadingManagers = false;
-			}
-		})();
+		error = data.loadFailed ? 'Failed to load managers.' : '';
 	});
 
 	async function analyzeRivalry() {
@@ -87,66 +47,12 @@
 		analysing = true;
 		rivalry = null;
 		error = '';
+		analyseStatus = 'Analyzing matchup history…';
 
 		try {
-			let curId: string | null = data.leagueId;
-			const result: Rivalry = { wins: { one: 0, two: 0 }, ties: 0, points: { one: 0, two: 0 }, matchups: [] };
-
-			while (curId && curId !== '0') {
-				analyseStatus = `Scanning season…`;
-				const [leagueData, rosters] = await Promise.all([
-					fetchLeague(curId),
-					fetchRosters(curId),
-				]);
-
-				analyseStatus = `Scanning ${leagueData.season}…`;
-
-				const rOne = (rosters as any[]).find(r => r.owner_id === userOneId)?.roster_id;
-				const rTwo = (rosters as any[]).find(r => r.owner_id === userTwoId)?.roster_id;
-
-				if (rOne && rTwo && rOne !== rTwo) {
-					const playoffStart = leagueData.settings?.playoff_week_start ?? 15;
-					const weekNums = Array.from({ length: playoffStart - 1 }, (_, i) => i + 1);
-
-					const weekData: any[][] = await Promise.all(
-						weekNums.map(w => fetchWeekMatchups(curId!, w))
-					);
-
-					for (let i = 0; i < weekData.length; i++) {
-						const week = weekNums[i];
-						const matchups: Record<number, any[]> = {};
-						for (const m of weekData[i] ?? []) {
-							if (m.roster_id === rOne || m.roster_id === rTwo) {
-								if (!matchups[m.matchup_id]) matchups[m.matchup_id] = [];
-								matchups[m.matchup_id].push(m);
-							}
-						}
-
-						const keys = Object.keys(matchups);
-						if (keys.length === 1) {
-							const pair = matchups[parseInt(keys[0])];
-							if (pair.length === 2) {
-								if (pair[0].roster_id !== rOne) pair.reverse();
-								const ptsOne = pair[0].points ?? 0;
-								const ptsTwo = pair[1].points ?? 0;
-
-								result.points.one += ptsOne;
-								result.points.two += ptsTwo;
-								if (ptsOne > ptsTwo) result.wins.one++;
-								else if (ptsTwo > ptsOne) result.wins.two++;
-								else result.ties++;
-
-								result.matchups.push({ season: leagueData.season, week, teamOne: { points: ptsOne }, teamTwo: { points: ptsTwo } });
-							}
-						}
-					}
-				}
-
-				curId = leagueData.previous_league_id ?? null;
-			}
-
-			result.matchups.sort((a, b) => parseInt(b.season) - parseInt(a.season) || b.week - a.week);
-			rivalry = result;
+			const res = await fetch(`/api/rivalry/${data.leagueId}?one=${userOneId}&two=${userTwoId}`);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			rivalry = await res.json();
 		} catch (e: any) {
 			error = e.message;
 		} finally {

@@ -32,11 +32,16 @@ function isFreshDefault<T>(env: CacheEnvelope<T>, ttlMs?: number, schemaVersion?
 
 /** Fire-and-forget write of a cache envelope. Errors are logged, not thrown. */
 export function writeCache<T>(ref: DocumentReference, value: T, schemaVersion?: number): Promise<void> {
-	const env: CacheEnvelope<T> = { value, cachedAt: Date.now(), schemaVersion };
-	return ref.set(env).then(
-		() => {},
-		(e) => console.error('[cache] write failed for', ref.path, e)
-	);
+	// Omit schemaVersion entirely when undefined — Firestore rejects undefined
+	// field values (and .set() throws synchronously, not as a rejection).
+	const env: CacheEnvelope<T> = { value, cachedAt: Date.now() };
+	if (schemaVersion !== undefined) env.schemaVersion = schemaVersion;
+	return Promise.resolve()
+		.then(() => ref.set(env))
+		.then(
+			() => {},
+			(e) => console.error('[cache] write failed for', ref.path, e)
+		);
 }
 
 /**
