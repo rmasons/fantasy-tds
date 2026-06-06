@@ -1,25 +1,8 @@
 <script lang="ts">
-	import type { LayoutData } from '../$types';
+	import type { PageData } from './$types';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
-	import { fetchDisplayNameOverrides, fetchUser, avatarUrl } from '$lib/sleeper';
 
-	let { data } = $props<{ data: LayoutData }>();
-
-	interface SeasonEntry {
-		season: string;
-		teamName: string;
-		avatar: string | null;
-		stat: string;
-		sub?: string;
-	}
-
-	interface Superlative {
-		key: string;
-		emoji: string;
-		title: string;
-		desc: string;
-		entries: SeasonEntry[];
-	}
+	let { data } = $props<{ data: PageData }>();
 
 	const SUP_DEFS = [
 		{ key: 'big_hairy', emoji: '🏈', title: 'Big Hairy American Winning Machine', desc: 'Regular Season Champion' },
@@ -46,84 +29,16 @@
 		{ key: 'confused', emoji: '🤔', title: 'Confused By Your Tactics', desc: 'Best Performer Without a Superlative' },
 	];
 
-	// ── State ─────────────────────────────────────────────────────────────────
-
-	let loading = $state(true);
-	let error = $state('');
-	let superlatives = $state<Superlative[]>([]);
 	let failedVideos = $state(new Set<string>());
 
-	$effect(() => {
-		const leagueId = data.leagueId;
-		loading = true;
-		error = '';
-		superlatives = [];
-
-		(async () => {
-			try {
-				const historicalRes = await fetch(`/api/superlatives/${leagueId}`).then(r => r.ok ? r.json() : { history: [] });
-				if (data.leagueId !== leagueId) return;
-
-				const supMap = new Map<string, SeasonEntry[]>();
-				type StoredEntry = { ownerId?: string; teamName?: string; stat: string; sub?: string };
-				const history: Array<{ season: string; awards: Record<string, StoredEntry> }> =
-					historicalRes?.history ?? [];
-
-				const uniqueOwnerIds = [...new Set(
-					history.flatMap(h => Object.values(h.awards).map(a => a.ownerId).filter(Boolean))
-				)] as string[];
-
-				const ownerDisplayMap = new Map<string, { teamName: string; avatar: string | null }>();
-				if (uniqueOwnerIds.length > 0) {
-					const profiles = await Promise.all(uniqueOwnerIds.map(u => fetchUser(u).catch(() => null)));
-					if (data.leagueId !== leagueId) return;
-
-					const idMap = new Map<string, { userId: string; displayName: string; avatar: string | null }>();
-					const resolvedIds: string[] = [];
-					for (let i = 0; i < uniqueOwnerIds.length; i++) {
-						const p = profiles[i];
-						if (p) { idMap.set(uniqueOwnerIds[i], { userId: p.user_id, displayName: p.display_name, avatar: avatarUrl(p.avatar) }); resolvedIds.push(p.user_id); }
-					}
-
-					const histOverrides = await fetchDisplayNameOverrides(resolvedIds);
-					if (data.leagueId !== leagueId) return;
-
-					for (const [username, { userId, displayName, avatar }] of idMap) {
-						ownerDisplayMap.set(username, { teamName: histOverrides.get(userId) ?? displayName, avatar });
-					}
-				}
-
-				for (const { season, awards } of history) {
-					for (const [key, entry] of Object.entries(awards)) {
-						const resolved = entry.ownerId ? ownerDisplayMap.get(entry.ownerId) : null;
-						const arr = supMap.get(key) ?? [];
-						arr.push({
-							season,
-							teamName: resolved?.teamName ?? entry.teamName ?? entry.ownerId ?? '',
-							avatar: resolved?.avatar ?? null,
-							stat: entry.stat,
-							sub: entry.sub,
-						});
-						supMap.set(key, arr);
-					}
-				}
-
-				superlatives = SUP_DEFS
-					.map(def => ({
-						...def,
-						entries: (supMap.get(def.key) ?? []).sort((a, b) => b.season.localeCompare(a.season)),
-					}))
-					.filter(s => s.entries.length > 0);
-
-			} catch (e: any) {
-				if (data.leagueId !== leagueId) return;
-				error = e.message;
-			} finally {
-				if (data.leagueId !== leagueId) return;
-				loading = false;
-			}
-		})();
-	});
+	// Owners are resolved server-side; just stitch the entries onto the defs.
+	const loading = false;
+	const error = $derived(data.loadFailed ? 'Failed to load superlatives.' : '');
+	const superlatives = $derived(
+		SUP_DEFS
+			.map((def) => ({ ...def, entries: data.entriesByKey[def.key] ?? [] }))
+			.filter((s) => s.entries.length > 0)
+	);
 </script>
 
 <div>
