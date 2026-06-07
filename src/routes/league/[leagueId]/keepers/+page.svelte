@@ -85,7 +85,7 @@
 	let expandedRow = $state<number | null>(null);
 	let colCount = $state(1);
 
-	onMount(async () => {
+	onMount(() => {
 		function updateCols() {
 			const next = window.innerWidth >= 1280 ? 3 : window.innerWidth >= 768 ? 2 : 1;
 			if (next !== colCount) {
@@ -96,11 +96,14 @@
 		updateCols();
 		window.addEventListener('resize', updateCols);
 
-		await load();
-		if (data.user?.sleeperUserId) {
-			const idx = rosters.findIndex(r => r.ownerUserId === data.user!.sleeperUserId);
-			if (idx !== -1) expandedRow = Math.floor(idx / colCount);
-		}
+		// Async load runs in the background so onMount can return its cleanup synchronously.
+		(async () => {
+			await load();
+			if (data.user?.sleeperUserId) {
+				const idx = rosters.findIndex(r => r.ownerUserId === data.user!.sleeperUserId);
+				if (idx !== -1) expandedRow = Math.floor(idx / colCount);
+			}
+		})();
 
 		return () => window.removeEventListener('resize', updateCols);
 	});
