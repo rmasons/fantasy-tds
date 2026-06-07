@@ -24,32 +24,32 @@ function toFirestoreWrite(obj: Record<string, unknown>): Record<string, unknown>
 }
 
 export async function getAppConfig(): Promise<AppConfig> {
-	const doc = await adminDb.collection('config').doc('app').get();
+	const doc = await adminDb().collection('config').doc('app').get();
 	if (!doc.exists) return {};
 	return doc.data() as AppConfig;
 }
 
 export async function setAppConfig(config: Partial<AppConfig>): Promise<void> {
-	await adminDb.collection('config').doc('app').set(toFirestoreWrite(config as Record<string, unknown>), { merge: true });
+	await adminDb().collection('config').doc('app').set(toFirestoreWrite(config as Record<string, unknown>), { merge: true });
 }
 
 export async function getLeagueConfig(leagueId: string): Promise<LeagueConfig> {
-	const doc = await adminDb.collection('leagueConfig').doc(leagueId).get();
+	const doc = await adminDb().collection('leagueConfig').doc(leagueId).get();
 	if (!doc.exists) return {};
 	return doc.data() as LeagueConfig;
 }
 
 export async function setLeagueConfig(leagueId: string, config: Partial<LeagueConfig>): Promise<void> {
-	await adminDb.collection('leagueConfig').doc(leagueId).set(toFirestoreWrite(config as Record<string, unknown>), { merge: true });
+	await adminDb().collection('leagueConfig').doc(leagueId).set(toFirestoreWrite(config as Record<string, unknown>), { merge: true });
 }
 
 export async function getAllLeagueConfigs(): Promise<Record<string, LeagueConfig>> {
-	const snap = await adminDb.collection('leagueConfig').get();
+	const snap = await adminDb().collection('leagueConfig').get();
 	const result: Record<string, LeagueConfig> = {};
 	snap.forEach(doc => { result[doc.id] = doc.data() as LeagueConfig; });
 	return result;
 }
 
 export async function deleteLeagueConfig(leagueId: string): Promise<void> {
-	await adminDb.collection('leagueConfig').doc(leagueId).delete();
+	await adminDb().collection('leagueConfig').doc(leagueId).delete();
 }

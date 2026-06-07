@@ -1,6 +1,8 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { adminDb } from '$lib/firebase/admin';
+import { validateLeagueId } from '$lib/server/leagueId';
+import { assertLeagueMember } from '$lib/server/membership';
 
 export interface EggClaim {
 	claimedBy: string;
@@ -13,7 +15,8 @@ const MAX_CLAIMS_PER_USER = 3;
 
 // GET — public; returns all claimed eggs for this league
 export const GET: RequestHandler = async ({ params }) => {
-	const doc = await adminDb.collection('faabEggs').doc(params.leagueId).get();
+	const leagueId = validateLeagueId(params.leagueId);
+	const doc = await adminDb().collection('faabEggs').doc(leagueId).get();
 	return json(doc.exists ? (doc.data() as Record<string, EggClaim>) : {});
 };
 
@@ -25,8 +28,9 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const eggId = typeof body?.eggId === 'string' ? body.eggId : null;
 	if (!eggId || !VALID_EGG_IDS.has(eggId)) throw error(400, 'Invalid eggId');
 
-	const { leagueId } = params;
-	const docRef = adminDb.collection('faabEggs').doc(leagueId);
+	const leagueId = validateLeagueId(params.leagueId);
+	await assertLeagueMember(locals.user, leagueId);
+	const docRef = adminDb().collection('faabEggs').doc(leagueId);
 	const uid = locals.user.sleeperUserId ?? locals.user.uid;
 
 	const claim: EggClaim = {
@@ -38,7 +42,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	let won = false;
 	let existingClaim: EggClaim | null = null;
 
-	await adminDb.runTransaction(async (tx) => {
+	await adminDb().runTransaction(async (tx) => {
 		const snap = await tx.get(docRef);
 		const data = (snap.exists ? snap.data() : {}) as Record<string, EggClaim>;
 

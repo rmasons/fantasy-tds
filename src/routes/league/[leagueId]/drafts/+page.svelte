@@ -3,11 +3,8 @@
 	import type { SlimPlayer } from '$lib/types';
 	import { onMount } from 'svelte';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
-	import { fetchLeague } from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
-
-	interface SeasonEntry { leagueId: string; season: string }
 
 	interface DraftPick {
 		round: number;
@@ -33,7 +30,7 @@
 		rosterNames: Map<number, string>;
 	}
 
-	let seasons = $state<SeasonEntry[]>([]);
+	let seasons = $state(data.seasons);
 	let viewLeagueId = $state(data.leagueId);
 
 	// Draft list + roster names — seeded from SSR, replaced on year change
@@ -119,9 +116,8 @@
 	});
 
 	$effect(() => {
-		const urlLeagueId = data.leagueId;
-		viewLeagueId = urlLeagueId;
-		seasons = [];
+		viewLeagueId = data.leagueId;
+		seasons = data.seasons;
 		// Re-seed from SSR data on league navigation
 		viewDrafts = data.completedDrafts ?? [];
 		viewRosterNames = new Map<number, string>(
@@ -132,23 +128,7 @@
 		currentPicks = [];
 		loadingPicks = true;
 		picksError = '';
-
-		walkSeasons(urlLeagueId);
 	});
-
-	async function walkSeasons(urlLeagueId: string) {
-		let curId: string | null = urlLeagueId;
-		while (curId && curId !== '0') {
-			try {
-				const league = await fetchLeague(curId);
-				if (data.leagueId !== urlLeagueId) return;
-				seasons = [...seasons, { leagueId: curId, season: league.season }];
-				curId = league.previous_league_id ?? null;
-			} catch {
-				return;
-			}
-		}
-	}
 
 	async function loadHistoricalDrafts(lid: string) {
 		draftsLoading = true;

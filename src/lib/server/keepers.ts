@@ -89,7 +89,7 @@ async function walkDraftHistory(startLeagueId: string): Promise<Map<string, Draf
 const DRAFT_HISTORY_SCHEMA_VERSION = 2;
 
 async function getCachedDraftHistory(leagueId: string): Promise<Map<string, DraftPick>> {
-	const ref = adminDb.collection('keeperDraftHistory').doc(leagueId);
+	const ref = adminDb().collection('keeperDraftHistory').doc(leagueId);
 	try {
 		const doc = await ref.get();
 		if (doc.exists) {
@@ -139,7 +139,7 @@ export async function getKeeperData(leagueId: string): Promise<{
 
 	const [draftHistory, overridesSnap, playersCache, managerProfiles, leagueConfig] = await Promise.all([
 		getCachedDraftHistory(leagueId),
-		adminDb.collection('keeperData').doc(leagueId).collection('players').get(),
+		adminDb().collection('keeperData').doc(leagueId).collection('players').get(),
 		getPlayers(),
 		getManagerProfilesBatch(sleeperUserIds),
 		getLeagueConfig(leagueId),
@@ -228,7 +228,7 @@ export interface KeeperSelection {
 }
 
 export async function getKeeperSelections(leagueId: string): Promise<KeeperSelection[]> {
-	const snap = await adminDb
+	const snap = await adminDb()
 		.collection('keeperSelections')
 		.doc(leagueId)
 		.collection('managers')
@@ -248,7 +248,7 @@ export async function setKeeperSelection(
 		playerIds,
 		submittedAt: new Date().toISOString(),
 	};
-	await adminDb
+	await adminDb()
 		.collection('keeperSelections')
 		.doc(leagueId)
 		.collection('managers')
@@ -258,7 +258,7 @@ export async function setKeeperSelection(
 }
 
 export function clearKeeperSelection(leagueId: string, ownerUserId: string) {
-	return adminDb
+	return adminDb()
 		.collection('keeperSelections')
 		.doc(leagueId)
 		.collection('managers')

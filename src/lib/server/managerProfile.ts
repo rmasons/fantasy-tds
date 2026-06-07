@@ -14,8 +14,18 @@ export const PROFILE_MAX_LENGTHS: Record<string, number> = {
 	preferredContact: 60,
 };
 
+// Fields kept off public responses; only returned to authenticated league-mates.
+const PRIVATE_PROFILE_FIELDS = ['email', 'firstName', 'lastName', 'preferredContact'] as const;
+
+/** Strip personally-identifying fields, leaving the public subset. */
+export function redactManagerProfile(profile: ManagerProfile): ManagerProfile {
+	const out = { ...profile };
+	for (const f of PRIVATE_PROFILE_FIELDS) delete out[f];
+	return out;
+}
+
 export async function getManagerProfile(sleeperUserId: string): Promise<ManagerProfile | null> {
-	const doc = await adminDb.collection('managerProfiles').doc(sleeperUserId).get();
+	const doc = await adminDb().collection('managerProfiles').doc(sleeperUserId).get();
 	if (!doc.exists) return null;
 	return doc.data() as ManagerProfile;
 }
@@ -28,14 +38,14 @@ export async function upsertManagerProfile(
 	for (const [k, v] of Object.entries(data)) {
 		toWrite[k] = v === undefined ? FieldValue.delete() : v;
 	}
-	await adminDb.collection('managerProfiles').doc(sleeperUserId).set(toWrite, { merge: true });
+	await adminDb().collection('managerProfiles').doc(sleeperUserId).set(toWrite, { merge: true });
 }
 
 export async function getManagerLeagueProfile(
 	sleeperUserId: string,
 	leagueId: string
 ): Promise<ManagerLeagueProfile | null> {
-	const doc = await adminDb
+	const doc = await adminDb()
 		.collection('managerProfiles')
 		.doc(sleeperUserId)
 		.collection('leagues')
@@ -54,15 +64,15 @@ export async function upsertManagerLeagueProfile(
 	for (const [k, v] of Object.entries(data)) {
 		toWrite[k] = v === undefined ? FieldValue.delete() : v;
 	}
-	await adminDb.collection('managerProfiles').doc(sleeperUserId).collection('leagues').doc(leagueId).set(toWrite, { merge: true });
+	await adminDb().collection('managerProfiles').doc(sleeperUserId).collection('leagues').doc(leagueId).set(toWrite, { merge: true });
 }
 
 export async function getManagerProfilesBatch(
 	sleeperUserIds: string[]
 ): Promise<Map<string, ManagerProfile>> {
 	if (sleeperUserIds.length === 0) return new Map();
-	const refs = sleeperUserIds.map(id => adminDb.collection('managerProfiles').doc(id));
-	const docs = await adminDb.getAll(...refs);
+	const refs = sleeperUserIds.map(id => adminDb().collection('managerProfiles').doc(id));
+	const docs = await adminDb().getAll(...refs);
 	const map = new Map<string, ManagerProfile>();
 	for (const doc of docs) {
 		if (doc.exists) map.set(doc.id, doc.data() as ManagerProfile);

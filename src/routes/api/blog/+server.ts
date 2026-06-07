@@ -2,14 +2,13 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getLeagueConfig } from '$lib/server/config';
 import { checkRateLimit } from '$lib/server/rateLimit';
+import { validateLeagueId } from '$lib/server/leagueId';
 
 export const GET: RequestHandler = async ({ url, getClientAddress }) => {
-	if (!checkRateLimit(`blog:${getClientAddress()}`)) {
+	if (!(await checkRateLimit(`blog:${getClientAddress()}`))) {
 		return new Response('Too many requests.', { status: 429, headers: { 'Retry-After': '60' } });
 	}
-	const leagueId = url.searchParams.get('leagueId') ?? '';
-	if (!leagueId) throw error(400, 'Missing leagueId');
-	if (!/^[\w-]+$/.test(leagueId)) throw error(400, 'Invalid leagueId.');
+	const leagueId = validateLeagueId(url.searchParams.get('leagueId'));
 
 	const config = await getLeagueConfig(leagueId);
 	const spaceId = config.contentfulSpaceId ?? '';

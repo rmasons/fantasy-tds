@@ -9,7 +9,7 @@ export const load: LayoutServerLoad = async ({ locals, params }) => {
 		fetchLeague(params.leagueId).catch(() => null),
 		// Persist last-viewed league for logged-in users
 		locals.user && locals.user.lastLeagueId !== params.leagueId
-			? adminDb.collection('users').doc(locals.user.uid).set({ lastLeagueId: params.leagueId }, { merge: true })
+			? adminDb().collection('users').doc(locals.user.uid).set({ lastLeagueId: params.leagueId }, { merge: true })
 			: Promise.resolve(),
 	]);
 

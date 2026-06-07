@@ -1,10 +1,10 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getKeeperData } from '$lib/server/keepers';
+import { validateLeagueId } from '$lib/server/leagueId';
 
 export const GET: RequestHandler = async ({ url }) => {
-	const leagueId = url.searchParams.get('leagueId');
-	if (!leagueId || !/^[\w-]+$/.test(leagueId)) throw error(400, 'Missing or invalid leagueId');
+	const leagueId = validateLeagueId(url.searchParams.get('leagueId'));
 	try {
 		return json(await getKeeperData(leagueId));
 	} catch (e) {

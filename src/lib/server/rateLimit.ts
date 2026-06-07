@@ -1,24 +1,30 @@
-type Bucket = { timestamps: number[]; windowMs: number };
-const buckets = new Map<string, Bucket>();
+import { adminDb } from '$lib/firebase/admin';
 
-// Evict keys whose most-recent hit has aged past their own window
-setInterval(() => {
-	const now = Date.now();
-	for (const [key, { timestamps, windowMs }] of buckets) {
-		if (!timestamps.length || now - timestamps[timestamps.length - 1] >= windowMs) {
-			buckets.delete(key);
-		}
-	}
-}, 60_000).unref();
+// Firestore-backed sliding-window limiter. Unlike an in-memory Map this is
+// shared across serverless instances, so limits hold no matter which instance
+// serves a request. Each key gets one doc holding its recent hit timestamps.
 
-export function checkRateLimit(key: string, limit = 30, windowMs = 60_000): boolean {
+export async function checkRateLimit(key: string, limit = 30, windowMs = 60_000): Promise<boolean> {
+	const ref = adminDb().collection('rateLimits').doc(key.replace(/[^\w-]/g, '_'));
 	const now = Date.now();
-	const kept = (buckets.get(key)?.timestamps ?? []).filter(t => now - t < windowMs);
-	if (kept.length >= limit) {
-		buckets.set(key, { timestamps: kept, windowMs });
-		return false;
+
+	try {
+		return await adminDb().runTransaction(async (tx) => {
+			const snap = await tx.get(ref);
+			const prev: number[] = snap.exists ? (snap.data()!.timestamps ?? []) : [];
+			const kept = prev.filter((t) => now - t < windowMs);
+
+			if (kept.length >= limit) {
+				tx.set(ref, { timestamps: kept, expiresAt: now + windowMs });
+				return false;
+			}
+
+			kept.push(now);
+			tx.set(ref, { timestamps: kept, expiresAt: now + windowMs });
+			return true;
+		});
+	} catch {
+		// Fail open: a Firestore hiccup shouldn't lock out legitimate traffic.
+		return true;
 	}
-	kept.push(now);
-	buckets.set(key, { timestamps: kept, windowMs });
-	return true;
 }

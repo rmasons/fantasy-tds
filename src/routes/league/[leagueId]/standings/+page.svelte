@@ -1,95 +1,55 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { StandingRow } from '$lib/types';
-	import { fetchLeague, fetchLeagueCore, buildRosterInfoMap, fetchDisplayNameOverrides, combineFpts } from '$lib/sleeper';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
-	interface SeasonEntry { leagueId: string; season: string }
-
-	let standings = $state<StandingRow[]>([]);
-	let loading = $state(true);
-	let error = $state('');
-	let season = $state('');
-	let seasons = $state<SeasonEntry[]>([]);
+	let standings = $state<StandingRow[]>(data.standings);
+	let loading = $state(false);
+	let error = $state(data.loadFailed ? 'Failed to load standings.' : '');
+	let season = $state(data.season);
+	let seasons = $state(data.seasons);
 	let viewLeagueId = $state(data.leagueId);
 
+	// Reset to the route league's server-rendered data whenever we navigate.
 	$effect(() => {
-		const urlLeagueId = data.leagueId;
-		viewLeagueId = urlLeagueId;
-		seasons = [];
-		standings = [];
-		loading = true;
-		error = '';
-		season = '';
-
-		loadStandings(urlLeagueId);
-		walkSeasons(urlLeagueId);
+		viewLeagueId = data.leagueId;
+		standings = data.standings;
+		season = data.season;
+		seasons = data.seasons;
+		loading = false;
+		error = data.loadFailed ? 'Failed to load standings.' : '';
 	});
 
-	async function walkSeasons(urlLeagueId: string) {
-		let curId: string | null = urlLeagueId;
-		while (curId && curId !== '0') {
-			try {
-				const league = await fetchLeague(curId);
-				if (data.leagueId !== urlLeagueId) return;
-				seasons = [...seasons, { leagueId: curId, season: league.season }];
-				curId = league.previous_league_id ?? null;
-			} catch {
-				return;
-			}
-		}
-	}
+	async function selectSeason(lid: string) {
+		if (viewLeagueId === lid) return;
+		viewLeagueId = lid;
 
-	async function loadStandings(lid: string) {
+		// The route league's standings already came down with the page (SSR).
+		if (lid === data.leagueId) {
+			standings = data.standings;
+			season = data.season;
+			error = data.loadFailed ? 'Failed to load standings.' : '';
+			return;
+		}
+
 		standings = [];
 		loading = true;
 		error = '';
-		season = '';
-
 		try {
-			const { league, rosters, users } = await fetchLeagueCore(lid);
+			const res = await fetch(`/api/standings/${lid}`);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const result = await res.json();
 			if (viewLeagueId !== lid) return;
-
-			season = league.season;
-			const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
-			if (viewLeagueId !== lid) return;
-			const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
-
-			const rows: StandingRow[] = rosters.map((roster) => {
-				const info = rosterInfo.get(roster.roster_id)!;
-				return {
-					rank: 0,
-					rosterId: roster.roster_id,
-					teamName: info.teamName,
-					ownerName: info.ownerName,
-					avatar: info.avatar,
-					wins: roster.settings.wins ?? 0,
-					losses: roster.settings.losses ?? 0,
-					ties: roster.settings.ties ?? 0,
-					fpts: combineFpts(roster.settings.fpts, roster.settings.fpts_decimal),
-					fptsAgainst: combineFpts(roster.settings.fpts_against, roster.settings.fpts_against_decimal),
-					streak: roster.metadata?.streak ?? '–'
-				};
-			});
-
-			rows.sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
-			rows.forEach((r, i) => (r.rank = i + 1));
-			standings = rows;
+			standings = result.standings;
+			season = result.season;
 		} catch (e: any) {
 			if (viewLeagueId !== lid) return;
 			error = e.message;
 		} finally {
-			if (viewLeagueId !== lid) return;
-			loading = false;
+			if (viewLeagueId === lid) loading = false;
 		}
-	}
-
-	function selectSeason(lid: string) {
-		if (viewLeagueId === lid) return;
-		viewLeagueId = lid;
-		loadStandings(lid);
 	}
 
 	function rankStyle(rank: number) {

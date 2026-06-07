@@ -1,181 +1,19 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import type { SleeperLeague, SleeperNflState } from '$lib/types';
+	import type { HomeData } from '$lib/server/homeData';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
-	import {
-		fetchLeague, fetchNflState, fetchUsers, fetchRosters, fetchWinnersBracket,
-		buildRosterInfoMap, fetchDisplayNameOverrides, fetchLeagueCore, fetchMatchups, combineFpts,
-	} from '$lib/sleeper';
 
 	let { data } = $props<{ data: PageData }>();
 
-	let league = $state<SleeperLeague | null>(null);
-	let nflState = $state<SleeperNflState | null>(null);
-	let loading = $state(true);
-
-	interface Champion {
-		teamName: string;
-		ownerName: string | null;
-		avatar: string | null;
-		season: string;
-	}
-	let champion = $state<Champion | null>(null);
-
-	interface StandingMini {
-		rank: number;
-		teamName: string;
-		ownerName: string | null;
-		avatar: string | null;
-		wins: number;
-		losses: number;
-		fpts: number;
-	}
-
-	interface MatchupWidget {
-		matchupId: number;
-		teams: { teamName: string; avatar: string | null; points: number }[];
-	}
-
-	let standingsMini = $state<StandingMini[]>([]);
-	let standingsLoading = $state(false);
-	let weekMatchups = $state<MatchupWidget[]>([]);
-	let matchupsLoading = $state(false);
-
-	const CHAMP_CACHE_PREFIX = 'ftds_champ_';
-
-	async function fetchPreviousChampion(prevLeagueId: string, forLeagueId: string) {
-		const cacheKey = `${CHAMP_CACHE_PREFIX}${forLeagueId}`;
-		try {
-			const cached = sessionStorage.getItem(cacheKey);
-			if (cached) {
-				if (data.leagueId !== forLeagueId) return;
-				champion = JSON.parse(cached);
-				return;
-			}
-		} catch {}
-
-		try {
-			const [prevLeague, users, rosters, winners] = await Promise.all([
-				fetchLeague(prevLeagueId),
-				fetchUsers(prevLeagueId),
-				fetchRosters(prevLeagueId),
-				fetchWinnersBracket(prevLeagueId),
-			]);
-			if (data.leagueId !== forLeagueId) return;
-			if (!Array.isArray(winners) || winners.length === 0) return;
-
-			const overrides = await fetchDisplayNameOverrides(users.map(u => u.user_id));
-			const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
-
-			const maxRound = Math.max(...(winners as any[]).map((m: any) => m.r));
-			const finalsMatch = (winners as any[]).find((m: any) => m.r === maxRound && m.t1_from?.w != null);
-			if (!finalsMatch?.w) return;
-
-			const info = rosterInfo.get(finalsMatch.w);
-			const result: Champion = {
-				teamName: info?.teamName ?? `Team ${finalsMatch.w}`,
-				ownerName: info?.ownerName ?? null,
-				avatar: info?.avatar ?? null,
-				season: prevLeague.season,
-			};
-			champion = result;
-			try { sessionStorage.setItem(cacheKey, JSON.stringify(result)); } catch {}
-		} catch {}
-	}
-
-	async function loadWidgets(leagueId: string, nflData: SleeperNflState) {
-		standingsLoading = true;
-		matchupsLoading = nflData.season_type === 'regular';
-		standingsMini = [];
-		weekMatchups = [];
-
-		try {
-			const [core, rawMatchups] = await Promise.all([
-				fetchLeagueCore(leagueId),
-				nflData.season_type === 'regular'
-					? fetchMatchups(leagueId, nflData.week).catch(() => [])
-					: Promise.resolve([]),
-			]);
-			if (data.leagueId !== leagueId) return;
-
-			const overrides = await fetchDisplayNameOverrides(core.users.map(u => u.user_id));
-			if (data.leagueId !== leagueId) return;
-
-			const rosterInfo = buildRosterInfoMap(core.rosters, core.users, overrides);
-
-			// Build standings mini
-			const rows: StandingMini[] = core.rosters.map(r => {
-				const info = rosterInfo.get(r.roster_id)!;
-				return {
-					rank: 0,
-					teamName: info.teamName,
-					ownerName: info.ownerName,
-					avatar: info.avatar,
-					wins: r.settings.wins ?? 0,
-					losses: r.settings.losses ?? 0,
-					fpts: combineFpts(r.settings.fpts, r.settings.fpts_decimal),
-				};
-			});
-			rows.sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
-			rows.forEach((r, i) => r.rank = i + 1);
-			standingsMini = rows;
-
-			// Build matchup widgets
-			if (rawMatchups.length > 0) {
-				const groups = new Map<number, { teamName: string; avatar: string | null; points: number }[]>();
-				for (const m of rawMatchups) {
-					if (!groups.has(m.matchup_id)) groups.set(m.matchup_id, []);
-					const info = rosterInfo.get(m.roster_id);
-					groups.get(m.matchup_id)!.push({
-						teamName: info?.teamName ?? `Team ${m.roster_id}`,
-						avatar: info?.avatar ?? null,
-						points: m.points ?? 0,
-					});
-				}
-				weekMatchups = [...groups.entries()]
-					.filter(([, pair]) => pair.length === 2)
-					.map(([mid, teams]) => ({ matchupId: mid, teams }))
-					.sort((a, b) => a.matchupId - b.matchupId);
-			}
-		} catch {
-			// widget failures are non-critical
-		} finally {
-			if (data.leagueId === leagueId) {
-				standingsLoading = false;
-				matchupsLoading = false;
-			}
-		}
-	}
-
-	$effect(() => {
-		const leagueId = data.leagueId;
-
-		loading = true;
-		league = null;
-		nflState = null;
-		champion = null;
-		standingsMini = [];
-		standingsLoading = false;
-		weekMatchups = [];
-		matchupsLoading = false;
-
-		Promise.all([
-			fetchLeague(leagueId),
-			fetchNflState(),
-		]).then(([leagueData, nflData]: [SleeperLeague, SleeperNflState]) => {
-			if (data.leagueId !== leagueId) return;
-			league = leagueData;
-			nflState = nflData;
-			loading = false;
-
-			const prevId: string = leagueData.previous_league_id ?? '';
-			if (prevId && prevId !== '0') {
-				fetchPreviousChampion(prevId, leagueId);
-			}
-
-			loadWidgets(leagueId, nflData);
-		});
-	});
+	const home = $derived(data.home as HomeData | null);
+	const loading = $derived(!home);
+	const league = $derived(home?.league ?? null);
+	const nflState = $derived(home?.nflState ?? null);
+	const champion = $derived(home?.champion ?? null);
+	const standingsMini = $derived(home?.standingsMini ?? []);
+	const weekMatchups = $derived(home?.weekMatchups ?? []);
+	const standingsLoading = false;
+	const matchupsLoading = false;
 
 	const allNavItems = [
 		{ href: 'standings',       label: 'Standings',        icon: '🏆' },
@@ -194,7 +32,7 @@
 	const navItems = $derived.by(() => {
 		const enabled = data.enabledNavItems;
 		const base = enabled && enabled.length > 0
-			? enabled.map(href => allNavItems.find(n => n.href === href)).filter(Boolean) as typeof allNavItems
+			? enabled.map((href: string) => allNavItems.find(n => n.href === href)).filter(Boolean) as typeof allNavItems
 			: allNavItems;
 		return base.filter(n => n.href !== 'blog' || data.hasBlog);
 	});

@@ -1,9 +1,11 @@
 import { getApps, initializeApp, cert, type App } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth, type Auth } from 'firebase-admin/auth';
+import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { FIREBASE_SERVICE_ACCOUNT } from '$env/static/private';
 
 let _app: App | null = null;
+let _auth: Auth | null = null;
+let _db: Firestore | null = null;
 
 function adminApp(): App {
 	if (_app) return _app;
@@ -25,19 +27,13 @@ function adminApp(): App {
 	return _app;
 }
 
-export const adminAuth = new Proxy({} as ReturnType<typeof getAuth>, {
-	get(_, prop) {
-		const instance = getAuth(adminApp());
-		const value = (instance as any)[prop];
-		return typeof value === 'function' ? value.bind(instance) : value;
-	}
-});
+/** Lazily-initialized, memoized Firebase Admin Auth instance. */
+export function adminAuth(): Auth {
+	return (_auth ??= getAuth(adminApp()));
+}
 
-export const adminDb = new Proxy({} as ReturnType<typeof getFirestore>, {
-	get(_, prop) {
-		const instance = getFirestore(adminApp());
-		const value = (instance as any)[prop];
-		return typeof value === 'function' ? value.bind(instance) : value;
-	}
-});
+/** Lazily-initialized, memoized Firestore instance. */
+export function adminDb(): Firestore {
+	return (_db ??= getFirestore(adminApp()));
+}
 

@@ -1,9 +1,14 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { upsertManagerLeagueProfile } from '$lib/server/managerProfile';
+import { validateLeagueId } from '$lib/server/leagueId';
+import { assertLeagueMember } from '$lib/server/membership';
 
 export const PUT: RequestHandler = async ({ request, locals, params }) => {
 	if (!locals.user?.sleeperUserId) throw error(401, 'Not authenticated');
+
+	const leagueId = validateLeagueId(params.leagueId);
+	await assertLeagueMember(locals.user, leagueId);
 
 	const body = await request.json();
 
@@ -18,7 +23,7 @@ export const PUT: RequestHandler = async ({ request, locals, params }) => {
 		throw error(400, 'Invalid joinedYear');
 	}
 
-	await upsertManagerLeagueProfile(locals.user.sleeperUserId, params.leagueId, {
+	await upsertManagerLeagueProfile(locals.user.sleeperUserId, leagueId, {
 		joinedYear: joinedYear || undefined,
 	});
 
