@@ -110,6 +110,10 @@
 		const meta = draftsMeta[0];
 		if (meta) {
 			await loadPicks(meta);
+		} else if (seasons.length > 1) {
+			// Route league has no completed drafts (e.g. a pre-draft season) —
+			// land on the most recent prior season instead of an empty page.
+			selectSeason(seasons[1].leagueId);
 		} else {
 			loadingPicks = false;
 		}

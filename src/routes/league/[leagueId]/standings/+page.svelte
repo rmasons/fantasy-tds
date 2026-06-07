@@ -53,6 +53,7 @@
 	}
 
 	function rankStyle(rank: number) {
+		if (!seasonStarted) return 'text-slate-600';
 		if (rank === 1) return 'text-amber-400 font-bold';
 		if (rank === 2) return 'text-slate-300 font-semibold';
 		if (rank === 3) return 'text-orange-600 font-semibold';
@@ -60,7 +61,7 @@
 	}
 
 	function rowStyle(rank: number) {
-		if (rank === 1) return 'bg-amber-500/[0.07] border-l-2 border-amber-400/60';
+		if (seasonStarted && rank === 1) return 'bg-amber-500/[0.07] border-l-2 border-amber-400/60';
 		return '';
 	}
 
@@ -71,6 +72,7 @@
 	}
 
 	const hasTies = $derived(standings.some(s => s.ties > 0));
+	const seasonStarted = $derived(standings.some(s => s.wins > 0 || s.losses > 0 || s.ties > 0));
 </script>
 
 <div>
@@ -110,6 +112,12 @@
 		<p class="text-navy-500">No standings available yet — season may not have started.</p>
 
 	{:else}
+		{#if !seasonStarted}
+			<div class="mb-4 rounded-lg border border-navy-700 bg-navy-850 px-4 py-3 text-sm text-navy-500">
+				Season hasn't started — standings will populate after Week 1.
+			</div>
+		{/if}
+
 		<!-- Desktop table -->
 		<div class="hidden sm:block overflow-x-auto rounded-lg border border-navy-700">
 			<table class="w-full text-sm">
