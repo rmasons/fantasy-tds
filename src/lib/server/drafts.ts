@@ -2,6 +2,8 @@ import { adminDb } from '$lib/firebase/admin';
 import { cachedFetch, writeCache, type CacheEnvelope } from '$lib/server/cache';
 import type { SleeperLeague, SleeperDraft, SleeperDraftPick, SleeperRoster, SleeperLeagueUser } from '$lib/types';
 
+const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
 async function sleeperGet<T>(path: string): Promise<T> {
 	const res = await fetch(`https://api.sleeper.app/v1${path}`, {
 		signal: AbortSignal.timeout(10000),
@@ -44,8 +46,8 @@ export async function seedLeagueChain(startLeagueId: string): Promise<SeedDraftR
 		let league: SleeperLeague;
 		try {
 			league = await sleeperGet<SleeperLeague>(`/league/${currentId}`);
-		} catch (e: any) {
-			console.error('[seed] Failed to fetch league', currentId, e.message);
+		} catch (e) {
+			console.error('[seed] Failed to fetch league', currentId, errMsg(e));
 			break;
 		}
 
@@ -62,8 +64,8 @@ export async function seedLeagueChain(startLeagueId: string): Promise<SeedDraftR
 				adminDb().collection('draftListCache').doc(currentId),
 				{ drafts, rosterInfo }
 			);
-		} catch (e: any) {
-			console.error('[seed] Failed to fetch/cache draft list for', currentId, e.message);
+		} catch (e) {
+			console.error('[seed] Failed to fetch/cache draft list for', currentId, errMsg(e));
 		}
 
 		for (const draft of drafts.filter((d) => d.status === 'complete')) {
@@ -96,7 +98,7 @@ export async function seedLeagueChain(startLeagueId: string): Promise<SeedDraftR
 					picks: picks.length,
 					status: picks.length === 0 ? 'empty' : 'seeded',
 				});
-			} catch (e: any) {
+			} catch (e) {
 				results.push({
 					leagueId: currentId,
 					season: league.season,
@@ -104,7 +106,7 @@ export async function seedLeagueChain(startLeagueId: string): Promise<SeedDraftR
 					type: draft.type,
 					picks: 0,
 					status: 'error',
-					error: e.message,
+					error: errMsg(e),
 				});
 			}
 		}

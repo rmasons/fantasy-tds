@@ -3,6 +3,7 @@ import { avatarUrl } from '$lib/sleeper';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 import { getLeagueConfig } from '$lib/server/config';
 import { getPlayers } from '$lib/server/players';
+import type { SleeperLeague, SleeperRoster, SleeperLeagueUser, SleeperDraft, SleeperDraftPick } from '$lib/types';
 
 export interface KeeperPlayerData {
 	playerId: string;
@@ -43,7 +44,7 @@ function calcKeeperCost(baseCost: number, yearsKept: number): number {
 	return Math.ceil(effective * (1 + (0.2 * (yearsKept + 1))));
 }
 
-async function sleeperGet(path: string): Promise<any> {
+async function sleeperGet<T>(path: string): Promise<T> {
 	const res = await fetch(`https://api.sleeper.app/v1${path}`, { signal: AbortSignal.timeout(5000) });
 	if (!res.ok) throw new Error(`Sleeper ${path} → ${res.status}`);
 	return res.json();
@@ -54,18 +55,18 @@ async function walkDraftHistory(startLeagueId: string): Promise<Map<string, Draf
 	let currentId: string | null = startLeagueId;
 
 	while (currentId && currentId !== '0') {
-		let league: any;
-		try { league = await sleeperGet(`/league/${currentId}`); }
+		let league: SleeperLeague;
+		try { league = await sleeperGet<SleeperLeague>(`/league/${currentId}`); }
 		catch { break; }
 
 		const season: string = league.season;
-		let drafts: any[] = [];
-		try { drafts = await sleeperGet(`/league/${currentId}/drafts`); }
+		let drafts: SleeperDraft[] = [];
+		try { drafts = await sleeperGet<SleeperDraft[]>(`/league/${currentId}/drafts`); }
 		catch { /* skip */ }
 
 		for (const draft of (drafts ?? [])) {
-			let picks: any[] = [];
-			try { picks = await sleeperGet(`/draft/${draft.draft_id}/picks`); }
+			let picks: SleeperDraftPick[] = [];
+			try { picks = await sleeperGet<SleeperDraftPick[]>(`/draft/${draft.draft_id}/picks`); }
 			catch { continue; }
 
 			for (const pick of (picks ?? [])) {
@@ -124,9 +125,9 @@ export async function getKeeperData(leagueId: string): Promise<{
 	faabBudget: number;
 }> {
 	const [league, rostersRaw, usersRaw] = await Promise.all([
-		sleeperGet(`/league/${leagueId}`),
-		sleeperGet(`/league/${leagueId}/rosters`),
-		sleeperGet(`/league/${leagueId}/users`),
+		sleeperGet<SleeperLeague>(`/league/${leagueId}`),
+		sleeperGet<SleeperRoster[]>(`/league/${leagueId}/rosters`),
+		sleeperGet<SleeperLeagueUser[]>(`/league/${leagueId}/users`),
 	]);
 
 	// league.season is the season currently being built — keepers are held for this year.
@@ -135,7 +136,7 @@ export async function getKeeperData(leagueId: string): Promise<{
 	const faabBudget: number = league.settings?.waiver_budget ?? 100;
 	const maxKeepers: number = league.settings?.num_keepers ?? 0;
 
-	const sleeperUserIds: string[] = (usersRaw ?? []).map((u: any) => u.user_id).filter(Boolean);
+	const sleeperUserIds: string[] = (usersRaw ?? []).map((u) => u.user_id).filter(Boolean);
 
 	const [draftHistory, overridesSnap, playersCache, managerProfiles, leagueConfig] = await Promise.all([
 		getCachedDraftHistory(leagueId),
