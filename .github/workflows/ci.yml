@@ -16,5 +16,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # svelte-kit sync generates the $env/static/* type modules from the env
+      # keys present at check time. Seed placeholders so type-checking resolves
+      # them; real values aren't needed to type-check.
+      - run: cp .env.example .env
       - run: npm run check
       - run: npm test
