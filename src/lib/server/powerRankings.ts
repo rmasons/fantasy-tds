@@ -1,5 +1,4 @@
-import { adminDb } from '$lib/firebase/admin';
-import { cachedFetch } from '$lib/server/cache';
+import { cachedFetch, cacheKey } from '$lib/server/cache';
 import { fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
 import { getCachedMatchups } from '$lib/server/sleeperCache';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
@@ -131,7 +130,7 @@ async function buildPowerRankings(leagueId: string): Promise<PowerRankingsData> 
 export async function getPowerRankings(leagueId: string): Promise<PowerRankingsData> {
 	// The week maps are encoded as nested arrays, which Firestore can't store,
 	// so the cached value is a JSON string.
-	const jsonStr = await cachedFetch<string>(adminDb().collection('powerRankingsCache').doc(leagueId), {
+	const jsonStr = await cachedFetch<string>(cacheKey('powerRankingsCache', leagueId), {
 		schemaVersion: SCHEMA_VERSION,
 		ttlMs: TTL_MS,
 		fetcher: async () => JSON.stringify(await buildPowerRankings(leagueId)),

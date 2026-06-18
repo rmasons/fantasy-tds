@@ -1,5 +1,5 @@
 import { adminDb } from '$lib/firebase/admin';
-import { cachedFetch } from '$lib/server/cache';
+import { cachedFetch, cacheKey } from '$lib/server/cache';
 import { fetchLeague, fetchUser, avatarUrl } from '$lib/sleeper';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 
@@ -87,7 +87,7 @@ async function buildSuperlatives(leagueId: string): Promise<Record<string, Super
 
 export function getSuperlatives(leagueId: string): Promise<Record<string, SuperlativeSeasonEntry[]>> {
 	return cachedFetch<Record<string, SuperlativeSeasonEntry[]>>(
-		adminDb().collection('superlativesResolvedCache').doc(leagueId),
+		cacheKey('superlativesResolvedCache', leagueId),
 		{
 			schemaVersion: SCHEMA_VERSION,
 			ttlMs: TTL_MS,

@@ -1,5 +1,4 @@
-import { adminDb } from '$lib/firebase/admin';
-import { cachedFetch } from '$lib/server/cache';
+import { cachedFetch, cacheKey } from '$lib/server/cache';
 import { fetchLeague, fetchLeagueCore, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 import type { StandingRow } from '$lib/types';
@@ -52,7 +51,7 @@ async function buildStandings(leagueId: string): Promise<StandingsResult> {
 }
 
 export function getStandings(leagueId: string): Promise<StandingsResult> {
-	return cachedFetch<StandingsResult>(adminDb().collection('standingsCache').doc(leagueId), {
+	return cachedFetch<StandingsResult>(cacheKey('standingsCache', leagueId), {
 		schemaVersion: SCHEMA_VERSION,
 		isFresh: (env) =>
 			env.schemaVersion === SCHEMA_VERSION &&
@@ -62,7 +61,7 @@ export function getStandings(leagueId: string): Promise<StandingsResult> {
 }
 
 export function getSeasonChain(leagueId: string): Promise<SeasonEntry[]> {
-	return cachedFetch<SeasonEntry[]>(adminDb().collection('seasonChainCache').doc(leagueId), {
+	return cachedFetch<SeasonEntry[]>(cacheKey('seasonChainCache', leagueId), {
 		ttlMs: CHAIN_TTL_MS,
 		fetcher: async () => {
 			const chain: SeasonEntry[] = [];

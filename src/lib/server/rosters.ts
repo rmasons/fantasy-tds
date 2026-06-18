@@ -1,5 +1,4 @@
-import { adminDb } from '$lib/firebase/admin';
-import { cachedFetch } from '$lib/server/cache';
+import { cachedFetch, cacheKey } from '$lib/server/cache';
 import { fetchLeagueCore, buildRosterInfoMap } from '$lib/sleeper';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 import { getPlayers } from '$lib/server/players';
@@ -61,7 +60,7 @@ async function buildRosters(leagueId: string): Promise<RosterTeam[]> {
 }
 
 export function getRosters(leagueId: string): Promise<RosterTeam[]> {
-	return cachedFetch<RosterTeam[]>(adminDb().collection('rostersCache').doc(leagueId), {
+	return cachedFetch<RosterTeam[]>(cacheKey('rostersCache', leagueId), {
 		schemaVersion: SCHEMA_VERSION,
 		ttlMs: TTL_MS,
 		fetcher: () => buildRosters(leagueId),

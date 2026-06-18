@@ -1,5 +1,4 @@
-import { adminDb } from '$lib/firebase/admin';
-import { cachedFetch } from '$lib/server/cache';
+import { cachedFetch, cacheKey } from '$lib/server/cache';
 import { fetchRosters, fetchUsers, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
 
 const SCHEMA_VERSION = 1;
@@ -39,7 +38,7 @@ async function buildManagers(leagueId: string): Promise<ManagerCard[]> {
 }
 
 export function getManagers(leagueId: string): Promise<ManagerCard[]> {
-	return cachedFetch<ManagerCard[]>(adminDb().collection('managersCache').doc(leagueId), {
+	return cachedFetch<ManagerCard[]>(cacheKey('managersCache', leagueId), {
 		schemaVersion: SCHEMA_VERSION,
 		ttlMs: TTL_MS,
 		fetcher: () => buildManagers(leagueId),

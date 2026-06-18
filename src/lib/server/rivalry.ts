@@ -1,5 +1,4 @@
-import { adminDb } from '$lib/firebase/admin';
-import { cachedFetch } from '$lib/server/cache';
+import { cachedFetch, cacheKey } from '$lib/server/cache';
 import { fetchLeague, fetchRosters, fetchUsers, fetchMatchups, buildRosterInfoMap } from '$lib/sleeper';
 import { getCachedMatchups } from '$lib/server/sleeperCache';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
@@ -52,7 +51,7 @@ async function buildManagerOptions(leagueId: string): Promise<ManagerOption[]> {
 }
 
 export function getManagerOptions(leagueId: string): Promise<ManagerOption[]> {
-	return cachedFetch<ManagerOption[]>(adminDb().collection('rivalryManagersCache').doc(leagueId), {
+	return cachedFetch<ManagerOption[]>(cacheKey('rivalryManagersCache', leagueId), {
 		schemaVersion: SCHEMA_VERSION,
 		ttlMs: TTL_MS,
 		fetcher: () => buildManagerOptions(leagueId),
@@ -120,7 +119,7 @@ async function buildRivalry(leagueId: string, oneId: string, twoId: string): Pro
 }
 
 export function getRivalry(leagueId: string, oneId: string, twoId: string): Promise<RivalryResult> {
-	return cachedFetch<RivalryResult>(adminDb().collection('rivalryCache').doc(`${leagueId}_${oneId}_${twoId}`), {
+	return cachedFetch<RivalryResult>(cacheKey('rivalryCache', leagueId, oneId, twoId), {
 		schemaVersion: SCHEMA_VERSION,
 		ttlMs: TTL_MS,
 		fetcher: () => buildRivalry(leagueId, oneId, twoId),

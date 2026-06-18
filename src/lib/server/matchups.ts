@@ -1,5 +1,4 @@
-import { adminDb } from '$lib/firebase/admin';
-import { cachedFetch } from '$lib/server/cache';
+import { cachedFetch, cacheKey } from '$lib/server/cache';
 import {
 	fetchLeagueCore,
 	fetchNflState,
@@ -103,7 +102,7 @@ async function buildMeta(leagueId: string): Promise<MatchupsMeta> {
 }
 
 export function getMatchupsMeta(leagueId: string): Promise<MatchupsMeta> {
-	return cachedFetch<MatchupsMeta>(adminDb().collection('matchupsMetaCache').doc(leagueId), {
+	return cachedFetch<MatchupsMeta>(cacheKey('matchupsMetaCache', leagueId), {
 		schemaVersion: META_SCHEMA,
 		isFresh: (env) =>
 			env.schemaVersion === META_SCHEMA && (env.value.status === 'complete' || Date.now() - env.cachedAt < META_TTL_MS),
@@ -201,7 +200,7 @@ async function buildBracket(leagueId: string): Promise<SeasonBracket[]> {
 }
 
 export function getBracket(leagueId: string): Promise<SeasonBracket[]> {
-	return cachedFetch<SeasonBracket[]>(adminDb().collection('matchupsBracketCache').doc(leagueId), {
+	return cachedFetch<SeasonBracket[]>(cacheKey('matchupsBracketCache', leagueId), {
 		schemaVersion: BRACKET_SCHEMA,
 		isFresh: (env) => env.schemaVersion === BRACKET_SCHEMA && Date.now() - env.cachedAt < BRACKET_TTL_MS,
 		fetcher: () => buildBracket(leagueId),

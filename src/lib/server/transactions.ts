@@ -1,5 +1,4 @@
-import { adminDb } from '$lib/firebase/admin';
-import { cachedFetch } from '$lib/server/cache';
+import { cachedFetch, cacheKey } from '$lib/server/cache';
 import { fetchLeagueCore, fetchNflState, fetchTransactions, buildRosterInfoMap, type RosterInfo } from '$lib/sleeper';
 import { getCachedTransactions } from '$lib/server/sleeperCache';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
@@ -87,7 +86,7 @@ async function buildTransactions(leagueId: string): Promise<TransactionsData> {
 }
 
 export function getTransactions(leagueId: string): Promise<TransactionsData> {
-	return cachedFetch<TransactionsData>(adminDb().collection('transactionsViewCache').doc(leagueId), {
+	return cachedFetch<TransactionsData>(cacheKey('transactionsViewCache', leagueId), {
 		schemaVersion: SCHEMA_VERSION,
 		isFresh: (env) =>
 			env.schemaVersion === SCHEMA_VERSION && (env.value.status === 'complete' || Date.now() - env.cachedAt < TTL_MS),

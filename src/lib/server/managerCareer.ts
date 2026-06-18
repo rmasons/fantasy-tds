@@ -1,5 +1,4 @@
-import { adminDb } from '$lib/firebase/admin';
-import { cachedFetch } from '$lib/server/cache';
+import { cachedFetch, cacheKey } from '$lib/server/cache';
 import { fetchLeague, fetchUsers, fetchRosters, fetchWinnersBracket, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
 import type { SleeperBracketMatch, SleeperLeague, SleeperLeagueUser, SleeperRoster } from '$lib/types';
 
@@ -99,7 +98,7 @@ async function buildCareer(leagueId: string, userId: string): Promise<ManagerCar
 }
 
 export function getManagerCareer(leagueId: string, userId: string): Promise<ManagerCareer> {
-	return cachedFetch<ManagerCareer>(adminDb().collection('managerCareerCache').doc(`${leagueId}_${userId}`), {
+	return cachedFetch<ManagerCareer>(cacheKey('managerCareerCache', leagueId, userId), {
 		schemaVersion: SCHEMA_VERSION,
 		ttlMs: TTL_MS,
 		fetcher: () => buildCareer(leagueId, userId),
