@@ -59,7 +59,7 @@ npm run dev
 | `PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Yes | Firebase client config |
 | `PUBLIC_FIREBASE_APP_ID` | Yes | Firebase client config |
 | `FIREBASE_SERVICE_ACCOUNT` | Yes | Full service account JSON as a single line (Firebase Console → Project Settings → Service Accounts) |
-| `CRON_SECRET` | Yes | Vercel injects this automatically; add for local testing |
+| `CRON_SECRET` | Yes | Protects the daily players-warming cron (`/api/cron/warm-players`). Vercel injects it automatically; add for local testing |
 | `CONTENTFUL_SPACE_ID` | No | Required only if using the blog |
 | `CONTENTFUL_ACCESS_TOKEN` | No | Required only if using the blog |
 | `CONTENTFUL_MANAGEMENT_TOKEN` | No | Required for blog comments |
@@ -71,6 +71,14 @@ The app is built for Vercel. Push to `main` to deploy.
 ```sh
 npm run build       # production build
 npm run preview     # preview production build locally
+```
+
+Firestore rules/indexes (`firestore.rules`, `firestore.indexes.json`) deploy with
+the Firebase CLI, which is intentionally **not** a project dependency — run it
+on demand so it stays out of `node_modules`:
+
+```sh
+npx firebase-tools deploy --only firestore
 ```
 
 ---

@@ -46,13 +46,20 @@ export function cacheKey(namespace: string, ...parts: Array<string | number>): s
 	return parts.length ? `${namespace}:${parts.join('_')}` : namespace;
 }
 
+// Storage safety net. Freshness is enforced at read time via `cachedAt`, so this
+// TTL is not about correctness — it just lets Redis evict entries nothing has
+// touched in a long while (e.g. completed-season data) so storage can't grow
+// unbounded. Immutable data that's still requested re-fetches from the free
+// Sleeper API and re-caches, so a generous window is safe.
+const REDIS_TTL_SECONDS = 90 * 24 * 60 * 60; // 90 days
+
 const redisBackend: CacheBackend = {
 	async get<T>(key: string): Promise<CacheEnvelope<T> | null> {
 		// Upstash deserializes JSON automatically.
 		return (await redis().get<CacheEnvelope<T>>(key)) ?? null;
 	},
 	async set<T>(key: string, env: CacheEnvelope<T>): Promise<void> {
-		await redis().set(key, env);
+		await redis().set(key, env, { ex: REDIS_TTL_SECONDS });
 	},
 	async del(key: string): Promise<void> {
 		await redis().del(key);

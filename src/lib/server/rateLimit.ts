@@ -1,30 +1,36 @@
-import { adminDb } from '$lib/firebase/admin';
+import { Ratelimit } from '@upstash/ratelimit';
+import { redis } from '$lib/server/redis';
 
-// Firestore-backed sliding-window limiter. Unlike an in-memory Map this is
-// shared across serverless instances, so limits hold no matter which instance
-// serves a request. Each key gets one doc holding its recent hit timestamps.
+// Upstash-backed sliding-window limiter. Shared across serverless instances (so
+// limits hold no matter which instance serves a request) but, unlike the old
+// Firestore version, it costs no Firestore reads/writes and self-expires keys —
+// no TTL policy to maintain. Limiter instances are memoized per (limit, window)
+// so repeated calls reuse one client.
+
+const limiters = new Map<string, Ratelimit>();
+
+function limiterFor(limit: number, windowMs: number): Ratelimit {
+	const cacheKey = `${limit}:${windowMs}`;
+	let rl = limiters.get(cacheKey);
+	if (!rl) {
+		rl = new Ratelimit({
+			redis: redis(),
+			limiter: Ratelimit.slidingWindow(limit, `${windowMs} ms`),
+			// Keys are namespaced so they can't collide with cache envelopes.
+			prefix: 'ratelimit',
+			analytics: false,
+		});
+		limiters.set(cacheKey, rl);
+	}
+	return rl;
+}
 
 export async function checkRateLimit(key: string, limit = 30, windowMs = 60_000): Promise<boolean> {
-	const ref = adminDb().collection('rateLimits').doc(key.replace(/[^\w-]/g, '_'));
-	const now = Date.now();
-
 	try {
-		return await adminDb().runTransaction(async (tx) => {
-			const snap = await tx.get(ref);
-			const prev: number[] = snap.exists ? (snap.data()!.timestamps ?? []) : [];
-			const kept = prev.filter((t) => now - t < windowMs);
-
-			if (kept.length >= limit) {
-				tx.set(ref, { timestamps: kept, expiresAt: now + windowMs });
-				return false;
-			}
-
-			kept.push(now);
-			tx.set(ref, { timestamps: kept, expiresAt: now + windowMs });
-			return true;
-		});
+		const { success } = await limiterFor(limit, windowMs).limit(key.replace(/[^\w-]/g, '_'));
+		return success;
 	} catch {
-		// Fail open: a Firestore hiccup shouldn't lock out legitimate traffic.
+		// Fail open: a Redis hiccup shouldn't lock out legitimate traffic.
 		return true;
 	}
 }
