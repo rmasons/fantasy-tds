@@ -1,7 +1,8 @@
-import { adminDb } from '$lib/firebase/admin';
+import { put, list } from '@vercel/blob';
+import { env } from '$env/dynamic/private';
 import type { SlimPlayer } from '$lib/types';
 
-// Bump when SlimPlayer shape changes to invalidate the Firestore cache.
+// Bump when SlimPlayer shape changes to invalidate the blob cache.
 const SCHEMA_VERSION = 2;
 
 let memCache: Record<string, SlimPlayer> | null = null;
@@ -34,35 +35,30 @@ async function fetchAndSlimFromSleeper(): Promise<Record<string, SlimPlayer>> {
 	);
 }
 
-// The slimmed active-player set is too large for a single Firestore doc (1 MB
-// ceiling), so it is sharded across N chunk docs plus a manifest doc.
-const CHUNK_SIZE = 1000; // entries per chunk doc — well under the 1 MB limit
-const MANIFEST_ID = 'players_nfl';
-const chunkId = (i: number) => `${MANIFEST_ID}_${i}`;
+// The slim active-player set is a daily snapshot of regenerable Sleeper data, so
+// it lives in Vercel Blob as a single object — one fetch per cold start instead
+// of the manifest + N chunk-doc reads the old Firestore scheme required. The
+// pathname is date- and schema-stamped, so each day's blob is written once and
+// is effectively immutable; that sidesteps any CDN staleness on overwrite.
+const blobPath = (date: string) => `players/nfl-${date}-v${SCHEMA_VERSION}.json`;
+const blobToken = () => env.BLOB_READ_WRITE_TOKEN;
 
-async function readChunks(chunkCount: number): Promise<Record<string, SlimPlayer>> {
-	const col = adminDb().collection('playersCache');
-	const refs = Array.from({ length: chunkCount }, (_, i) => col.doc(chunkId(i)));
-	const docs = await adminDb().getAll(...refs);
-	const merged: Record<string, SlimPlayer> = {};
-	for (const d of docs) {
-		if (!d.exists) throw new Error(`players cache missing chunk ${d.id}`);
-		Object.assign(merged, JSON.parse(d.data()!.data));
-	}
-	return merged;
+async function readFromBlob(date: string): Promise<Record<string, SlimPlayer> | null> {
+	const { blobs } = await list({ prefix: blobPath(date), limit: 1, token: blobToken() });
+	if (blobs.length === 0) return null;
+	const res = await fetch(blobs[0].url);
+	if (!res.ok) return null;
+	return (await res.json()) as Record<string, SlimPlayer>;
 }
 
-async function writeChunks(slim: Record<string, SlimPlayer>, date: string): Promise<void> {
-	const col = adminDb().collection('playersCache');
-	const entries = Object.entries(slim);
-	const chunkCount = Math.max(1, Math.ceil(entries.length / CHUNK_SIZE));
-	const batch = adminDb().batch();
-	for (let i = 0; i < chunkCount; i++) {
-		const slice = Object.fromEntries(entries.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
-		batch.set(col.doc(chunkId(i)), { data: JSON.stringify(slice) });
-	}
-	batch.set(col.doc(MANIFEST_ID), { chunkCount, cachedDate: date, schemaVersion: SCHEMA_VERSION });
-	await batch.commit();
+async function writeToBlob(slim: Record<string, SlimPlayer>, date: string): Promise<void> {
+	await put(blobPath(date), JSON.stringify(slim), {
+		access: 'public',
+		addRandomSuffix: false,
+		allowOverwrite: true,
+		contentType: 'application/json',
+		token: blobToken(),
+	});
 }
 
 export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
@@ -71,24 +67,21 @@ export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
 	if (memCache && memCacheDate === date) return memCache;
 
 	try {
-		const manifest = await adminDb().collection('playersCache').doc(MANIFEST_ID).get();
-		if (manifest.exists) {
-			const m = manifest.data()!;
-			if (m.cachedDate === date && m.schemaVersion === SCHEMA_VERSION && typeof m.chunkCount === 'number') {
-				memCache = await readChunks(m.chunkCount);
-				memCacheDate = date;
-				return memCache;
-			}
+		const cached = await readFromBlob(date);
+		if (cached) {
+			memCache = cached;
+			memCacheDate = date;
+			return cached;
 		}
 	} catch (e) {
-		console.warn('[players] Firestore read failed, falling back to Sleeper:', e);
+		console.warn('[players] Blob read failed, falling back to Sleeper:', e);
 	}
 
 	const slim = await fetchAndSlimFromSleeper();
 	try {
-		await writeChunks(slim, date);
+		await writeToBlob(slim, date);
 	} catch (e) {
-		console.error('[players] Failed to write to Firestore:', e);
+		console.error('[players] Failed to write to Blob:', e);
 	}
 
 	memCache = slim;
