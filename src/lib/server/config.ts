@@ -8,6 +8,12 @@ import { cachedFetch, deleteCache, cacheKey } from '$lib/server/cache';
 const LEAGUE_CONFIG_TTL_MS = 5 * 60 * 1000;
 const leagueConfigKey = (leagueId: string) => cacheKey('leagueConfigCache', leagueId);
 
+// config/app is read on the anonymous landing page (the redirect to the default
+// league), so an uncached/unhardened read 500s the site entry when Firestore is
+// down. Same cache+fail-soft treatment as leagueConfig.
+const APP_CONFIG_TTL_MS = 5 * 60 * 1000;
+const appConfigKey = () => cacheKey('appConfigCache', 'app');
+
 export interface AppConfig {
 	defaultLeagueId?: string;
 }
@@ -31,13 +37,25 @@ function toFirestoreWrite(obj: Record<string, unknown>): Record<string, unknown>
 }
 
 export async function getAppConfig(): Promise<AppConfig> {
-	const doc = await adminDb().collection('config').doc('app').get();
-	if (!doc.exists) return {};
-	return doc.data() as AppConfig;
+	try {
+		return await cachedFetch<AppConfig>(appConfigKey(), {
+			ttlMs: APP_CONFIG_TTL_MS,
+			fetcher: async () => {
+				const doc = await adminDb().collection('config').doc('app').get();
+				return doc.exists ? (doc.data() as AppConfig) : {};
+			},
+		});
+	} catch (e) {
+		// Firestore unavailable and no warm cache: degrade to empty config so the
+		// landing page still renders (falls through to /login) instead of 500-ing.
+		console.error('[config] appConfig unavailable', e);
+		return {};
+	}
 }
 
 export async function setAppConfig(config: Partial<AppConfig>): Promise<void> {
 	await adminDb().collection('config').doc('app').set(toFirestoreWrite(config as Record<string, unknown>), { merge: true });
+	await deleteCache(appConfigKey());
 }
 
 export async function getLeagueConfig(leagueId: string): Promise<LeagueConfig> {
