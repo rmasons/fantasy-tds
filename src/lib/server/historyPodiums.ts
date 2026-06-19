@@ -1,5 +1,4 @@
-import { adminDb } from '$lib/firebase/admin';
-import { cachedFetch } from '$lib/server/cache';
+import { cachedFetch, cacheKey } from '$lib/server/cache';
 import { fetchLeague, fetchLeagueCore, fetchWinnersBracket, fetchLosersBracket, buildRosterInfoMap } from '$lib/sleeper';
 
 const SCHEMA_VERSION = 1;
@@ -85,7 +84,7 @@ async function buildPodiums(leagueId: string): Promise<HistoryPodiums> {
 }
 
 export function getHistoryPodiums(leagueId: string): Promise<HistoryPodiums> {
-	return cachedFetch<HistoryPodiums>(adminDb().collection('historyPodiumsCache').doc(leagueId), {
+	return cachedFetch<HistoryPodiums>(cacheKey('historyPodiumsCache', leagueId), {
 		schemaVersion: SCHEMA_VERSION,
 		ttlMs: TTL_MS,
 		fetcher: () => buildPodiums(leagueId),

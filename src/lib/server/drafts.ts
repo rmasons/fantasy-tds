@@ -1,5 +1,4 @@
-import { adminDb } from '$lib/firebase/admin';
-import { cachedFetch, writeCache, type CacheEnvelope } from '$lib/server/cache';
+import { cachedFetch, writeCache, peekCache, cacheKey } from '$lib/server/cache';
 import type { SleeperLeague, SleeperDraft, SleeperDraftPick, SleeperRoster, SleeperLeagueUser } from '$lib/types';
 
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -60,36 +59,30 @@ export async function seedLeagueChain(startLeagueId: string): Promise<SeedDraftR
 			]);
 			drafts = fetchedDrafts ?? [];
 			const rosterInfo = buildRosterInfo(rosters ?? [], users ?? []);
-			await writeCache<DraftListPayload>(
-				adminDb().collection('draftListCache').doc(currentId),
-				{ drafts, rosterInfo }
-			);
+			await writeCache<DraftListPayload>(cacheKey('draftListCache', currentId), { drafts, rosterInfo });
 		} catch (e) {
 			console.error('[seed] Failed to fetch/cache draft list for', currentId, errMsg(e));
 		}
 
 		for (const draft of drafts.filter((d) => d.status === 'complete')) {
 			const draftId = draft.draft_id;
-			const picksRef = adminDb().collection('draftPicksCache').doc(draftId);
-			try {
-				const existing = await picksRef.get();
-				if (existing.exists) {
-					const env = existing.data() as CacheEnvelope<SleeperDraftPick[]>;
-					results.push({
-						leagueId: currentId,
-						season: league.season,
-						draftId,
-						type: draft.type,
-						picks: env.value?.length ?? 0,
-						status: 'already_cached',
-					});
-					continue;
-				}
-			} catch { /* proceed to fetch */ }
+			const picksKey = cacheKey('draftPicksCache', draftId);
+			const existing = await peekCache<SleeperDraftPick[]>(picksKey);
+			if (existing) {
+				results.push({
+					leagueId: currentId,
+					season: league.season,
+					draftId,
+					type: draft.type,
+					picks: existing.value?.length ?? 0,
+					status: 'already_cached',
+				});
+				continue;
+			}
 
 			try {
 				const picks = await sleeperGet<SleeperDraftPick[]>(`/draft/${draftId}/picks`);
-				await writeCache(picksRef, picks);
+				await writeCache(picksKey, picks);
 				results.push({
 					leagueId: currentId,
 					season: league.season,
@@ -119,7 +112,7 @@ export async function seedLeagueChain(startLeagueId: string): Promise<SeedDraftR
 
 // Completed draft picks are immutable — no TTL needed.
 export function getCachedDraftPicks(draftId: string): Promise<SleeperDraftPick[]> {
-	return cachedFetch(adminDb().collection('draftPicksCache').doc(draftId), {
+	return cachedFetch(cacheKey('draftPicksCache', draftId), {
 		fetcher: () => sleeperGet<SleeperDraftPick[]>(`/draft/${draftId}/picks`),
 	});
 }
@@ -127,7 +120,7 @@ export function getCachedDraftPicks(draftId: string): Promise<SleeperDraftPick[]
 const DRAFT_LIST_TTL_MS = 24 * 60 * 60 * 1000; // 24 h — new drafts are rare
 
 export function getCachedDraftList(leagueId: string): Promise<DraftListPayload> {
-	return cachedFetch<DraftListPayload>(adminDb().collection('draftListCache').doc(leagueId), {
+	return cachedFetch<DraftListPayload>(cacheKey('draftListCache', leagueId), {
 		ttlMs: DRAFT_LIST_TTL_MS,
 		fetcher: async () => {
 			const [drafts, rosters, users] = await Promise.all([

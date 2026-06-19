@@ -1,5 +1,4 @@
-import { adminDb } from '$lib/firebase/admin';
-import { cachedFetch } from '$lib/server/cache';
+import { cachedFetch, cacheKey } from '$lib/server/cache';
 import {
 	fetchLeague,
 	fetchNflState,
@@ -133,7 +132,7 @@ async function buildHome(leagueId: string): Promise<HomeData> {
 }
 
 export function getHomeData(leagueId: string): Promise<HomeData> {
-	return cachedFetch<HomeData>(adminDb().collection('homeDataCache').doc(leagueId), {
+	return cachedFetch<HomeData>(cacheKey('homeDataCache', leagueId), {
 		schemaVersion: SCHEMA_VERSION,
 		ttlMs: TTL_MS,
 		fetcher: () => buildHome(leagueId),
