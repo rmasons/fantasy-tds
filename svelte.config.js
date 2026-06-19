@@ -1,4 +1,4 @@
-import adapter from '@sveltejs/adapter-auto';
+import adapter from '@sveltejs/adapter-vercel';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -7,10 +7,14 @@ const config = {
 		runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
 	},
 	kit: {
-		// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
-		// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
-		// See https://svelte.dev/docs/kit/adapters for more information about adapters.
-		adapter: adapter()
+		// Explicit Vercel adapter so we can pin the runtime and a single region.
+		// One region (iad1, US East) keeps all serverless functions co-located —
+		// fewer cold starts and no cross-region egress for a US-based league app.
+		// Change `regions` if your members are concentrated elsewhere.
+		adapter: adapter({
+			runtime: 'nodejs22.x',
+			regions: ['iad1']
+		})
 	}
 };
 

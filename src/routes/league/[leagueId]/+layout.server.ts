@@ -1,12 +1,12 @@
 import type { LayoutServerLoad } from './$types';
 import { adminDb } from '$lib/firebase/admin';
 import { getLeagueConfig } from '$lib/server/config';
-import { fetchLeague } from '$lib/sleeper';
+import { getCachedLeague } from '$lib/server/sleeperCache';
 
 export const load: LayoutServerLoad = async ({ locals, params }) => {
 	const [leagueConfig, league] = await Promise.all([
 		getLeagueConfig(params.leagueId),
-		fetchLeague(params.leagueId).catch(() => null),
+		getCachedLeague(params.leagueId).catch(() => null),
 		// Persist last-viewed league for logged-in users
 		locals.user && locals.user.lastLeagueId !== params.leagueId
 			? adminDb().collection('users').doc(locals.user.uid).set({ lastLeagueId: params.leagueId }, { merge: true })

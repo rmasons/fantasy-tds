@@ -1,4 +1,4 @@
-import { put, list } from '@vercel/blob';
+import { put, list, del } from '@vercel/blob';
 import { env } from '$env/dynamic/private';
 import type { SlimPlayer } from '$lib/types';
 
@@ -61,6 +61,16 @@ async function writeToBlob(slim: Record<string, SlimPlayer>, date: string): Prom
 	});
 }
 
+// Each day (and each schema bump) writes a new date-stamped blob; without
+// pruning, old snapshots accumulate forever and slowly fill the Blob store.
+// Keep only today's file — yesterday's is never read once today's exists.
+async function pruneOldBlobs(keepDate: string): Promise<void> {
+	const keep = blobPath(keepDate);
+	const { blobs } = await list({ prefix: 'players/', token: blobToken() });
+	const stale = blobs.filter((b) => b.pathname !== keep).map((b) => b.url);
+	if (stale.length) await del(stale, { token: blobToken() });
+}
+
 export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
 	const date = today();
 
@@ -80,6 +90,8 @@ export async function getPlayers(): Promise<Record<string, SlimPlayer>> {
 	const slim = await fetchAndSlimFromSleeper();
 	try {
 		await writeToBlob(slim, date);
+		// Best-effort cleanup of prior days' / older-schema snapshots.
+		await pruneOldBlobs(date).catch((e) => console.warn('[players] Blob prune failed:', e));
 	} catch (e) {
 		console.error('[players] Failed to write to Blob:', e);
 	}

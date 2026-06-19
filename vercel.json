@@ -1,4 +1,7 @@
 {
+  "crons": [
+    { "path": "/api/cron/warm-players", "schedule": "0 9 * * *" }
+  ],
   "redirects": [
     { "source": "/league/:leagueId/playoff-bracket", "destination": "/league/:leagueId/history", "permanent": true },
     { "source": "/league/:leagueId/awards", "destination": "/league/:leagueId/history", "permanent": true }
