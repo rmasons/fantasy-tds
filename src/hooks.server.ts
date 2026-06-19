@@ -10,14 +10,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (sessionCookie) {
 		const decoded = await verifySessionCookie(sessionCookie);
 		if (decoded) {
-			const user = await getUserProfileCached(decoded.uid);
-			if (user) {
-				event.locals.user = user;
-			} else {
-				event.locals.user = null;
-				event.cookies.delete(SESSION_COOKIE, { path: '/' });
-			}
+			// The session is cryptographically valid; the profile lookup is a
+			// best-effort enrichment. A null result may mean "no profile" OR a
+			// transient Firestore outage (getUserProfileCached fails soft), so we
+			// keep the valid cookie either way and let the next request repopulate.
+			event.locals.user = await getUserProfileCached(decoded.uid);
 		} else {
+			// Invalid/expired session — clear it.
 			event.locals.user = null;
 			event.cookies.delete(SESSION_COOKIE, { path: '/' });
 		}

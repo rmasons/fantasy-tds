@@ -1,6 +1,8 @@
-import type { DocumentReference } from 'firebase-admin/firestore';
+import { adminDb } from '$lib/firebase/admin';
+import { redis } from '$lib/server/redis';
+import { env } from '$env/dynamic/private';
 
-/** Wrapper persisted in Firestore around any cached payload. */
+/** Wrapper persisted in the cache around any cached payload. */
 export interface CacheEnvelope<T> {
 	value: T;
 	cachedAt: number;        // epoch ms when written
@@ -24,38 +26,124 @@ export interface CachedFetchOptions<T> {
 	isFresh?: (env: CacheEnvelope<T>) => boolean;
 }
 
+/**
+ * Storage behind the read-through cache. Swappable so the backend (Redis in
+ * production, Firestore for rollback, an in-memory fake in tests) can change
+ * without touching any caller.
+ */
+export interface CacheBackend {
+	get<T>(key: string): Promise<CacheEnvelope<T> | null>;
+	set<T>(key: string, env: CacheEnvelope<T>): Promise<void>;
+	del(key: string): Promise<void>;
+}
+
+/**
+ * Build a cache key. Multi-part keys join with `_` so they map 1:1 onto the
+ * Firestore doc ids the old code used (e.g. `${leagueId}_${week}`), keeping the
+ * Firestore backend a drop-in fallback.
+ */
+export function cacheKey(namespace: string, ...parts: Array<string | number>): string {
+	return parts.length ? `${namespace}:${parts.join('_')}` : namespace;
+}
+
+const redisBackend: CacheBackend = {
+	async get<T>(key: string): Promise<CacheEnvelope<T> | null> {
+		// Upstash deserializes JSON automatically.
+		return (await redis().get<CacheEnvelope<T>>(key)) ?? null;
+	},
+	async set<T>(key: string, env: CacheEnvelope<T>): Promise<void> {
+		await redis().set(key, env);
+	},
+	async del(key: string): Promise<void> {
+		await redis().del(key);
+	},
+};
+
+/** Map a `namespace:docId` key back onto a Firestore collection/doc pair. */
+function refForKey(key: string) {
+	const i = key.indexOf(':');
+	const collection = i === -1 ? key : key.slice(0, i);
+	const docId = i === -1 ? '_' : key.slice(i + 1);
+	return adminDb().collection(collection).doc(docId);
+}
+
+const firestoreBackend: CacheBackend = {
+	async get<T>(key: string): Promise<CacheEnvelope<T> | null> {
+		const doc = await refForKey(key).get();
+		return doc.exists ? (doc.data() as CacheEnvelope<T>) : null;
+	},
+	async set<T>(key: string, env: CacheEnvelope<T>): Promise<void> {
+		// Firestore rejects undefined fields; envelopes already omit schemaVersion
+		// when undefined (see writeCache), so this is safe.
+		await refForKey(key).set(env);
+	},
+	async del(key: string): Promise<void> {
+		await refForKey(key).delete();
+	},
+};
+
+let _backend: CacheBackend | null = null;
+
+function backend(): CacheBackend {
+	if (_backend) return _backend;
+	_backend = env.CACHE_BACKEND === 'firestore' ? firestoreBackend : redisBackend;
+	return _backend;
+}
+
+/** Override the cache backend (tests, or forcing a specific backend). */
+export function setCacheBackend(b: CacheBackend | null): void {
+	_backend = b;
+}
+
 function isFreshDefault<T>(env: CacheEnvelope<T>, ttlMs?: number, schemaVersion?: number): boolean {
 	if (schemaVersion !== undefined && env.schemaVersion !== schemaVersion) return false;
 	if (ttlMs !== undefined && Date.now() - env.cachedAt >= ttlMs) return false;
 	return true;
 }
 
+/** Read the raw envelope without the read-through fetch. Null on miss or error. */
+export async function peekCache<T>(key: string): Promise<CacheEnvelope<T> | null> {
+	try {
+		return await backend().get<T>(key);
+	} catch {
+		return null;
+	}
+}
+
+/** Evict a key (e.g. after writing through to the source of truth). Never throws. */
+export async function deleteCache(key: string): Promise<void> {
+	try {
+		await backend().del(key);
+	} catch (e) {
+		console.error('[cache] delete failed for', key, e);
+	}
+}
+
 /** Fire-and-forget write of a cache envelope. Errors are logged, not thrown. */
-export function writeCache<T>(ref: DocumentReference, value: T, schemaVersion?: number): Promise<void> {
-	// Omit schemaVersion entirely when undefined — Firestore rejects undefined
-	// field values (and .set() throws synchronously, not as a rejection).
+export function writeCache<T>(key: string, value: T, schemaVersion?: number): Promise<void> {
+	// Omit schemaVersion entirely when undefined so the Firestore backend stays
+	// valid (Firestore rejects undefined field values).
 	const env: CacheEnvelope<T> = { value, cachedAt: Date.now() };
 	if (schemaVersion !== undefined) env.schemaVersion = schemaVersion;
 	return Promise.resolve()
-		.then(() => ref.set(env))
+		.then(() => backend().set(key, env))
 		.then(
 			() => {},
-			(e) => console.error('[cache] write failed for', ref.path, e)
+			(e) => console.error('[cache] write failed for', key, e)
 		);
 }
 
 /**
- * Read-through Firestore cache. Returns the cached value when present and fresh,
- * otherwise calls `fetcher`, persists the result, and returns it.
+ * Read-through cache. Returns the cached value when present and fresh, otherwise
+ * calls `fetcher`, persists the result, and returns it.
  */
-export async function cachedFetch<T>(ref: DocumentReference, opts: CachedFetchOptions<T>): Promise<T> {
+export async function cachedFetch<T>(key: string, opts: CachedFetchOptions<T>): Promise<T> {
 	const { fetcher, ttlMs, schemaVersion, bypass = false, isFresh } = opts;
 
 	if (!bypass) {
 		try {
-			const doc = await ref.get();
-			if (doc.exists) {
-				const env = doc.data() as CacheEnvelope<T>;
+			const env = await backend().get<T>(key);
+			if (env) {
 				const fresh = isFresh ? isFresh(env) : isFreshDefault(env, ttlMs, schemaVersion);
 				if (fresh && env.value !== undefined) return env.value;
 			}
@@ -65,6 +153,6 @@ export async function cachedFetch<T>(ref: DocumentReference, opts: CachedFetchOp
 	}
 
 	const value = await fetcher();
-	if (!bypass) void writeCache(ref, value, schemaVersion);
+	if (!bypass) void writeCache(key, value, schemaVersion);
 	return value;
 }
