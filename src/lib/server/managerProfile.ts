@@ -49,10 +49,17 @@ export async function getManagerProfile(sleeperUserId: string): Promise<ManagerP
 	const cached = getCachedProfile(sleeperUserId);
 	if (cached !== undefined) return cached;
 
-	const doc = await adminDb().collection('managerProfiles').doc(sleeperUserId).get();
-	const profile = doc.exists ? (doc.data() as ManagerProfile) : null;
-	setCachedProfile(sleeperUserId, profile);
-	return profile;
+	try {
+		const doc = await adminDb().collection('managerProfiles').doc(sleeperUserId).get();
+		const profile = doc.exists ? (doc.data() as ManagerProfile) : null;
+		setCachedProfile(sleeperUserId, profile);
+		return profile;
+	} catch (e) {
+		// Firestore unavailable — degrade to "no profile" rather than throwing.
+		// Not cached, so it's retried on the next request once Firestore recovers.
+		console.error('[managerProfile] read failed for', sleeperUserId, e);
+		return null;
+	}
 }
 
 export async function upsertManagerProfile(
@@ -108,12 +115,18 @@ export async function getManagerProfilesBatch(
 	}
 
 	if (misses.length > 0) {
-		const refs = misses.map(id => adminDb().collection('managerProfiles').doc(id));
-		const docs = await adminDb().getAll(...refs);
-		for (const doc of docs) {
-			const profile = doc.exists ? (doc.data() as ManagerProfile) : null;
-			setCachedProfile(doc.id, profile); // cache null too, to avoid re-reading absent profiles
-			if (profile) map.set(doc.id, profile);
+		try {
+			const refs = misses.map(id => adminDb().collection('managerProfiles').doc(id));
+			const docs = await adminDb().getAll(...refs);
+			for (const doc of docs) {
+				const profile = doc.exists ? (doc.data() as ManagerProfile) : null;
+				setCachedProfile(doc.id, profile); // cache null too, to avoid re-reading absent profiles
+				if (profile) map.set(doc.id, profile);
+			}
+		} catch (e) {
+			// Firestore unavailable — return whatever was cached (display-name
+			// overrides degrade to Sleeper-derived names) instead of failing.
+			console.error('[managerProfile] batch read failed; serving cached subset', e);
 		}
 	}
 

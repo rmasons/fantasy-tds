@@ -34,6 +34,7 @@ export interface CachedFetchOptions<T> {
 export interface CacheBackend {
 	get<T>(key: string): Promise<CacheEnvelope<T> | null>;
 	set<T>(key: string, env: CacheEnvelope<T>): Promise<void>;
+	del(key: string): Promise<void>;
 }
 
 /**
@@ -52,6 +53,9 @@ const redisBackend: CacheBackend = {
 	},
 	async set<T>(key: string, env: CacheEnvelope<T>): Promise<void> {
 		await redis().set(key, env);
+	},
+	async del(key: string): Promise<void> {
+		await redis().del(key);
 	},
 };
 
@@ -72,6 +76,9 @@ const firestoreBackend: CacheBackend = {
 		// Firestore rejects undefined fields; envelopes already omit schemaVersion
 		// when undefined (see writeCache), so this is safe.
 		await refForKey(key).set(env);
+	},
+	async del(key: string): Promise<void> {
+		await refForKey(key).delete();
 	},
 };
 
@@ -100,6 +107,15 @@ export async function peekCache<T>(key: string): Promise<CacheEnvelope<T> | null
 		return await backend().get<T>(key);
 	} catch {
 		return null;
+	}
+}
+
+/** Evict a key (e.g. after writing through to the source of truth). Never throws. */
+export async function deleteCache(key: string): Promise<void> {
+	try {
+		await backend().del(key);
+	} catch (e) {
+		console.error('[cache] delete failed for', key, e);
 	}
 }
 

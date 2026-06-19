@@ -3,6 +3,7 @@ import {
 	cachedFetch,
 	writeCache,
 	peekCache,
+	deleteCache,
 	cacheKey,
 	setCacheBackend,
 	type CacheBackend,
@@ -16,6 +17,9 @@ function fakeBackend(initial?: Record<string, CacheEnvelope<unknown>>) {
 		get: vi.fn(async (key: string) => store.get(key) ?? null),
 		set: vi.fn(async (key: string, env: CacheEnvelope<unknown>) => {
 			store.set(key, env);
+		}),
+		del: vi.fn(async (key: string) => {
+			store.delete(key);
 		}),
 	} as unknown as CacheBackend;
 	return { backend, store };
@@ -79,6 +83,22 @@ describe('peekCache', () => {
 	it('returns null (not throw) when the backend read fails', async () => {
 		(backend.get as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('down'));
 		expect(await peekCache('k')).toBeNull();
+	});
+});
+
+describe('deleteCache', () => {
+	it('evicts the key from the backend', async () => {
+		store.set('k', { value: 1, cachedAt: Date.now() });
+		await deleteCache('k');
+		expect(backend.del).toHaveBeenCalledWith('k');
+		expect(store.has('k')).toBe(false);
+	});
+
+	it('never throws when the backend delete fails', async () => {
+		(backend.del as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('boom'));
+		const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		await expect(deleteCache('k')).resolves.toBeUndefined();
+		spy.mockRestore();
 	});
 });
 
