@@ -20,7 +20,6 @@ function mockRef(initial?: CacheEnvelope<unknown>) {
 describe('writeCache', () => {
 	it('omits schemaVersion when undefined (Firestore rejects undefined)', async () => {
 		const ref = mockRef();
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		await writeCache(ref as any, { hi: 1 });
 		const written = ref.set.mock.calls[0][0];
 		expect('schemaVersion' in written).toBe(false);
@@ -30,7 +29,6 @@ describe('writeCache', () => {
 
 	it('includes schemaVersion when provided', async () => {
 		const ref = mockRef();
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		await writeCache(ref as any, { hi: 1 }, 3);
 		expect(ref.set.mock.calls[0][0].schemaVersion).toBe(3);
 	});
@@ -39,7 +37,6 @@ describe('writeCache', () => {
 		const ref = mockRef();
 		ref.set.mockRejectedValueOnce(new Error('boom'));
 		const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		await expect(writeCache(ref as any, { x: 1 })).resolves.toBeUndefined();
 		spy.mockRestore();
 	});
@@ -49,7 +46,6 @@ describe('cachedFetch', () => {
 	it('returns the fetched value and writes it on a cache miss', async () => {
 		const ref = mockRef();
 		const fetcher = vi.fn(async () => ['fresh']);
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const out = await cachedFetch(ref as any, { fetcher });
 		expect(out).toEqual(['fresh']);
 		expect(fetcher).toHaveBeenCalledOnce();
@@ -61,7 +57,6 @@ describe('cachedFetch', () => {
 	it('returns the cached value without calling the fetcher when fresh', async () => {
 		const ref = mockRef({ value: ['cached'], cachedAt: Date.now(), schemaVersion: 1 });
 		const fetcher = vi.fn(async () => ['fresh']);
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const out = await cachedFetch(ref as any, { fetcher, schemaVersion: 1, ttlMs: 60_000 });
 		expect(out).toEqual(['cached']);
 		expect(fetcher).not.toHaveBeenCalled();
@@ -70,7 +65,6 @@ describe('cachedFetch', () => {
 	it('refetches when the schemaVersion differs', async () => {
 		const ref = mockRef({ value: ['old'], cachedAt: Date.now(), schemaVersion: 1 });
 		const fetcher = vi.fn(async () => ['new']);
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const out = await cachedFetch(ref as any, { fetcher, schemaVersion: 2 });
 		expect(out).toEqual(['new']);
 		expect(fetcher).toHaveBeenCalledOnce();
@@ -79,7 +73,6 @@ describe('cachedFetch', () => {
 	it('refetches when the entry is older than the TTL', async () => {
 		const ref = mockRef({ value: ['stale'], cachedAt: Date.now() - 10_000, schemaVersion: 1 });
 		const fetcher = vi.fn(async () => ['new']);
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const out = await cachedFetch(ref as any, { fetcher, schemaVersion: 1, ttlMs: 1_000 });
 		expect(out).toEqual(['new']);
 		expect(fetcher).toHaveBeenCalledOnce();
@@ -88,7 +81,6 @@ describe('cachedFetch', () => {
 	it('bypass=true skips both the read and the write', async () => {
 		const ref = mockRef({ value: ['cached'], cachedAt: Date.now(), schemaVersion: 1 });
 		const fetcher = vi.fn(async () => ['fresh']);
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const out = await cachedFetch(ref as any, { fetcher, bypass: true });
 		expect(out).toEqual(['fresh']);
 		expect(ref.get).not.toHaveBeenCalled();
@@ -113,7 +105,6 @@ describe('cachedFetch', () => {
 		const ref = mockRef();
 		ref.get.mockRejectedValueOnce(new Error('read failed'));
 		const fetcher = vi.fn(async () => ['recovered']);
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const out = await cachedFetch(ref as any, { fetcher });
 		expect(out).toEqual(['recovered']);
 	});

@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [dev]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # svelte-kit sync generates the $env/static/* type modules from the env
+      # keys present at check time. Seed placeholders so type-checking resolves
+      # them; real values aren't needed to type-check.
+      - run: cp .env.example .env
+      - run: npm run check
+      - run: npm test

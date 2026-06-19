@@ -31,6 +31,8 @@ export interface SleeperLeague {
 		playoff_week_start?: number;
 		playoff_round_type?: number; // 0=1-week, 2=2-week rounds
 		playoff_teams?: number;
+		waiver_budget?: number; // total FAAB budget per team
+		num_keepers?: number;
 	};
 	avatar: string | null;
 }
@@ -66,6 +68,7 @@ export interface SleeperRoster {
 		fpts_against: number;
 		fpts_against_decimal: number;
 		division?: number;
+		waiver_budget_used?: number; // FAAB already spent on waivers
 	};
 	metadata?: {
 		streak?: string;
