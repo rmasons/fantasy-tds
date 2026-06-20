@@ -3,15 +3,11 @@ import type { RequestHandler } from './$types';
 import { adminDb } from '$lib/firebase/admin';
 import { validateLeagueId } from '$lib/server/leagueId';
 import { assertLeagueMember } from '$lib/server/membership';
+import { EGG_IDS, MAX_CLAIMS_PER_USER } from '$lib/eggs';
 
-export interface EggClaim {
-	claimedBy: string;
-	displayName: string;
-	claimedAt: string;
-}
-
-const VALID_EGG_IDS = new Set(['1','2','3','4','5','6','7','8','9','10','11','12']);
-const MAX_CLAIMS_PER_USER = 3;
+// Re-export so existing importers (FaabEasterEgg component) keep working.
+export type { EggClaim } from '$lib/eggs';
+import type { EggClaim } from '$lib/eggs';
 
 // GET — public; returns all claimed eggs for this league
 export const GET: RequestHandler = async ({ params }) => {
@@ -26,7 +22,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 
 	const body = await request.json().catch(() => null);
 	const eggId = typeof body?.eggId === 'string' ? body.eggId : null;
-	if (!eggId || !VALID_EGG_IDS.has(eggId)) throw error(400, 'Invalid eggId');
+	if (!eggId || !EGG_IDS.has(eggId)) throw error(400, 'Invalid eggId');
 
 	const leagueId = validateLeagueId(params.leagueId);
 	await assertLeagueMember(locals.user, leagueId);

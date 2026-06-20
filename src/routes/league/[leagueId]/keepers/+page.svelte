@@ -2,11 +2,10 @@
 	import type { PageData } from './$types';
 	import type { KeeperRosterData, KeeperSelection } from '$lib/server/keepers';
 	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
+	import { TOTAL_EGGS } from '$lib/eggs';
 	import { onMount } from 'svelte';
 
 	let { data } = $props<{ data: PageData }>();
-
-	const TOTAL_EGGS = 12;
 	let huntOpen = $state(false);
 	let huntClaimed = $state(0);
 	let huntLoading = $state(false);
@@ -416,6 +415,10 @@
 				onclick={() => { huntOpen = false; }}
 				class="w-full py-3 bg-amber-500 hover:bg-amber-400 text-navy-950 font-sport font-bold uppercase tracking-wide rounded-xl transition-colors text-sm"
 			>Let's Hunt!</button>
+			<a
+				href="/league/{data.leagueId}/hunt"
+				class="block mt-3 text-center text-amber-400 hover:underline text-xs font-semibold uppercase tracking-widest"
+			>View the leaderboard →</a>
 		</div>
 	</div>
 {/if}
