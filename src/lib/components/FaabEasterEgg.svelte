@@ -1,5 +1,5 @@
 <script module>
-	import type { EggClaim } from '../../routes/api/faab-eggs/[leagueId]/+server';
+	import type { EggClaim } from '$lib/eggs';
 
 	// Shared per-leagueId promise cache so multiple eggs on the same page share one fetch
 	const claimsCache = new Map<string, Promise<Record<string, EggClaim>>>();
@@ -68,16 +68,23 @@
 				claimError = "You've already claimed your max (3). Nice hunting!";
 				return;
 			}
+			if (!res.ok) {
+				claimError = 'Something went wrong — try again.';
+				return;
+			}
 			const body = await res.json();
 			if (body.won) {
 				localStorage.setItem(STORAGE_KEY, '1');
 				claimsCache.delete(leagueId);
 				status = 'mine';
 				open = true;
-			} else {
-				claimedBy = body.claim?.displayName ?? 'someone';
+			} else if (body.claim?.displayName) {
+				// Lost the race — someone else got here first. Show who.
+				claimedBy = body.claim.displayName;
 				status = 'other';
 				alreadyOpen = true;
+			} else {
+				claimError = 'Something went wrong — try again.';
 			}
 		} catch {
 			claimError = 'Network error — try again.';
@@ -139,7 +146,7 @@
 			<h2 class="font-sport font-black text-3xl uppercase text-amber-400 leading-tight mb-3">FINALLY.</h2>
 			<p class="text-white text-lg leading-relaxed mb-2">You found <span class="text-amber-400 font-bold">$5 of extra FAAB!</span></p>
 			<p class="text-slate-400 text-sm mb-2">This has been sitting here for two weeks. <span class="text-slate-300 italic">Two weeks.</span> And you're the first one to find it. Remarkable.</p>
-			<p class="text-slate-500 text-xs mb-6">Take a screenshot and send it to the league group text to collect. Don't forget to check the <a href="/league/{leagueId}/keepers?hunt=1" onclick={() => { open = false; }} class="text-amber-400 hover:underline">hunt page</a> for the rest.</p>
+			<p class="text-slate-500 text-xs mb-6">Take a screenshot and send it to the league group text to collect. Don't forget to check the <a href="/league/{leagueId}/hunt" onclick={() => { open = false; }} class="text-amber-400 hover:underline">hunt page</a> for the rest.</p>
 			<button
 				onclick={() => { open = false; }}
 				class="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-navy-950 font-sport font-bold uppercase tracking-wide rounded-xl transition-colors text-sm"
