@@ -57,19 +57,26 @@
 
 	async function analyzeRivalry() {
 		if (!userOneId || !userTwoId || userOneId === userTwoId) return;
+		// Capture the selection before awaiting. The auto-analyze effect fires on
+		// every change, so a slow earlier request must not overwrite a newer one —
+		// discard the response if the selection changed while in flight.
+		const reqOne = userOneId;
+		const reqTwo = userTwoId;
 		analysing = true;
 		rivalry = null;
 		error = '';
 		analyseStatus = 'Analyzing matchup history…';
 
 		try {
-			const res = await fetch(`/api/rivalry/${data.leagueId}?one=${userOneId}&two=${userTwoId}`);
+			const res = await fetch(`/api/rivalry/${data.leagueId}?one=${reqOne}&two=${reqTwo}`);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			if (userOneId !== reqOne || userTwoId !== reqTwo) return; // stale — discard
 			rivalry = await res.json();
 		} catch (e: any) {
+			if (userOneId !== reqOne || userTwoId !== reqTwo) return;
 			error = e.message;
 		} finally {
-			analysing = false;
+			if (userOneId === reqOne && userTwoId === reqTwo) analysing = false;
 		}
 	}
 
