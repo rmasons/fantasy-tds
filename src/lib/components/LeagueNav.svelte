@@ -22,6 +22,7 @@
 		{ href: 'rivalry',         label: 'Rivalry'         },
 		{ href: 'blog',            label: 'Blog'            },
 		{ href: 'keepers',         label: 'Keepers'         },
+		{ href: 'faab',            label: 'FAAB Ledger'     },
 	];
 
 	onMount(async () => {
