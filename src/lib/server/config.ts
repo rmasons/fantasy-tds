@@ -18,14 +18,35 @@ export interface AppConfig {
 	defaultLeagueId?: string;
 }
 
+/** A single commissioner FAAB adjustment, shown to the league as a transaction. */
+export interface FaabTransaction {
+	id: string;
+	/** roster_id (as string) the adjustment applies to */
+	rosterId: string;
+	/** signed amount: positive = grant, negative = penalty */
+	amount: number;
+	/** why the adjustment was made (shown in the ledger) */
+	reason: string;
+	/** epoch ms */
+	createdAt: number;
+	/** display name of the admin who entered it */
+	createdBy: string;
+}
+
 export interface LeagueConfig {
 	contentfulSpaceId?: string;
 	contentfulAccessToken?: string;
 	contentfulManagementToken?: string;
 	/** Ordered list of nav slugs to show; omit to show all defaults */
 	enabledNavItems?: string[];
-	/** Bonus FAAB awarded outside Sleeper, keyed by roster_id (as string) */
+	/**
+	 * Per-roster net FAAB adjustment (sum of faabTransactions), keyed by
+	 * roster_id (as string). Kept in sync on every ledger write so consumers
+	 * (keepers budget math) read the net without summing the ledger.
+	 */
 	faabBonuses?: Record<string, number>;
+	/** Full ledger of commissioner FAAB adjustments (source of truth). */
+	faabTransactions?: FaabTransaction[];
 }
 
 function toFirestoreWrite(obj: Record<string, unknown>): Record<string, unknown> {
