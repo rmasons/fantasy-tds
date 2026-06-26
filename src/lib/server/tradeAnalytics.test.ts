@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeTradeAnalytics } from './tradeAnalytics';
+import { computeTradeAnalytics, aggregateTradeAnalytics } from './tradeAnalytics';
 import type { SleeperTransaction, SlimPlayer } from '$lib/types';
 import type { RosterInfo } from '$lib/sleeper';
 
@@ -406,5 +406,103 @@ describe('computeTradeAnalytics — waiver ROI', () => {
 		const result = computeTradeAnalytics([fa], [], rosterInfoMap, players);
 		expect(result.totalWaiverTransactions).toBe(1);
 		expect(result.waiverRoi).toHaveLength(1);
+	});
+});
+
+// ── Tests: pre-draft cutoff (draftStartMs) ─────────────────────────────────────
+
+describe('computeTradeAnalytics — pre-draft cutoff', () => {
+	const DRAFT_MS = 1_700_000_500_000;
+
+	function preDraftTrade() {
+		// status_updated well before the draft cutoff
+		return { ...makeTrade({ id: 'pre' }), status_updated: DRAFT_MS - 10_000 };
+	}
+	function inSeasonTrade() {
+		return { ...makeTrade({ id: 'in', adds: { p1: 1 }, drops: { p1: 2 } }), status_updated: DRAFT_MS + 10_000 };
+	}
+
+	it('keeps all trades when no cutoff is given', () => {
+		const result = computeTradeAnalytics([preDraftTrade(), inSeasonTrade()], [], rosterInfoMap, players);
+		expect(result.totalTrades).toBe(2);
+	});
+
+	it('drops trades that settled before the draft', () => {
+		const result = computeTradeAnalytics(
+			[preDraftTrade(), inSeasonTrade()],
+			[],
+			rosterInfoMap,
+			players,
+			DRAFT_MS,
+		);
+		expect(result.totalTrades).toBe(1);
+		expect(result.trades[0].transactionId).toBe('in');
+	});
+
+	it('also excludes pre-draft waiver/FA pickups', () => {
+		const preWaiver = { ...makeWaiver({ id: 'wpre', adds: { p2: 1 } }), status_updated: DRAFT_MS - 5_000 };
+		const result = computeTradeAnalytics([preWaiver], [], rosterInfoMap, players, DRAFT_MS);
+		expect(result.totalWaiverTransactions).toBe(0);
+	});
+});
+
+// ── Tests: all-time aggregation ────────────────────────────────────────────────
+
+describe('aggregateTradeAnalytics', () => {
+	it('returns an empty result for no seasons', () => {
+		const agg = aggregateTradeAnalytics([]);
+		expect(agg.totalTrades).toBe(0);
+		expect(agg.trades).toHaveLength(0);
+		expect(agg.bestTrade).toBeNull();
+		expect(agg.waiverRoi).toHaveLength(0);
+	});
+
+	it('sums totals, tags trades by season, and picks the all-time most lopsided', () => {
+		const matchups2024 = buildMatchupWeeks(
+			[matchupEntry(1, 2, ['p1'], { p1: 30 }), matchupEntry(2, 2, [], {})],
+			3,
+		);
+		const s2024 = computeTradeAnalytics(
+			[makeTrade({ id: 't24', week: 1, adds: { p1: 1 }, drops: { p1: 2 } })],
+			matchups2024,
+			rosterInfoMap,
+			players,
+		);
+		const s2023 = computeTradeAnalytics(
+			[makeTrade({ id: 't23', week: 1, adds: { p2: 1 }, drops: { p2: 2 } })],
+			[],
+			rosterInfoMap,
+			players,
+		);
+
+		const agg = aggregateTradeAnalytics([
+			{ season: '2023', result: s2023 },
+			{ season: '2024', result: s2024 },
+		]);
+
+		expect(agg.totalTrades).toBe(2);
+		expect(agg.trades).toHaveLength(2);
+		// every trade carries its season tag
+		expect(new Set(agg.trades.map((t) => t.season))).toEqual(new Set(['2023', '2024']));
+		// the 2024 trade has real point swing, so it's the most lopsided all-time
+		expect(agg.bestTrade?.transactionId).toBe('t24');
+		expect(agg.worstTrade?.transactionId).toBe('t24');
+	});
+
+	it('aggregates waiver ROI by owner across seasons', () => {
+		const mk = (id: string, pts: number) => {
+			const m = buildMatchupWeeks([matchupEntry(1, 1, ['p3'], { p3: pts })], 2);
+			return computeTradeAnalytics([makeWaiver({ id, adds: { p3: 1 }, faabBid: 5 })], m, rosterInfoMap, players);
+		};
+		const agg = aggregateTradeAnalytics([
+			{ season: '2023', result: mk('w23', 10) },
+			{ season: '2024', result: mk('w24', 20) },
+		]);
+		// roster 1 → owner u1, combined across both seasons
+		const row = agg.waiverRoi.find((r) => r.ownerId === 'u1');
+		expect(row).toBeTruthy();
+		expect(row!.faabSpent).toBe(10); // 5 + 5
+		expect(row!.pointsGained).toBeCloseTo(30); // 10 + 20
+		expect(row!.roi).toBeCloseTo(3); // 30 / 10
 	});
 });

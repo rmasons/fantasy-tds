@@ -1,21 +1,27 @@
 import { cachedFetch, cacheKey } from '$lib/server/cache';
-import { fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap } from '$lib/sleeper';
-import { getCachedTransactions, getCachedMatchups } from '$lib/server/sleeperCache';
+import { fetchLeagueCore, fetchNflState, fetchMatchups, fetchDrafts, buildRosterInfoMap } from '$lib/sleeper';
+import { getCachedTransactions, getCachedMatchups, getCachedLeague } from '$lib/server/sleeperCache';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 import { getPlayers } from '$lib/server/players';
-import { computeTradeAnalytics } from '$lib/server/tradeAnalytics';
+import { getSeasonChain } from '$lib/server/standings';
+import { computeTradeAnalytics, aggregateTradeAnalytics } from '$lib/server/tradeAnalytics';
 import type { TradeAnalyticsResult } from '$lib/server/tradeAnalytics';
 import type { SlimPlayer } from '$lib/types';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const LIVE_TTL_MS = 15 * 60 * 1000;
 
 async function buildTradeAnalytics(leagueId: string): Promise<TradeAnalyticsResult> {
-	const [{ league, rosters, users }, nfl, allPlayers] = await Promise.all([
+	const [{ league, rosters, users }, nfl, allPlayers, drafts] = await Promise.all([
 		fetchLeagueCore(leagueId),
 		fetchNflState(),
 		getPlayers(),
+		fetchDrafts(leagueId).catch(() => []),
 	]);
+
+	// Cutoff: anything before the draft is pre-season and shouldn't be analyzed
+	// (otherwise dynasty pre-draft trades get charged a whole season at week 1).
+	const draftStartMs = drafts.reduce((mx, d) => Math.max(mx, d.start_time ?? 0), 0) || undefined;
 
 	const profiles = await getManagerProfilesBatch(rosters.map((r) => r.owner_id).filter(Boolean));
 	const overrides = new Map<string, string>();
@@ -68,21 +74,47 @@ async function buildTradeAnalytics(leagueId: string): Promise<TradeAnalyticsResu
 		})),
 	);
 
-	return computeTradeAnalytics(allTransactions, engineMatchups, rosterInfoMap, players);
+	return computeTradeAnalytics(allTransactions, engineMatchups, rosterInfoMap, players, draftStartMs);
 }
 
 /**
  * Read-through cached trade analytics for a single league/season. Shared by the
  * /trades page load (current season, SSR) and the /api/trades/[leagueId]
  * endpoint (season-walk fetches from the client).
+ *
+ * Completed seasons are immutable, so they're cached indefinitely (no age TTL) —
+ * only live seasons expire on LIVE_TTL_MS. This is what keeps past seasons
+ * (2024/2023) from re-running a cold ~36-request rebuild every 15 minutes.
  */
-export function getTradeAnalytics(leagueId: string): Promise<TradeAnalyticsResult> {
+export async function getTradeAnalytics(leagueId: string): Promise<TradeAnalyticsResult> {
+	const league = await getCachedLeague(leagueId).catch(() => null);
+	const complete = league?.status === 'complete';
 	return cachedFetch<TradeAnalyticsResult>(cacheKey('tradeAnalyticsCache', leagueId), {
 		schemaVersion: SCHEMA_VERSION,
-		// Live seasons refresh on the TTL; the cache is keyed per-leagueId, and each
-		// past season is a distinct Sleeper leagueId, so completed seasons stay warm.
-		isFresh: (env) =>
-			env.schemaVersion === SCHEMA_VERSION && Date.now() - env.cachedAt < LIVE_TTL_MS,
+		ttlMs: complete ? undefined : LIVE_TTL_MS,
 		fetcher: () => buildTradeAnalytics(leagueId),
 	});
+}
+
+/**
+ * All-time trade analytics across the full season chain. Orchestrates the
+ * per-season cached results (so the heavy lifting is already memoized) and
+ * aggregates them; waiver ROI is combined by owner since roster ids repeat.
+ */
+export async function getAllTimeTradeAnalytics(leagueId: string): Promise<TradeAnalyticsResult> {
+	const chain = await getSeasonChain(leagueId).catch(() => []);
+	const seasons = chain.length ? chain : [{ leagueId, season: '' }];
+
+	const perSeason = await Promise.all(
+		seasons.map(async (s) => ({
+			season: s.season,
+			result: await getTradeAnalytics(s.leagueId).catch(() => null),
+		})),
+	);
+
+	return aggregateTradeAnalytics(
+		perSeason
+			.filter((p): p is { season: string; result: TradeAnalyticsResult } => p.result !== null)
+			.map((p) => ({ season: p.season, result: p.result })),
+	);
 }
