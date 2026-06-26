@@ -22,3 +22,6 @@ jobs:
       - run: cp .env.example .env
       - run: npm run check
       - run: npm test
+      # Production build catches SSR/adapter regressions that typecheck + unit
+      # tests miss — these would otherwise only surface on Vercel after merge.
+      - run: npm run build
