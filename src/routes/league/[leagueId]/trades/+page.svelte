@@ -1,0 +1,412 @@
+<script lang="ts">
+	import type { PageData } from './$types';
+	import type { TradeAnalyticsResult, AnalyzedTrade } from '$lib/server/tradeAnalytics';
+
+	let { data } = $props<{ data: PageData }>();
+
+	let analytics = $state<TradeAnalyticsResult | null>(data.analytics);
+	let seasons = $state(data.seasons);
+	let viewLeagueId = $state(data.leagueId);
+	let loading = $state(false);
+	let error = $state(data.loadFailed ? 'Failed to load trade analytics.' : '');
+
+	// Active tab: 'overview' | 'trades' | 'waiver'
+	let activeTab = $state<'overview' | 'trades' | 'waiver'>('overview');
+
+	// Reset to server-rendered data when navigating
+	$effect(() => {
+		viewLeagueId = data.leagueId;
+		analytics = data.analytics;
+		seasons = data.seasons;
+		loading = false;
+		activeTab = 'overview';
+		error = data.loadFailed ? 'Failed to load trade analytics.' : '';
+	});
+
+	async function selectSeason(lid: string) {
+		if (viewLeagueId === lid) return;
+		viewLeagueId = lid;
+		activeTab = 'overview';
+
+		if (lid === data.leagueId) {
+			analytics = data.analytics;
+			error = data.loadFailed ? 'Failed to load trade analytics.' : '';
+			loading = false; // clear any spinner left over from an in-flight season fetch
+			return;
+		}
+
+		analytics = null;
+		loading = true;
+		error = '';
+		try {
+			const res = await fetch(`/api/trades/${lid}`);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const result = await res.json();
+			if (viewLeagueId !== lid) return;
+			analytics = result;
+		} catch (e: any) {
+			if (viewLeagueId !== lid) return;
+			error = e.message;
+		} finally {
+			if (viewLeagueId === lid) loading = false;
+		}
+	}
+
+	// All-time view: aggregate trades & waiver steals/busts across every season.
+	async function selectAllTime() {
+		if (viewLeagueId === 'all-time') return;
+		viewLeagueId = 'all-time';
+		activeTab = 'overview';
+		analytics = null;
+		loading = true;
+		error = '';
+		try {
+			const res = await fetch(`/api/trades/${data.leagueId}/all-time`);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const result = await res.json();
+			if (viewLeagueId !== 'all-time') return;
+			analytics = result;
+		} catch (e: any) {
+			if (viewLeagueId !== 'all-time') return;
+			error = e.message;
+		} finally {
+			if (viewLeagueId === 'all-time') loading = false;
+		}
+	}
+
+	function formatDate(ts: number) {
+		return new Date(ts).toLocaleDateString('en-US', {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric',
+		});
+	}
+
+	// Guards against null: JSON.stringify turns any non-finite number into null,
+	// so coerce defensively before calling toFixed.
+	function fmtPts(n: number | null | undefined) {
+		return (Number.isFinite(n) ? (n as number) : 0).toFixed(1);
+	}
+
+	function fmtCost(faab: number | null | undefined) {
+		return faab && faab > 0 ? `$${faab}` : 'FA';
+	}
+
+	function swingClass(n: number | null | undefined) {
+		if (n != null && n > 0) return 'text-green-400';
+		if (n != null && n < 0) return 'text-red-400';
+		return 'text-slate-500';
+	}
+
+	function swingLabel(n: number | null | undefined) {
+		const v = Number.isFinite(n) ? (n as number) : 0;
+		if (v === 0) return '0';
+		return (v > 0 ? '+' : '') + fmtPts(v);
+	}
+
+	function tradeWinner(trade: AnalyzedTrade) {
+		const swings = Object.entries(trade.pointSwings);
+		if (swings.length === 0) return null;
+		return swings.reduce<[string, number] | null>((best, [k, v]) => (!best || v > best[1] ? [k, v] : best), null);
+	}
+
+	function tradeLoser(trade: AnalyzedTrade) {
+		const swings = Object.entries(trade.pointSwings);
+		if (swings.length === 0) return null;
+		return swings.reduce<[string, number] | null>((worst, [k, v]) => (!worst || v < worst[1] ? [k, v] : worst), null);
+	}
+
+	const trades = $derived(analytics?.trades ?? []);
+	const bestTrade = $derived(analytics?.bestTrade ?? null);
+	const steals = $derived(analytics?.waiverSteals ?? []);
+	const busts = $derived(analytics?.waiverBusts ?? []);
+
+	const tabs = [
+		{ id: 'overview' as const, label: 'Overview' },
+		{ id: 'trades' as const, label: 'All Trades' },
+		{ id: 'waiver' as const, label: 'Steals & Busts' },
+	];
+</script>
+
+<!-- One waiver pickup row, shared by the overview preview and the Steals & Busts tab -->
+{#snippet pickupRow(p: import('$lib/server/tradeAnalytics').WaiverPickupRow, rank: number, pointsClass: string)}
+	<div class="flex items-center gap-3 py-2 border-t border-navy-700/40 first:border-0">
+		<span class="font-mono text-xs text-navy-500 w-5 text-center shrink-0">{rank}</span>
+		{#if p.avatar}
+			<img src={p.avatar} alt="" class="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
+		{:else}
+			<div class="w-8 h-8 rounded-full bg-navy-800 shrink-0 flex items-center justify-center text-sm">🏈</div>
+		{/if}
+		<div class="flex-1 min-w-0">
+			<p class="font-semibold text-white text-sm truncate">{p.playerName}</p>
+			<p class="text-xs text-navy-500 truncate">{#if p.season}{p.season} · {/if}{p.teamName}</p>
+		</div>
+		<span class="font-mono text-sm tabular-nums shrink-0 w-12 text-right text-slate-400">{fmtCost(p.faabBid)}</span>
+		<span class="font-mono text-sm font-bold tabular-nums shrink-0 w-16 text-right {pointsClass}">{fmtPts(p.pointsAfterPickup)} pts</span>
+	</div>
+{/snippet}
+
+<div>
+	<!-- Page header -->
+	<div class="mb-6">
+		<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none">
+			Trade Analytics
+		</h1>
+		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">
+			Season-wide trade & waiver intelligence
+		</p>
+	</div>
+
+	<!-- Season picker -->
+	{#if seasons.length > 1}
+		<div class="flex mb-4 border-b border-navy-700 flex-wrap">
+			<button
+				onclick={selectAllTime}
+				class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+				       {viewLeagueId === 'all-time'
+				           ? 'text-amber-400 border-b-2 border-amber-400'
+				           : 'text-navy-500 hover:text-slate-300'}"
+			>
+				All-Time
+			</button>
+			{#each seasons as s}
+				<button
+					onclick={() => selectSeason(s.leagueId)}
+					class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+					       {viewLeagueId === s.leagueId
+					           ? 'text-amber-400 border-b-2 border-amber-400'
+					           : 'text-navy-500 hover:text-slate-300'}"
+				>
+					{s.season}
+				</button>
+			{/each}
+		</div>
+	{/if}
+
+	<!-- Tab bar -->
+	<div class="flex mb-6 border-b border-navy-700">
+		{#each tabs as tab}
+			<button
+				onclick={() => (activeTab = tab.id)}
+				class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+				       {activeTab === tab.id
+				           ? 'text-amber-400 border-b-2 border-amber-400'
+				           : 'text-navy-500 hover:text-slate-300'}"
+			>
+				{tab.label}
+			</button>
+		{/each}
+	</div>
+
+	<!-- Loading skeleton -->
+	{#if loading}
+		<div class="space-y-3">
+			{#each Array(6) as _}
+				<div class="h-20 bg-navy-850 rounded-lg animate-pulse"></div>
+			{/each}
+		</div>
+
+	<!-- Error state -->
+	{:else if error}
+		<div class="bg-navy-850 rounded-lg border border-navy-700 p-6 text-center">
+			<p class="text-slate-400">Failed to load trade analytics.</p>
+			<p class="text-navy-500 text-sm mt-1">{error}</p>
+		</div>
+
+	<!-- Empty state -->
+	{:else if !analytics}
+		<p class="text-navy-500">No analytics data available.</p>
+
+	<!-- ── OVERVIEW TAB ───────────────────────────────────────────────────── -->
+	{:else if activeTab === 'overview'}
+		<!-- Summary stats row -->
+		<div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+			<div class="bg-navy-850 rounded-lg border border-navy-700 p-4">
+				<p class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1">Total Trades</p>
+				<p class="text-3xl font-black font-sport text-white">{analytics.totalTrades}</p>
+			</div>
+			<div class="bg-navy-850 rounded-lg border border-navy-700 p-4">
+				<p class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1">Waiver Moves</p>
+				<p class="text-3xl font-black font-sport text-white">{analytics.totalWaiverTransactions}</p>
+			</div>
+			<div class="bg-navy-850 rounded-lg border border-navy-700 p-4 col-span-2 sm:col-span-1">
+				<p class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1">FAAB Busts</p>
+				<p class="text-3xl font-black font-sport text-white">{busts.length}</p>
+			</div>
+		</div>
+
+		<!-- Best trade card -->
+		{#if bestTrade}
+			{@const winner = tradeWinner(bestTrade)}
+			{@const loser = tradeLoser(bestTrade)}
+			<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
+				<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-4">
+					Most Lopsided Trade
+					<span class="ml-2 text-amber-400 font-mono text-xs normal-case tracking-normal">
+						{#if bestTrade.season}{bestTrade.season} · {/if}Wk {bestTrade.week} · {formatDate(bestTrade.date)}
+					</span>
+				</h2>
+				<div class="grid divide-x divide-navy-700/50"
+				     style="grid-template-columns: repeat({bestTrade.parties.length}, 1fr)">
+					{#each bestTrade.parties as party}
+						{@const swing = bestTrade.pointSwings[party.rosterId] ?? 0}
+						<div class="px-4 first:pl-0 last:pr-0">
+							<div class="flex items-center gap-2 mb-2">
+								{#if party.avatar}
+									<img src={party.avatar} alt="" class="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
+								{:else}
+									<div class="w-7 h-7 rounded-full bg-navy-800 shrink-0 flex items-center justify-center text-sm">🏈</div>
+								{/if}
+								<span class="text-sm font-bold text-white truncate">{party.teamName}</span>
+							</div>
+
+							<p class="text-[9px] text-navy-500 uppercase tracking-widest font-semibold mb-1">Received</p>
+							{#each party.received as asset}
+								<p class="text-xs text-slate-300 truncate mb-0.5">
+									{asset.type === 'pick' ? '📋' : '🏈'} {asset.label}
+								</p>
+							{/each}
+							{#if party.received.length === 0}
+								<p class="text-xs text-navy-600 italic">nothing</p>
+							{/if}
+
+							<div class="mt-3 pt-2 border-t border-navy-700/40">
+								<p class="text-[9px] text-navy-500 uppercase tracking-widest font-semibold">Net pts</p>
+								<p class="text-lg font-black font-mono {swingClass(swing)}">{swingLabel(swing)}</p>
+							</div>
+						</div>
+					{/each}
+				</div>
+				<div class="mt-4 pt-3 border-t border-navy-700/40 flex flex-wrap gap-6">
+					{#if winner && winner[1] > 0}
+						{@const winParty = bestTrade.parties.find(p => p.rosterId === Number(winner[0]))}
+						<div>
+							<p class="text-[9px] text-green-400 uppercase tracking-widest font-semibold">Winner</p>
+							<p class="text-sm font-semibold text-white">{winParty?.teamName ?? `Team ${winner[0]}`}</p>
+							<p class="text-xs text-green-400 font-mono">+{fmtPts(winner[1])} pts</p>
+						</div>
+					{/if}
+					{#if loser && loser[1] < 0}
+						{@const loseParty = bestTrade.parties.find(p => p.rosterId === Number(loser[0]))}
+						<div>
+							<p class="text-[9px] text-red-400 uppercase tracking-widest font-semibold">Loser</p>
+							<p class="text-sm font-semibold text-white">{loseParty?.teamName ?? `Team ${loser[0]}`}</p>
+							<p class="text-xs text-red-400 font-mono">{fmtPts(loser[1])} pts</p>
+						</div>
+					{/if}
+				</div>
+			</section>
+		{/if}
+
+		<!-- Biggest steals preview (top 5) -->
+		{#if steals.length > 0}
+			<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
+				<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-2">
+					Biggest Steals
+					<span class="ml-2 text-navy-500 font-normal normal-case tracking-normal">cheap wire adds that paid off</span>
+				</h2>
+				{#each steals.slice(0, 5) as p, i}
+					{@render pickupRow(p, i + 1, 'text-green-400')}
+				{/each}
+			</section>
+		{/if}
+
+	<!-- ── ALL TRADES TAB ─────────────────────────────────────────────────── -->
+	{:else if activeTab === 'trades'}
+		{#if trades.length === 0}
+			<p class="text-navy-500">No trades found for this season.</p>
+		{:else}
+			<div class="space-y-3">
+				{#each trades as trade (trade.transactionId)}
+					{@const winner = tradeWinner(trade)}
+					{@const hasSwings = !trade.involvesPicks && Object.values(trade.pointSwings).some(v => v !== 0)}
+					<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden">
+						<!-- Trade header -->
+						<div class="flex items-center gap-2 px-4 py-2.5 border-b border-navy-700/60 flex-wrap">
+							<span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-purple-900/60 text-purple-300">Trade</span>
+							{#if trade.involvesPicks}
+								<span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-navy-800 text-slate-400">Picks involved</span>
+							{/if}
+							<span class="text-xs text-slate-500">{#if trade.season}{trade.season} · {/if}Wk {trade.week} · {formatDate(trade.date)}</span>
+							{#if hasSwings && winner && Math.abs(winner[1]) > 0.1}
+								<span class="ml-auto text-[10px] text-slate-500">
+									Imbalance: <span class="font-mono text-amber-400">{fmtPts(trade.imbalanceScore)} pts</span>
+								</span>
+							{/if}
+						</div>
+
+						<!-- Party columns -->
+						<div class="grid divide-x divide-navy-700/50"
+						     style="grid-template-columns: repeat({trade.parties.length}, 1fr)">
+							{#each trade.parties as party}
+								{@const swing = trade.pointSwings[party.rosterId] ?? 0}
+								<div class="px-3 sm:px-4 py-3">
+									<div class="flex items-center gap-2 mb-2">
+										{#if party.avatar}
+											<img src={party.avatar} alt="" class="w-6 h-6 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
+										{:else}
+											<div class="w-6 h-6 rounded-full bg-navy-800 shrink-0"></div>
+										{/if}
+										<span class="text-[11px] font-bold uppercase tracking-wide text-white truncate">
+											{party.teamName}
+										</span>
+									</div>
+
+									<p class="text-[9px] text-navy-500 uppercase tracking-widest font-semibold mb-1">Received</p>
+									{#each party.received as asset}
+										<p class="text-xs text-slate-300 truncate mb-0.5">
+											{asset.type === 'pick' ? '📋' : '🏈'} {asset.label}
+										</p>
+									{/each}
+									{#if party.received.length === 0}
+										<p class="text-xs text-navy-600 italic">nothing</p>
+									{/if}
+
+									{#if hasSwings}
+										<div class="mt-2 pt-1.5 border-t border-navy-700/30">
+											<span class="text-[9px] text-navy-500 uppercase tracking-widest">Net</span>
+											<span class="ml-1 text-xs font-mono font-bold {swingClass(swing)}">{swingLabel(swing)}</span>
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/each}
+			</div>
+		{/if}
+
+	<!-- ── STEALS & BUSTS TAB ─────────────────────────────────────────────── -->
+	{:else if activeTab === 'waiver'}
+		{#if steals.length === 0 && busts.length === 0}
+			<p class="text-navy-500">No waiver data available for this season.</p>
+		{:else}
+			<p class="text-slate-400 text-sm mb-4">
+				Best- and worst-value wire pickups, by starter points scored from the week of acquisition onward (cost shown left of points).
+			</p>
+			<div class="grid lg:grid-cols-2 gap-6">
+				<!-- Biggest Steals -->
+				<section class="bg-navy-850 rounded-lg border border-navy-700 p-6">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-green-400 mb-1">Biggest Steals</h2>
+					<p class="text-xs text-navy-500 mb-3">Cheap or free adds that produced.</p>
+					{#each steals as p, i}
+						{@render pickupRow(p, i + 1, 'text-green-400')}
+					{:else}
+						<p class="text-navy-500 text-sm">No pickups found.</p>
+					{/each}
+				</section>
+
+				<!-- Biggest FAAB Busts -->
+				<section class="bg-navy-850 rounded-lg border border-navy-700 p-6">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-red-400 mb-1">Biggest FAAB Busts</h2>
+					<p class="text-xs text-navy-500 mb-3">Real FAAB spent for little return.</p>
+					{#each busts as p, i}
+						{@render pickupRow(p, i + 1, 'text-red-400')}
+					{:else}
+						<p class="text-navy-500 text-sm">No FAAB busts — nobody overpaid.</p>
+					{/each}
+				</section>
+			</div>
+		{/if}
+	{/if}
+</div>

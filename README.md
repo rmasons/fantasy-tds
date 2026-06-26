@@ -11,8 +11,14 @@ Built with SvelteKit, Firebase, and the Sleeper API.
 ### Historical year-walk
 Every major page lets you browse any past season. Standings, matchups, power rankings, rosters, transactions, and the draft board are all navigable by year — not just the current one.
 
-### Keepers cost calculator
-Prices every rostered player automatically based on the round they were originally drafted, how many years they've been kept, and your league's cost formula. Admins can override base cost or years kept on a per-player basis.
+### Keepers cost calculator & planner
+Prices every rostered player automatically based on the round they were originally drafted, how many years they've been kept, and your league's cost formula (keeper cap read from Sleeper's `max_keepers`). Admins can override base cost or years kept per player. A **scenario planner** lets managers toggle hypothetical keepers and see live cost / cap / budget impact before the draft.
+
+### Trade & waiver analytics
+A `/trades` page surfacing season and all-time insight from full transaction history: the most lopsided **trades** (draft-pick trades excluded, since a pick isn't a measurable point loss), and waiver-wire **Biggest Steals & FAAB Busts** (best- and worst-value pickups by starter points scored after acquisition).
+
+### FAAB ledger
+Commissioner FAAB grants and penalties as an auditable ledger — pick a manager, enter a signed amount and a reason. Every adjustment shows on a league-facing FAAB page, and the running net feeds each team's keeper budget.
 
 ### Playoff bracket
 A visual tournament bracket with connecting lines showing how each round flows into the next. Available for any completed or in-progress season.
@@ -23,11 +29,19 @@ All-time league records across every season — single-game highs, season totals
 ### Superlatives
 End-of-season awards computed from full matchup and transaction history: most points, biggest blowout, hottest win streak, most moves, and ~20 more. Admins can compute them automatically or edit individual entries.
 
-### Manager profiles
-Per-manager pages with head-to-head history, season-by-season stats, and rivalry tracking.
+### Manager profiles & rivalries
+Per-manager pages with head-to-head history, season-by-season stats, and rivalry tracking. The rivalry analyzer auto-runs as soon as two managers are picked, and the page surfaces a weekly "grudge match" digest.
 
 ### Blog
 Optional Contentful-backed blog for commissioner posts, recaps, and league lore.
+
+---
+
+## Branching & deployment
+
+This project uses a **`dev → test → main`** flow with a blocking fresh-context
+review on each promotion. See **[docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md)** for the
+branch model, review gates, and the Vercel environment setup.
 
 ---
 
