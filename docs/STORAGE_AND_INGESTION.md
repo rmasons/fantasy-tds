@@ -67,37 +67,33 @@ Indexes: `matchups(league_id, week)`, `transactions(league_id, week)`,
 - **Stat-correction window:** Sleeper adjusts points for ~2 days post-game, so keep
   re-pulling the just-finished week through ~Wednesday, then set `is_final = true`
   and never touch it again.
-- **In-game:** see below.
+
+(Live in-game ingestion is intentionally out of scope — see below.)
 
 ## Scheduler (in-stack — no GCP)
 
-- **Supabase `pg_cron` → Edge Function** (pull + upsert) — lives next to the data, free.
-- **GitHub Actions `schedule:`** → an ingest API route — free, already in your stack,
-  ~5-min granularity.
-- **Vercel Cron** — Hobby fires **once/day** (fine for backfill/daily, too coarse for live).
+Everything is daily-or-slower (see "Live scoring is out of scope" below), so the
+simplest option is enough:
 
-## In-game ingestion
+- **Vercel Cron** — Hobby fires **once/day**, which now covers the whole pipeline.
+  Adds to the existing `warm-players` cron.
+- Upgrade paths *only if* you later want the in-progress week fresher than daily:
+  **Supabase `pg_cron` → Edge Function**, or a **GitHub Actions `schedule:`** hitting
+  an ingest route (both free, ~5-min granularity).
 
-Only the **current week's scoring** changes live, so the live pull is narrow:
+## Live scoring is out of scope (deliberate)
 
-- **current-week `matchups` per active league** — `players_points`,
-  `starters_points`, team `points`. This is the primary live pull.
-- **transactions** on the same/slower cadence (between-game waiver/FA/trade moves).
-- **`nfl_state`** occasionally (week rollover).
-- **Not needed:** raw NFL stats / play-by-play — Sleeper already returns
-  league-scored player points. (This is why Postgres, not a warehouse, is plenty.)
+Real-time in-game scoring is **not** ingested — Sleeper is where people go for live
+stuff, and this app's value is the historical/analytics layer Sleeper doesn't have.
 
-**Cadence:** every ~2–5 min during game windows (Thu night; Sun ~1:00–11:30 pm ET;
-Mon night); hourly/daily otherwise. **Current week only** — never re-ingest
-completed weeks.
-
-**Volume / limits:** one matchups call per league per tick. Sleeper's limit is
-~1000 req/min, so even ~100 leagues every 2 min ≈ 50 req/min. Upserts keyed
-`(league_id, week, roster_id)` are idempotent. Store `last_synced_at` so the UI
-can show "updated 2 min ago".
-
-**Live page:** reads the DB and polls every ~30–60 s (instead of bypassing cache to
-hit Sleeper per request).
+- The **current, in-progress week** is only as fresh as the daily ingest, which is
+  fine; mid-game numbers lag and that's acceptable.
+- We never pull raw NFL stats / play-by-play — Sleeper returns league-scored player
+  points, so a daily `matchups` pull is all that's needed. (This is also why
+  Postgres, not a warehouse, is the right grain.)
+- **Stat corrections:** Sleeper revises points for ~2 days after games, so keep
+  re-pulling the most recent week until it settles (~Wed), then set `is_final` and
+  freeze it. A flag + date check, no infrastructure.
 
 ## App changes
 
@@ -115,6 +111,5 @@ hit Sleeper per request).
    retires the FAAB/egg workarounds.
 2. **Backfill history** into the normalized Sleeper tables; point analytics /
    standings modules at SQL.
-3. **Daily + stat-correction ingest.**
-4. **In-game ingester** (scheduler + endpoint); live page reads the DB.
-5. **(If Supabase) migrate auth**, then delete Firebase.
+3. **Daily + stat-correction ingest** (one Vercel cron).
+4. **(If Supabase) migrate auth**, then delete Firebase.
