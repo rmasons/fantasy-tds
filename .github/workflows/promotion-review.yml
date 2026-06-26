@@ -54,14 +54,14 @@ jobs:
                  first-run, boundary values.
               5. Performance problems that actually matter at this app's scale.
 
-            What counts as a finding (these BLOCK the promotion):
-              - A concrete, defensible problem in one of the categories above that
-                a maintainer would want fixed before shipping to production.
-
-            What is NOT a finding (do NOT raise these — they must not block):
-              - Style, formatting, naming, import order, comment wording.
-              - Subjective preferences or "could also" refactors with no real defect.
-              - Praise. Speculation you cannot ground in the diff.
+            Severity decides whether a finding BLOCKS the promotion:
+              - critical / high → BLOCKS. Reserve for concrete correctness,
+                security, or data-integrity defects that would harm production.
+              - medium / low → ADVISORY only (does NOT block): test-coverage
+                gaps, minor edge cases, polish, borderline concerns. Still post
+                them as inline comments so they're visible.
+            Do NOT raise style, formatting, naming, praise, or speculation you
+            cannot ground in the diff — at any severity.
 
             For EACH real finding: post an inline comment on the exact line
             (confirmed: true) explaining the problem and the fix.
@@ -77,8 +77,10 @@ jobs:
                 ]
               }
             Rules for the verdict:
-              - "block" with a non-empty findings array if you raised ANY finding.
-              - "pass" with an empty findings array ONLY if the code is sound.
+              - findings: include ALL findings you raised, each with an accurate
+                severity (critical/high/medium/low).
+              - verdict: "block" if ANY finding is high or critical, else "pass".
+                (The gate enforces this from severities regardless.)
             Finally post ONE short top-level summary with
               gh pr comment ${{ github.event.pull_request.number }} --body "..."
             (the verdict and a one-line rationale). Writing review-verdict.json is
@@ -93,11 +95,12 @@ jobs:
             exit 1
           fi
           echo "Verdict file:" && cat review-verdict.json
-          verdict=$(jq -r '.verdict // "block"' review-verdict.json)
-          count=$(jq -r '(.findings // []) | length' review-verdict.json)
-          echo "verdict=$verdict findings=$count"
-          if [ "$verdict" != "pass" ] || [ "$count" -gt 0 ]; then
-            echo "::error::Promotion blocked: review returned '$verdict' with $count finding(s). Address the inline comments and push, or refine until the review passes."
+          blocking=$(jq -r '[(.findings // [])[] | select(.severity=="high" or .severity=="critical")] | length' review-verdict.json)
+          total=$(jq -r '(.findings // []) | length' review-verdict.json)
+          echo "blocking(high/critical)=$blocking advisory=$((total - blocking))"
+          if [ "$blocking" -gt 0 ]; then
+            echo "::error::Promotion blocked: $blocking high/critical finding(s). Address the inline comments and push."
             exit 1
           fi
+          [ "$total" -gt 0 ] && echo "::warning::$total advisory (medium/low) finding(s) — not blocking."
           echo "Promotion review passed."

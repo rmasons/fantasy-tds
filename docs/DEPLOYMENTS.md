@@ -19,11 +19,12 @@ feature/*  ──PR──▶  dev  ──PR──▶  test  ──PR──▶  m
 - **feature → dev** — [`claude-code-review.yml`](../.github/workflows/claude-code-review.yml).
   Advisory only: posts comments, never blocks. Keeps iteration fast.
 - **dev → test** and **test → main** — [`promotion-review.yml`](../.github/workflows/promotion-review.yml).
-  **Blocking.** A fresh-context Claude review of the promotion diff. If it raises
-  **any** substantive finding (correctness, security, data integrity, error
-  handling, real edge cases) the `promotion-review` check **fails**, and branch
-  protection prevents the merge. Style/nitpick/opinion items are explicitly out
-  of scope and do not block.
+  **Blocking.** A fresh-context Claude review of the promotion diff. A
+  **high/critical** finding (correctness, security, data integrity) fails the
+  `promotion-review` check, and branch protection prevents the merge.
+  **Medium/low** findings (test-coverage gaps, minor edge cases, polish) post as
+  advisory inline comments but do **not** block. Style/nitpick/opinion items are
+  out of scope entirely.
 
 Both promotions also still run **`verify`** (typecheck + tests + build) from
 [`ci.yml`](../.github/workflows/ci.yml).
