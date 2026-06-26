@@ -1,10 +1,13 @@
 name: Claude Code Review
 
-# Fresh-context review of every PR. The runner starts clean each time, so Claude
-# judges the diff on its merits — it never saw the conversation that wrote it.
+# Advisory fresh-context review for work landing on dev (feature -> dev). The
+# runner starts clean each time, so Claude judges the diff on its merits. This
+# review only COMMENTS; it never blocks. Promotions (dev -> test, test -> main)
+# go through the stricter, blocking promotion-review.yml instead.
 on:
   pull_request:
     types: [opened, synchronize]
+    branches: [dev]
 
 permissions:
   contents: read
