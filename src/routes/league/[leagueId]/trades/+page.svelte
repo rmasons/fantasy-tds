@@ -81,24 +81,33 @@
 		});
 	}
 
-	function fmtPts(n: number) {
-		return n.toFixed(1);
+	// Note on null: an infinite ROI (points off a $0 pickup) is emitted as
+	// Infinity by the engine, but JSON.stringify on the API responses turns
+	// Infinity into null. So null/non-finite here means "infinite ROI" → ∞.
+	function fmtPts(n: number | null | undefined) {
+		return (Number.isFinite(n) ? (n as number) : 0).toFixed(1);
 	}
 
-	function swingClass(n: number) {
-		if (n > 0) return 'text-green-400';
-		if (n < 0) return 'text-red-400';
+	function swingClass(n: number | null | undefined) {
+		if (n != null && n > 0) return 'text-green-400';
+		if (n != null && n < 0) return 'text-red-400';
 		return 'text-slate-500';
 	}
 
-	function swingLabel(n: number) {
-		if (n === 0) return '0';
-		return (n > 0 ? '+' : '') + fmtPts(n);
+	function swingLabel(n: number | null | undefined) {
+		const v = Number.isFinite(n) ? (n as number) : 0;
+		if (v === 0) return '0';
+		return (v > 0 ? '+' : '') + fmtPts(v);
 	}
 
-	function roiLabel(roi: number) {
-		if (!isFinite(roi)) return '∞';
+	function roiLabel(roi: number | null | undefined) {
+		if (roi == null || !Number.isFinite(roi)) return '∞';
 		return roi.toFixed(2) + 'x';
+	}
+
+	// Infinite ROI (null/non-finite) is a good outcome, so colour it green.
+	function roiClass(roi: number | null | undefined) {
+		return roi == null || !Number.isFinite(roi) || roi >= 1 ? 'text-green-400' : 'text-red-400';
 	}
 
 	function tradeWinner(trade: AnalyzedTrade) {
@@ -316,7 +325,7 @@
 									<td class="py-2.5 text-right font-mono tabular-nums text-amber-400 font-semibold">
 										{fmtPts(row.pointsGained)}
 									</td>
-									<td class="py-2.5 text-right font-mono tabular-nums {row.roi >= 1 ? 'text-green-400' : 'text-red-400'}">
+									<td class="py-2.5 text-right font-mono tabular-nums {roiClass(row.roi)}">
 										{roiLabel(row.roi)}
 									</td>
 									<td class="py-2.5 pl-4 text-xs text-slate-400">
@@ -348,7 +357,7 @@
 								<p class="text-xs text-slate-400">{fmtPts(row.pointsGained)} pts · ${row.faabSpent} FAAB</p>
 							</div>
 							<div class="text-right shrink-0">
-								<p class="font-mono font-bold text-sm {row.roi >= 1 ? 'text-green-400' : 'text-red-400'}">{roiLabel(row.roi)}</p>
+								<p class="font-mono font-bold text-sm {roiClass(row.roi)}">{roiLabel(row.roi)}</p>
 								<p class="text-[10px] text-navy-500 uppercase tracking-wide">ROI</p>
 							</div>
 						</div>
@@ -441,7 +450,7 @@
 								<p class="font-semibold text-white">{row.teamName}</p>
 							</div>
 							<div class="text-right shrink-0">
-								<p class="font-mono font-bold text-lg {row.roi >= 1 ? 'text-green-400' : 'text-red-400'}">{roiLabel(row.roi)}</p>
+								<p class="font-mono font-bold text-lg {roiClass(row.roi)}">{roiLabel(row.roi)}</p>
 								<p class="text-[10px] text-navy-500 uppercase tracking-wide">ROI</p>
 							</div>
 						</div>
