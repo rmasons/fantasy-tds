@@ -33,6 +33,8 @@ export interface AnalyzedTrade {
 	transactionId: string;
 	date: number; // epoch ms
 	week: number;
+	/** Season this trade belongs to. Set by the all-time aggregator; undefined for a single-season result. */
+	season?: string;
 	parties: TradeParty[];
 	/** Net roster-points gained by each party after the trade (post-trade starts) */
 	pointSwings: Record<number, number>; // rosterId → net points gained
@@ -132,14 +134,28 @@ export function computeTradeAnalytics(
 	matchupWeeks: Array<Array<{ roster_id: number; starters?: string[]; players_points?: Record<string, number> }>>,
 	rosterInfoMap: Map<number, RosterInfo>,
 	players: Record<string, SlimPlayer>,
+	/**
+	 * Epoch ms of the season's draft. Transactions before the draft (e.g.
+	 * pre-season dynasty trades) are excluded so they aren't mis-attributed to
+	 * week 1 and don't skew the lopsided-trade ranking. Omit to keep everything.
+	 */
+	draftStartMs?: number,
 ): TradeAnalyticsResult {
 	const starterIdx = buildStarterIndex(matchupWeeks);
 
-	const completedTrades = transactions.filter(
+	// Drop anything that settled before the draft — nothing legitimate happens
+	// before rosters exist, and pre-draft trades otherwise get charged a full
+	// season of points at week 1.
+	const inSeason =
+		draftStartMs === undefined
+			? transactions
+			: transactions.filter((t) => t.status_updated >= draftStartMs);
+
+	const completedTrades = inSeason.filter(
 		(t) => t.type === 'trade' && t.status === 'complete',
 	);
 
-	const waiverTxs = transactions.filter(
+	const waiverTxs = inSeason.filter(
 		(t) =>
 			(t.type === 'waiver' || t.type === 'free_agent') &&
 			t.status === 'complete',
@@ -333,5 +349,79 @@ export function computeTradeAnalytics(
 		waiverRoi,
 		totalTrades: completedTrades.length,
 		totalWaiverTransactions: waiverTxs.length,
+	};
+}
+
+// ── All-time aggregation ───────────────────────────────────────────────────────
+
+/**
+ * Combine per-season results into one all-time view.
+ *
+ * - Trades are concatenated (each tagged with its season) and re-sorted newest-first.
+ * - Best/worst trade is the single most lopsided deal across every season.
+ * - Waiver ROI is aggregated **by owner** (roster ids are reused across seasons,
+ *   so they can't be the key); team name/avatar come from the most recent season
+ *   the owner appears in.
+ *
+ * @param perSeason  results paired with their season label, in any order
+ */
+export function aggregateTradeAnalytics(
+	perSeason: Array<{ season: string; result: TradeAnalyticsResult }>,
+): TradeAnalyticsResult {
+	// Newest season first so "latest team name/avatar" wins ties below.
+	const ordered = [...perSeason].sort((a, b) => Number(b.season) - Number(a.season));
+
+	const allTrades: AnalyzedTrade[] = [];
+	let totalTrades = 0;
+	let totalWaiverTransactions = 0;
+
+	// owner_id → aggregated waiver row
+	const byOwner = new Map<
+		string,
+		{ row: WaiverRoiRow; pickups: WaiverPickup[] }
+	>();
+
+	for (const { season, result } of ordered) {
+		totalTrades += result.totalTrades;
+		totalWaiverTransactions += result.totalWaiverTransactions;
+
+		for (const t of result.trades) allTrades.push({ ...t, season });
+
+		for (const r of result.waiverRoi) {
+			const key = r.ownerId ?? `roster:${r.rosterId}`;
+			const existing = byOwner.get(key);
+			if (!existing) {
+				// First (== most recent) season seen for this owner sets identity.
+				byOwner.set(key, {
+					row: { ...r, topPickups: [] },
+					pickups: [...r.topPickups],
+				});
+			} else {
+				existing.row.faabSpent += r.faabSpent;
+				existing.row.pointsGained += r.pointsGained;
+				existing.pickups.push(...r.topPickups);
+			}
+		}
+	}
+
+	const waiverRoi: WaiverRoiRow[] = [...byOwner.values()]
+		.map(({ row, pickups }) => ({
+			...row,
+			roi: row.faabSpent > 0 ? row.pointsGained / row.faabSpent : row.pointsGained > 0 ? Infinity : 0,
+			topPickups: [...pickups].sort((a, b) => b.pointsAfterPickup - a.pointsAfterPickup).slice(0, 5),
+		}))
+		.sort((a, b) => b.pointsGained - a.pointsGained);
+
+	const tradesSorted = [...allTrades].sort((a, b) => b.date - a.date);
+	const byImbalance = [...allTrades].sort((a, b) => b.imbalanceScore - a.imbalanceScore);
+	const bestTrade = byImbalance[0] ?? null;
+
+	return {
+		trades: tradesSorted,
+		bestTrade,
+		worstTrade: bestTrade,
+		waiverRoi,
+		totalTrades,
+		totalWaiverTransactions,
 	};
 }

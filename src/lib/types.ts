@@ -32,7 +32,8 @@ export interface SleeperLeague {
 		playoff_round_type?: number; // 0=1-week, 2=2-week rounds
 		playoff_teams?: number;
 		waiver_budget?: number; // total FAAB budget per team
-		num_keepers?: number;
+		max_keepers?: number;   // Sleeper's keeper cap per team (preferred)
+		num_keepers?: number;   // legacy/alternate keeper-count field
 	};
 	avatar: string | null;
 }

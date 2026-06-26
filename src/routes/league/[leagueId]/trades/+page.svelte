@@ -51,6 +51,28 @@
 		}
 	}
 
+	// All-time view: aggregate trades & waiver ROI across every season in the chain.
+	async function selectAllTime() {
+		if (viewLeagueId === 'all-time') return;
+		viewLeagueId = 'all-time';
+		activeTab = 'overview';
+		analytics = null;
+		loading = true;
+		error = '';
+		try {
+			const res = await fetch(`/api/trades/${data.leagueId}/all-time`);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const result = await res.json();
+			if (viewLeagueId !== 'all-time') return;
+			analytics = result;
+		} catch (e: any) {
+			if (viewLeagueId !== 'all-time') return;
+			error = e.message;
+		} finally {
+			if (viewLeagueId === 'all-time') loading = false;
+		}
+	}
+
 	function formatDate(ts: number) {
 		return new Date(ts).toLocaleDateString('en-US', {
 			month: 'short',
@@ -116,6 +138,15 @@
 	<!-- Season picker -->
 	{#if seasons.length > 1}
 		<div class="flex mb-4 border-b border-navy-700 flex-wrap">
+			<button
+				onclick={selectAllTime}
+				class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
+				       {viewLeagueId === 'all-time'
+				           ? 'text-amber-400 border-b-2 border-amber-400'
+				           : 'text-navy-500 hover:text-slate-300'}"
+			>
+				All-Time
+			</button>
 			{#each seasons as s}
 				<button
 					onclick={() => selectSeason(s.leagueId)}
@@ -190,7 +221,7 @@
 				<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-4">
 					Most Lopsided Trade
 					<span class="ml-2 text-amber-400 font-mono text-xs normal-case tracking-normal">
-						Wk {bestTrade.week} · {formatDate(bestTrade.date)}
+						{#if bestTrade.season}{bestTrade.season} · {/if}Wk {bestTrade.week} · {formatDate(bestTrade.date)}
 					</span>
 				</h2>
 				<div class="grid divide-x divide-navy-700/50"
@@ -339,7 +370,7 @@
 						<!-- Trade header -->
 						<div class="flex items-center gap-2 px-4 py-2.5 border-b border-navy-700/60 flex-wrap">
 							<span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-purple-900/60 text-purple-300">Trade</span>
-							<span class="text-xs text-slate-500">Wk {trade.week} · {formatDate(trade.date)}</span>
+							<span class="text-xs text-slate-500">{#if trade.season}{trade.season} · {/if}Wk {trade.week} · {formatDate(trade.date)}</span>
 							{#if hasSwings && winner && Math.abs(winner[1]) > 0.1}
 								<span class="ml-auto text-[10px] text-slate-500">
 									Imbalance: <span class="font-mono text-amber-400">{fmtPts(trade.imbalanceScore)} pts</span>

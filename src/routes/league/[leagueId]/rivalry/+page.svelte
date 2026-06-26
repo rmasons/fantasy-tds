@@ -46,6 +46,15 @@
 		error = data.loadFailed ? 'Failed to load managers.' : '';
 	});
 
+	// Auto-analyze as soon as two distinct managers are selected — no button click
+	// required. Depends only on the two ids, so it fires once per selection change
+	// (the guard inside analyzeRivalry no-ops on incomplete/identical picks).
+	$effect(() => {
+		if (userOneId && userTwoId && userOneId !== userTwoId) {
+			analyzeRivalry();
+		}
+	});
+
 	async function analyzeRivalry() {
 		if (!userOneId || !userTwoId || userOneId === userTwoId) return;
 		analysing = true;
