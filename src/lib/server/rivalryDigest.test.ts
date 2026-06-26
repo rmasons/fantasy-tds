@@ -193,6 +193,21 @@ describe('computeRivalryDigest', () => {
 		expect(result[0].signals).toContain('tied_series');
 	});
 
+	it('uses pairing-oriented record — names the correct manager in an asymmetric headline', () => {
+		// Non-canonical pairing (u2 first) with a pairing-oriented record: wins.one
+		// belongs to u2. u1 (Alpha) leads 6–1, so Alpha — not Beta — must be named.
+		// A symmetric record can't catch an orientation flip; this asymmetric one can.
+		const pairings: WeeklyPairing[] = [{ managerOneId: 'u2', managerTwoId: 'u1' }];
+		const records = new Map<string, RivalryResult>([
+			['u1_u2', makeRecord(1, 6)], // wins.one = 1 (u2/Beta), wins.two = 6 (u1/Alpha)
+		]);
+		const result = computeRivalryDigest(pairings, records, managers);
+		expect(result).toHaveLength(1);
+		expect(result[0].signals).toContain('lopsided_series');
+		expect(result[0].headline).toMatch(/Alpha/i);
+		expect(result[0].headline).not.toMatch(/Beta/i);
+	});
+
 	it('ranks tied_series above lopsided_series', () => {
 		const pairings: WeeklyPairing[] = [
 			{ managerOneId: 'u1', managerTwoId: 'u2' }, // lopsided
