@@ -80,6 +80,16 @@ jobs:
           claude_args: |
             --allowed-tools "mcp__github_inline_comment__create_inline_comment,Write,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(cat:*),Bash(ls:*)"
 
+      - name: Debug — dump execution output
+        if: always()
+        run: |
+          echo "=== claude-execution-output.json ==="
+          cat "$RUNNER_TEMP/claude-execution-output.json" 2>/dev/null || echo "(no execution output file)"
+          echo "=== workspace files ==="
+          ls -la
+          echo "=== review-verdict.json (if any) ==="
+          cat review-verdict.json 2>/dev/null || echo "(no verdict file)"
+
       - name: Enforce verdict
         run: |
           if [ ! -f review-verdict.json ]; then
