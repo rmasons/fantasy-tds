@@ -48,24 +48,21 @@ export interface AnalyzedTrade {
 	involvesPicks: boolean;
 }
 
-export interface WaiverRoiRow {
+/** A single waiver / free-agent pickup, used for the steals & busts lists. */
+export interface WaiverPickupRow {
+	playerId: string;
+	playerName: string;
 	rosterId: number;
 	teamName: string;
 	avatar: string | null;
 	ownerId: string | null;
-	faabSpent: number;
-	pointsGained: number;
-	/** pointsGained / faabSpent (Infinity when faabSpent = 0 but points > 0) */
-	roi: number;
-	/** Players added off waivers with their individual ROI */
-	topPickups: WaiverPickup[];
-}
-
-export interface WaiverPickup {
-	playerId: string;
-	playerName: string;
+	/** FAAB spent on the pickup (0 for a free-agent add). */
 	faabBid: number;
+	/** Starter points the player scored for this roster from the pickup week on. */
 	pointsAfterPickup: number;
+	week: number;
+	/** Season label — set by the all-time aggregator; undefined for one season. */
+	season?: string;
 }
 
 export interface TradeAnalyticsResult {
@@ -75,10 +72,27 @@ export interface TradeAnalyticsResult {
 	bestTrade: AnalyzedTrade | null;
 	/** Worst trade: same logic but for the losing side of the most lopsided deal */
 	worstTrade: AnalyzedTrade | null;
-	/** FAAB / waiver-ROI rows sorted by pointsGained desc */
-	waiverRoi: WaiverRoiRow[];
+	/** Best-value pickups: cheap (often free) adds that scored a lot. */
+	waiverSteals: WaiverPickupRow[];
+	/** Worst-value pickups: real FAAB spent for little production. */
+	waiverBusts: WaiverPickupRow[];
 	totalTrades: number;
 	totalWaiverTransactions: number;
+}
+
+/** Pick the N best-value (steals) and worst-value paid (busts) pickups. */
+export function selectStealsAndBusts(
+	pickups: WaiverPickupRow[],
+	limit = 12,
+): { steals: WaiverPickupRow[]; busts: WaiverPickupRow[] } {
+	// value = points returned minus FAAB spent. Rewards cheap, productive adds.
+	const value = (p: WaiverPickupRow) => p.pointsAfterPickup - p.faabBid;
+	const steals = [...pickups].sort((a, b) => value(b) - value(a)).slice(0, limit);
+	const busts = pickups
+		.filter((p) => p.faabBid > 0 && value(p) < 0) // paid more FAAB than points returned
+		.sort((a, b) => value(a) - value(b))
+		.slice(0, limit);
+	return { steals, busts };
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -294,10 +308,10 @@ export function computeTradeAnalytics(
 	const bestTrade = byImbalance[0] ?? null;
 	const worstTrade = byImbalance[0] ?? null; // same transaction, different party shown in UI
 
-	// ── Waiver / FAAB ROI ─────────────────────────────────────────────────────
+	// ── Waiver / FAAB pickups ──────────────────────────────────────────────────
 
-	// Track first acquisition week per (player, roster) so we only count
-	// points earned after the pickup.
+	// First acquisition per (player, roster), so points are counted from the
+	// pickup onward and a re-add doesn't double-count.
 	const firstPickup = new Map<string, { week: number; faab: number }>();
 	for (const t of waiverTxs) {
 		const week = t.leg ?? 1;
@@ -308,58 +322,33 @@ export function computeTradeAnalytics(
 		}
 	}
 
-	// Aggregate per roster
-	const roiByRoster = new Map<
-		number,
-		{ faabSpent: number; pointsGained: number; pickups: WaiverPickup[] }
-	>();
-
+	const pickups: WaiverPickupRow[] = [];
 	for (const [key, { week, faab }] of firstPickup) {
-		const [pidStr, ridStr] = key.split('_');
-		const pid = pidStr;
-		const rid = Number(ridStr);
-		const pts = pointsAfterWeek(starterIdx, pid, rid, week);
-
-		const cur = roiByRoster.get(rid) ?? { faabSpent: 0, pointsGained: 0, pickups: [] };
-		cur.faabSpent += faab;
-		cur.pointsGained += pts;
-		cur.pickups.push({
+		const sep = key.lastIndexOf('_');
+		const pid = key.slice(0, sep);
+		const rid = Number(key.slice(sep + 1));
+		const info = rosterInfoMap.get(rid);
+		pickups.push({
 			playerId: pid,
 			playerName: players[pid]?.name ?? pid,
+			rosterId: rid,
+			teamName: info?.teamName ?? `Team ${rid}`,
+			avatar: info?.avatar ?? null,
+			ownerId: info?.ownerId ?? null,
 			faabBid: faab,
-			pointsAfterPickup: pts,
+			pointsAfterPickup: pointsAfterWeek(starterIdx, pid, rid, week),
+			week,
 		});
-		roiByRoster.set(rid, cur);
 	}
 
-	const waiverRoi: WaiverRoiRow[] = [...roiByRoster.entries()].map(
-		([rid, { faabSpent, pointsGained, pickups }]) => {
-			const info = rosterInfoMap.get(rid);
-			// Sort top pickups by points desc, keep top 5
-			const topPickups = [...pickups]
-				.sort((a, b) => b.pointsAfterPickup - a.pointsAfterPickup)
-				.slice(0, 5);
-			return {
-				rosterId: rid,
-				teamName: info?.teamName ?? `Team ${rid}`,
-				avatar: info?.avatar ?? null,
-				ownerId: info?.ownerId ?? null,
-				faabSpent,
-				pointsGained,
-				roi: faabSpent > 0 ? pointsGained / faabSpent : pointsGained > 0 ? Infinity : 0,
-				topPickups,
-			};
-		},
-	);
-
-	// Sort by pointsGained desc
-	waiverRoi.sort((a, b) => b.pointsGained - a.pointsGained);
+	const { steals: waiverSteals, busts: waiverBusts } = selectStealsAndBusts(pickups);
 
 	return {
 		trades: tradesSorted,
 		bestTrade,
 		worstTrade,
-		waiverRoi,
+		waiverSteals,
+		waiverBusts,
 		totalTrades: completedTrades.length,
 		totalWaiverTransactions: waiverTxs.length,
 	};
@@ -372,58 +361,36 @@ export function computeTradeAnalytics(
  *
  * - Trades are concatenated (each tagged with its season) and re-sorted newest-first.
  * - Best/worst trade is the single most lopsided deal across every season.
- * - Waiver ROI is aggregated **by owner** (roster ids are reused across seasons,
- *   so they can't be the key); team name/avatar come from the most recent season
- *   the owner appears in.
+ * - Steals/busts: merging each season's top-N and re-ranking yields the exact
+ *   all-time top-N (an all-time top-N pickup is always top-N within its own
+ *   season), so we just pool the per-season lists and re-select.
  *
  * @param perSeason  results paired with their season label, in any order
  */
 export function aggregateTradeAnalytics(
 	perSeason: Array<{ season: string; result: TradeAnalyticsResult }>,
 ): TradeAnalyticsResult {
-	// Newest season first so "latest team name/avatar" wins ties below.
-	const ordered = [...perSeason].sort((a, b) => Number(b.season) - Number(a.season));
-
 	const allTrades: AnalyzedTrade[] = [];
+	const allPickups: WaiverPickupRow[] = [];
 	let totalTrades = 0;
 	let totalWaiverTransactions = 0;
 
-	// owner_id → aggregated waiver row
-	const byOwner = new Map<
-		string,
-		{ row: WaiverRoiRow; pickups: WaiverPickup[] }
-	>();
-
-	for (const { season, result } of ordered) {
+	const seenPickup = new Set<string>();
+	for (const { season, result } of perSeason) {
 		totalTrades += result.totalTrades;
 		totalWaiverTransactions += result.totalWaiverTransactions;
-
 		for (const t of result.trades) allTrades.push({ ...t, season });
-
-		for (const r of result.waiverRoi) {
-			const key = r.ownerId ?? `roster:${r.rosterId}`;
-			const existing = byOwner.get(key);
-			if (!existing) {
-				// First (== most recent) season seen for this owner sets identity.
-				byOwner.set(key, {
-					row: { ...r, topPickups: [] },
-					pickups: [...r.topPickups],
-				});
-			} else {
-				existing.row.faabSpent += r.faabSpent;
-				existing.row.pointsGained += r.pointsGained;
-				existing.pickups.push(...r.topPickups);
-			}
+		// A pickup can appear in both a season's steals and busts on tiny datasets;
+		// dedupe so it isn't double-counted in the pooled re-ranking.
+		for (const p of [...result.waiverSteals, ...result.waiverBusts]) {
+			const k = `${season}_${p.playerId}_${p.rosterId}`;
+			if (seenPickup.has(k)) continue;
+			seenPickup.add(k);
+			allPickups.push({ ...p, season });
 		}
 	}
 
-	const waiverRoi: WaiverRoiRow[] = [...byOwner.values()]
-		.map(({ row, pickups }) => ({
-			...row,
-			roi: row.faabSpent > 0 ? row.pointsGained / row.faabSpent : row.pointsGained > 0 ? Infinity : 0,
-			topPickups: [...pickups].sort((a, b) => b.pointsAfterPickup - a.pointsAfterPickup).slice(0, 5),
-		}))
-		.sort((a, b) => b.pointsGained - a.pointsGained);
+	const { steals: waiverSteals, busts: waiverBusts } = selectStealsAndBusts(allPickups);
 
 	const tradesSorted = [...allTrades].sort((a, b) => b.date - a.date);
 	const byImbalance = allTrades
@@ -435,7 +402,8 @@ export function aggregateTradeAnalytics(
 		trades: tradesSorted,
 		bestTrade,
 		worstTrade: bestTrade,
-		waiverRoi,
+		waiverSteals,
+		waiverBusts,
 		totalTrades,
 		totalWaiverTransactions,
 	};

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import type { TradeAnalyticsResult, AnalyzedTrade, WaiverRoiRow } from '$lib/server/tradeAnalytics';
+	import type { TradeAnalyticsResult, AnalyzedTrade } from '$lib/server/tradeAnalytics';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -81,11 +81,14 @@
 		});
 	}
 
-	// Note on null: an infinite ROI (points off a $0 pickup) is emitted as
-	// Infinity by the engine, but JSON.stringify on the API responses turns
-	// Infinity into null. So null/non-finite here means "infinite ROI" → ∞.
+	// Guards against null: JSON.stringify turns any non-finite number into null,
+	// so coerce defensively before calling toFixed.
 	function fmtPts(n: number | null | undefined) {
 		return (Number.isFinite(n) ? (n as number) : 0).toFixed(1);
+	}
+
+	function fmtCost(faab: number | null | undefined) {
+		return faab && faab > 0 ? `$${faab}` : 'FA';
 	}
 
 	function swingClass(n: number | null | undefined) {
@@ -98,16 +101,6 @@
 		const v = Number.isFinite(n) ? (n as number) : 0;
 		if (v === 0) return '0';
 		return (v > 0 ? '+' : '') + fmtPts(v);
-	}
-
-	function roiLabel(roi: number | null | undefined) {
-		if (roi == null || !Number.isFinite(roi)) return '∞';
-		return roi.toFixed(2) + 'x';
-	}
-
-	// Infinite ROI (null/non-finite) is a good outcome, so colour it green.
-	function roiClass(roi: number | null | undefined) {
-		return roi == null || !Number.isFinite(roi) || roi >= 1 ? 'text-green-400' : 'text-red-400';
 	}
 
 	function tradeWinner(trade: AnalyzedTrade) {
@@ -124,14 +117,33 @@
 
 	const trades = $derived(analytics?.trades ?? []);
 	const bestTrade = $derived(analytics?.bestTrade ?? null);
-	const waiverRoi = $derived(analytics?.waiverRoi ?? []);
+	const steals = $derived(analytics?.waiverSteals ?? []);
+	const busts = $derived(analytics?.waiverBusts ?? []);
 
 	const tabs = [
 		{ id: 'overview' as const, label: 'Overview' },
 		{ id: 'trades' as const, label: 'All Trades' },
-		{ id: 'waiver' as const, label: 'Waiver ROI' },
+		{ id: 'waiver' as const, label: 'Steals & Busts' },
 	];
 </script>
+
+<!-- One waiver pickup row, shared by the overview preview and the Steals & Busts tab -->
+{#snippet pickupRow(p: import('$lib/server/tradeAnalytics').WaiverPickupRow, rank: number, pointsClass: string)}
+	<div class="flex items-center gap-3 py-2 border-t border-navy-700/40 first:border-0">
+		<span class="font-mono text-xs text-navy-500 w-5 text-center shrink-0">{rank}</span>
+		{#if p.avatar}
+			<img src={p.avatar} alt="" class="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
+		{:else}
+			<div class="w-8 h-8 rounded-full bg-navy-800 shrink-0 flex items-center justify-center text-sm">🏈</div>
+		{/if}
+		<div class="flex-1 min-w-0">
+			<p class="font-semibold text-white text-sm truncate">{p.playerName}</p>
+			<p class="text-xs text-navy-500 truncate">{#if p.season}{p.season} · {/if}{p.teamName}</p>
+		</div>
+		<span class="font-mono text-sm tabular-nums shrink-0 w-12 text-right text-slate-400">{fmtCost(p.faabBid)}</span>
+		<span class="font-mono text-sm font-bold tabular-nums shrink-0 w-16 text-right {pointsClass}">{fmtPts(p.pointsAfterPickup)} pts</span>
+	</div>
+{/snippet}
 
 <div>
 	<!-- Page header -->
@@ -217,8 +229,8 @@
 				<p class="text-3xl font-black font-sport text-white">{analytics.totalWaiverTransactions}</p>
 			</div>
 			<div class="bg-navy-850 rounded-lg border border-navy-700 p-4 col-span-2 sm:col-span-1">
-				<p class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1">Managers Active</p>
-				<p class="text-3xl font-black font-sport text-white">{waiverRoi.length}</p>
+				<p class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1">FAAB Busts</p>
+				<p class="text-3xl font-black font-sport text-white">{busts.length}</p>
 			</div>
 		</div>
 
@@ -285,84 +297,16 @@
 			</section>
 		{/if}
 
-		<!-- Waiver ROI leaderboard (top 5) -->
-		{#if waiverRoi.length > 0}
+		<!-- Biggest steals preview (top 5) -->
+		{#if steals.length > 0}
 			<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
-				<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-4">
-					Waiver ROI — Top Managers
+				<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-2">
+					Biggest Steals
+					<span class="ml-2 text-navy-500 font-normal normal-case tracking-normal">cheap wire adds that paid off</span>
 				</h2>
-
-				<!-- Desktop table -->
-				<div class="hidden sm:block overflow-x-auto">
-					<table class="w-full text-sm">
-						<thead>
-							<tr class="text-[10px] uppercase tracking-wider text-navy-500 border-b border-navy-700">
-								<th class="pb-2 text-left">#</th>
-								<th class="pb-2 text-left">Manager</th>
-								<th class="pb-2 text-right">FAAB Spent</th>
-								<th class="pb-2 text-right">Pts Gained</th>
-								<th class="pb-2 text-right">ROI</th>
-								<th class="pb-2 text-left pl-4">Top Pickup</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each waiverRoi.slice(0, 10) as row, i}
-								<tr class="border-t border-navy-700/40 {i % 2 !== 0 ? 'bg-navy-875/30' : ''}">
-									<td class="py-2.5 pr-3 font-mono text-xs text-navy-500">{i + 1}</td>
-									<td class="py-2.5 pr-4">
-										<div class="flex items-center gap-2">
-											{#if row.avatar}
-												<img src={row.avatar} alt="" class="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
-											{:else}
-												<div class="w-7 h-7 rounded-full bg-navy-800 shrink-0"></div>
-											{/if}
-											<span class="font-semibold text-white text-sm">{row.teamName}</span>
-										</div>
-									</td>
-									<td class="py-2.5 text-right font-mono tabular-nums text-slate-400">
-										${row.faabSpent}
-									</td>
-									<td class="py-2.5 text-right font-mono tabular-nums text-amber-400 font-semibold">
-										{fmtPts(row.pointsGained)}
-									</td>
-									<td class="py-2.5 text-right font-mono tabular-nums {roiClass(row.roi)}">
-										{roiLabel(row.roi)}
-									</td>
-									<td class="py-2.5 pl-4 text-xs text-slate-400">
-										{#if row.topPickups[0]}
-											{row.topPickups[0].playerName}
-											<span class="text-navy-500 ml-1">
-												({fmtPts(row.topPickups[0].pointsAfterPickup)} pts)
-											</span>
-										{/if}
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
-
-				<!-- Mobile cards -->
-				<div class="sm:hidden space-y-2">
-					{#each waiverRoi.slice(0, 10) as row, i}
-						<div class="flex items-center gap-3 py-2 border-t border-navy-700/40 first:border-0">
-							<span class="font-mono text-xs text-navy-500 w-5 text-center">{i + 1}</span>
-							{#if row.avatar}
-								<img src={row.avatar} alt="" class="w-9 h-9 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
-							{:else}
-								<div class="w-9 h-9 rounded-full bg-navy-800 shrink-0"></div>
-							{/if}
-							<div class="flex-1 min-w-0">
-								<p class="font-semibold text-white text-sm truncate">{row.teamName}</p>
-								<p class="text-xs text-slate-400">{fmtPts(row.pointsGained)} pts · ${row.faabSpent} FAAB</p>
-							</div>
-							<div class="text-right shrink-0">
-								<p class="font-mono font-bold text-sm {roiClass(row.roi)}">{roiLabel(row.roi)}</p>
-								<p class="text-[10px] text-navy-500 uppercase tracking-wide">ROI</p>
-							</div>
-						</div>
-					{/each}
-				</div>
+				{#each steals.slice(0, 5) as p, i}
+					{@render pickupRow(p, i + 1, 'text-green-400')}
+				{/each}
 			</section>
 		{/if}
 
@@ -433,65 +377,34 @@
 
 	<!-- ── WAIVER ROI TAB ─────────────────────────────────────────────────── -->
 	{:else if activeTab === 'waiver'}
-		{#if waiverRoi.length === 0}
+		{#if steals.length === 0 && busts.length === 0}
 			<p class="text-navy-500">No waiver data available for this season.</p>
 		{:else}
 			<p class="text-slate-400 text-sm mb-4">
-				Points scored by waiver-wire pickups (starters only, from the week of acquisition onward).
+				Best- and worst-value wire pickups, by starter points scored from the week of acquisition onward (cost shown left of points).
 			</p>
-			<div class="space-y-4">
-				{#each waiverRoi as row, i}
-					<div class="bg-navy-850 rounded-lg border border-navy-700 p-4">
-						<div class="flex items-center gap-3 mb-3">
-							<span class="font-mono text-sm text-navy-500 w-6 shrink-0">{i + 1}</span>
-							{#if row.avatar}
-								<img src={row.avatar} alt="" class="w-9 h-9 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
-							{:else}
-								<div class="w-9 h-9 rounded-full bg-navy-800 shrink-0 flex items-center justify-center text-base">🏈</div>
-							{/if}
-							<div class="flex-1 min-w-0">
-								<p class="font-semibold text-white">{row.teamName}</p>
-							</div>
-							<div class="text-right shrink-0">
-								<p class="font-mono font-bold text-lg {roiClass(row.roi)}">{roiLabel(row.roi)}</p>
-								<p class="text-[10px] text-navy-500 uppercase tracking-wide">ROI</p>
-							</div>
-						</div>
+			<div class="grid lg:grid-cols-2 gap-6">
+				<!-- Biggest Steals -->
+				<section class="bg-navy-850 rounded-lg border border-navy-700 p-6">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-green-400 mb-1">Biggest Steals</h2>
+					<p class="text-xs text-navy-500 mb-3">Cheap or free adds that produced.</p>
+					{#each steals as p, i}
+						{@render pickupRow(p, i + 1, 'text-green-400')}
+					{:else}
+						<p class="text-navy-500 text-sm">No pickups found.</p>
+					{/each}
+				</section>
 
-						<!-- Stat pills -->
-						<div class="flex gap-4 flex-wrap mb-3">
-							<div>
-								<p class="text-[9px] text-navy-500 uppercase tracking-widest font-semibold">FAAB Spent</p>
-								<p class="text-sm font-mono font-bold text-slate-200">${row.faabSpent}</p>
-							</div>
-							<div>
-								<p class="text-[9px] text-navy-500 uppercase tracking-widest font-semibold">Pts Gained</p>
-								<p class="text-sm font-mono font-bold text-amber-400">{fmtPts(row.pointsGained)}</p>
-							</div>
-						</div>
-
-						<!-- Top pickups -->
-						{#if row.topPickups.length > 0}
-							<div class="border-t border-navy-700/40 pt-2.5">
-								<p class="text-[9px] text-navy-500 uppercase tracking-widest font-semibold mb-2">Top Pickups</p>
-								<div class="space-y-1">
-									{#each row.topPickups as pickup}
-										<div class="flex items-center gap-2 text-xs">
-											<span class="text-slate-300 flex-1 truncate">{pickup.playerName}</span>
-											<!-- Cost on the left of points; blank for free ($0) pickups so points stay aligned -->
-											<span class="font-mono text-slate-500 tabular-nums shrink-0 w-10 text-right">
-												{pickup.faabBid > 0 ? `$${pickup.faabBid}` : ''}
-											</span>
-											<span class="font-mono text-amber-400 tabular-nums shrink-0 w-16 text-right">
-												{fmtPts(pickup.pointsAfterPickup)} pts
-											</span>
-										</div>
-									{/each}
-								</div>
-							</div>
-						{/if}
-					</div>
-				{/each}
+				<!-- Biggest FAAB Busts -->
+				<section class="bg-navy-850 rounded-lg border border-navy-700 p-6">
+					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-red-400 mb-1">Biggest FAAB Busts</h2>
+					<p class="text-xs text-navy-500 mb-3">Real FAAB spent for little return.</p>
+					{#each busts as p, i}
+						{@render pickupRow(p, i + 1, 'text-red-400')}
+					{:else}
+						<p class="text-navy-500 text-sm">No FAAB busts — nobody overpaid.</p>
+					{/each}
+				</section>
 			</div>
 		{/if}
 	{/if}

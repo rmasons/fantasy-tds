@@ -110,7 +110,8 @@ describe('computeTradeAnalytics — edge cases', () => {
 		expect(result.trades).toHaveLength(0);
 		expect(result.bestTrade).toBeNull();
 		expect(result.worstTrade).toBeNull();
-		expect(result.waiverRoi).toHaveLength(0);
+		expect(result.waiverSteals).toHaveLength(0);
+		expect(result.waiverBusts).toHaveLength(0);
 	});
 
 	it('ignores incomplete / pending transactions', () => {
@@ -275,127 +276,68 @@ describe('computeTradeAnalytics — trade analysis', () => {
 	});
 });
 
-// ── Tests: waiver / FAAB ROI ──────────────────────────────────────────────────
+// ── Tests: waiver steals & busts ──────────────────────────────────────────────
 
-describe('computeTradeAnalytics — waiver ROI', () => {
-	it('aggregates FAAB spent and post-pickup starter points per roster', () => {
+describe('computeTradeAnalytics — waiver steals & busts', () => {
+	it('counts only starter points from the pickup week onward', () => {
 		const waivers: SleeperTransaction[] = [
-			makeWaiver({ id: 'wv1', week: 2, adds: { p3: 1 }, faabBid: 30 }),
-			makeWaiver({ id: 'wv2', week: 3, adds: { p4: 2 }, faabBid: 15 }),
+			makeWaiver({ id: 'wv1', week: 3, adds: { p4: 2 }, faabBid: 15 }),
 		];
-
 		const matchupWeeks = buildMatchupWeeks(
 			[
-				// p3 starts for roster 1 in weeks 2 and 3 (post-pickup from week 2)
-				matchupEntry(1, 2, ['p3'], { p3: 25 }),
-				matchupEntry(1, 3, ['p3'], { p3: 20 }),
-				// p4 starts for roster 2 in week 3 only (post-pickup from week 3)
-				matchupEntry(2, 2, ['p4'], { p4: 30 }), // week 2 shouldn't count (not yet acquired)
-				matchupEntry(2, 3, ['p4'], { p4: 18 }),
+				matchupEntry(2, 2, ['p4'], { p4: 30 }), // before pickup — must NOT count
+				matchupEntry(2, 3, ['p4'], { p4: 18 }), // from week 3 on — counts
 			],
 			3,
 		);
-
 		const result = computeTradeAnalytics(waivers, matchupWeeks, rosterInfoMap, players);
-
-		const row1 = result.waiverRoi.find((r) => r.rosterId === 1)!;
-		expect(row1.faabSpent).toBe(30);
-		expect(row1.pointsGained).toBeCloseTo(45, 1); // 25 + 20
-
-		const row2 = result.waiverRoi.find((r) => r.rosterId === 2)!;
-		expect(row2.faabSpent).toBe(15);
-		expect(row2.pointsGained).toBeCloseTo(18, 1); // only week 3 counts
+		const pickup = result.waiverSteals.find((p) => p.rosterId === 2)!;
+		expect(pickup.pointsAfterPickup).toBeCloseTo(18, 1);
+		expect(pickup.faabBid).toBe(15);
 	});
 
-	it('computes ROI as pointsGained / faabSpent', () => {
+	it('ranks cheap, productive pickups as the biggest steals', () => {
 		const waivers: SleeperTransaction[] = [
-			makeWaiver({ id: 'wv1', week: 1, adds: { p1: 1 }, faabBid: 50 }),
-		];
-		const matchupWeeks = buildMatchupWeeks(
-			[matchupEntry(1, 1, ['p1'], { p1: 100 })],
-			1,
-		);
-
-		const result = computeTradeAnalytics(waivers, matchupWeeks, rosterInfoMap, players);
-		const row = result.waiverRoi.find((r) => r.rosterId === 1)!;
-		expect(row.roi).toBeCloseTo(2, 2); // 100 / 50 = 2
-	});
-
-	it('returns Infinity ROI when FAAB = 0 (free agent pickup) but points > 0', () => {
-		const waivers: SleeperTransaction[] = [
-			makeWaiver({ id: 'fa1', week: 1, adds: { p1: 1 }, faabBid: 0 }),
-		];
-		const matchupWeeks = buildMatchupWeeks(
-			[matchupEntry(1, 1, ['p1'], { p1: 20 })],
-			1,
-		);
-
-		const result = computeTradeAnalytics(waivers, matchupWeeks, rosterInfoMap, players);
-		const row = result.waiverRoi.find((r) => r.rosterId === 1)!;
-		expect(row.roi).toBe(Infinity);
-	});
-
-	it('returns ROI = 0 when both FAAB and points are 0', () => {
-		const waivers: SleeperTransaction[] = [
-			makeWaiver({ id: 'fa1', week: 1, adds: { p1: 1 }, faabBid: 0 }),
-		];
-		// No matchup data → 0 points
-		const result = computeTradeAnalytics(waivers, [], rosterInfoMap, players);
-		const row = result.waiverRoi.find((r) => r.rosterId === 1)!;
-		expect(row.roi).toBe(0);
-	});
-
-	it('deduplicates pickups — only counts first acquisition of a player per roster', () => {
-		// Same player added twice (re-add after dropped) — only count from first pickup
-		const waivers: SleeperTransaction[] = [
-			makeWaiver({ id: 'wv1', week: 1, adds: { p1: 1 }, faabBid: 20 }),
-			makeWaiver({ id: 'wv2', week: 3, adds: { p1: 1 }, faabBid: 10 }), // same player, same roster
-		];
-		const result = computeTradeAnalytics(waivers, [], rosterInfoMap, players);
-		const row = result.waiverRoi.find((r) => r.rosterId === 1)!;
-		// Only the first $20 bid should be counted (first pickup wins)
-		expect(row.faabSpent).toBe(20);
-	});
-
-	it('sorts waiverRoi rows by pointsGained descending', () => {
-		const waivers: SleeperTransaction[] = [
-			makeWaiver({ id: 'wv1', week: 1, adds: { p2: 2 }, faabBid: 5 }),
-			makeWaiver({ id: 'wv2', week: 1, adds: { p1: 1 }, faabBid: 5 }),
+			makeWaiver({ id: 'free', week: 1, adds: { p1: 1 }, faabBid: 0 }),
+			makeWaiver({ id: 'paid', week: 1, adds: { p2: 2 }, faabBid: 40 }),
 		];
 		const matchupWeeks = buildMatchupWeeks(
 			[
-				matchupEntry(1, 1, ['p1'], { p1: 10 }),
-				matchupEntry(2, 1, ['p2'], { p2: 40 }),
+				matchupEntry(1, 1, ['p1'], { p1: 60 }), // value 60 - 0 = 60
+				matchupEntry(2, 1, ['p2'], { p2: 70 }), // value 70 - 40 = 30
 			],
 			1,
 		);
 		const result = computeTradeAnalytics(waivers, matchupWeeks, rosterInfoMap, players);
-		// Roster 2 has more points gained (40 > 10)
-		expect(result.waiverRoi[0].rosterId).toBe(2);
+		// The free $0/60 pickup out-values the $40/70 one.
+		expect(result.waiverSteals[0].playerId).toBe('p1');
 	});
 
-	it('includes topPickups with player names and points', () => {
+	it('flags expensive, unproductive paid pickups as busts (and excludes free ones)', () => {
 		const waivers: SleeperTransaction[] = [
-			makeWaiver({ id: 'wv1', week: 1, adds: { p1: 1 }, faabBid: 20 }),
+			makeWaiver({ id: 'bust', week: 1, adds: { p1: 1 }, faabBid: 80 }),
+			makeWaiver({ id: 'free', week: 1, adds: { p2: 2 }, faabBid: 0 }),
 		];
 		const matchupWeeks = buildMatchupWeeks(
-			[matchupEntry(1, 1, ['p1'], { p1: 50 })],
+			[matchupEntry(1, 1, ['p1'], { p1: 5 })], // $80 for 5 pts → bust
 			1,
 		);
 		const result = computeTradeAnalytics(waivers, matchupWeeks, rosterInfoMap, players);
-		const row = result.waiverRoi[0];
-		expect(row.topPickups[0].playerName).toBe('Josh Allen');
-		expect(row.topPickups[0].pointsAfterPickup).toBeCloseTo(50, 1);
-		expect(row.topPickups[0].faabBid).toBe(20);
+		expect(result.waiverBusts).toHaveLength(1);
+		expect(result.waiverBusts[0].playerId).toBe('p1');
+		// A $0 pickup can never be a bust.
+		expect(result.waiverBusts.some((p) => p.faabBid === 0)).toBe(false);
 	});
 
-	it('caps topPickups at 5 entries', () => {
-		const waivers: SleeperTransaction[] = Array.from({ length: 8 }, (_, i) =>
-			makeWaiver({ id: `wv${i}`, week: 1, adds: { [`p${i}`]: 1 }, faabBid: 5 }),
-		);
-		const result = computeTradeAnalytics(waivers, [], rosterInfoMap, {});
-		const row = result.waiverRoi.find((r) => r.rosterId === 1);
-		expect(row?.topPickups.length).toBeLessThanOrEqual(5);
+	it('deduplicates pickups — only the first acquisition of a player per roster', () => {
+		const waivers: SleeperTransaction[] = [
+			makeWaiver({ id: 'wv1', week: 1, adds: { p1: 1 }, faabBid: 20 }),
+			makeWaiver({ id: 'wv2', week: 3, adds: { p1: 1 }, faabBid: 10 }), // re-add, same roster
+		];
+		const result = computeTradeAnalytics(waivers, [], rosterInfoMap, players);
+		const rows = result.waiverSteals.filter((p) => p.playerId === 'p1' && p.rosterId === 1);
+		expect(rows).toHaveLength(1);
+		expect(rows[0].faabBid).toBe(20); // first pickup wins
 	});
 
 	it('handles free_agent type transactions identically to waiver', () => {
@@ -405,7 +347,7 @@ describe('computeTradeAnalytics — waiver ROI', () => {
 		};
 		const result = computeTradeAnalytics([fa], [], rosterInfoMap, players);
 		expect(result.totalWaiverTransactions).toBe(1);
-		expect(result.waiverRoi).toHaveLength(1);
+		expect(result.waiverSteals).toHaveLength(1);
 	});
 });
 
@@ -485,7 +427,8 @@ describe('aggregateTradeAnalytics', () => {
 		expect(agg.totalTrades).toBe(0);
 		expect(agg.trades).toHaveLength(0);
 		expect(agg.bestTrade).toBeNull();
-		expect(agg.waiverRoi).toHaveLength(0);
+		expect(agg.waiverSteals).toHaveLength(0);
+		expect(agg.waiverBusts).toHaveLength(0);
 	});
 
 	it('sums totals, tags trades by season, and picks the all-time most lopsided', () => {
@@ -520,20 +463,18 @@ describe('aggregateTradeAnalytics', () => {
 		expect(agg.worstTrade?.transactionId).toBe('t24');
 	});
 
-	it('aggregates waiver ROI by owner across seasons', () => {
-		const mk = (id: string, pts: number) => {
-			const m = buildMatchupWeeks([matchupEntry(1, 1, ['p3'], { p3: pts })], 2);
-			return computeTradeAnalytics([makeWaiver({ id, adds: { p3: 1 }, faabBid: 5 })], m, rosterInfoMap, players);
+	it('pools waiver pickups across seasons and re-ranks steals, tagged by season', () => {
+		const mk = (id: string, pid: string, pts: number) => {
+			const m = buildMatchupWeeks([matchupEntry(1, 1, [pid], { [pid]: pts })], 2);
+			return computeTradeAnalytics([makeWaiver({ id, adds: { [pid]: 1 }, faabBid: 0 })], m, rosterInfoMap, players);
 		};
 		const agg = aggregateTradeAnalytics([
-			{ season: '2023', result: mk('w23', 10) },
-			{ season: '2024', result: mk('w24', 20) },
+			{ season: '2023', result: mk('w23', 'p2', 12) },
+			{ season: '2024', result: mk('w24', 'p1', 40) },
 		]);
-		// roster 1 → owner u1, combined across both seasons
-		const row = agg.waiverRoi.find((r) => r.ownerId === 'u1');
-		expect(row).toBeTruthy();
-		expect(row!.faabSpent).toBe(10); // 5 + 5
-		expect(row!.pointsGained).toBeCloseTo(30); // 10 + 20
-		expect(row!.roi).toBeCloseTo(3); // 30 / 10
+		// Two distinct pickups pooled; the higher-scoring one leads, season tagged.
+		expect(agg.waiverSteals).toHaveLength(2);
+		expect(agg.waiverSteals[0].playerId).toBe('p1');
+		expect(agg.waiverSteals[0].season).toBe('2024');
 	});
 });
