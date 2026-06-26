@@ -185,6 +185,25 @@
 	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-1">League Admin</h1>
 	<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mb-8">Tools for commissioners. Changes affect all league members.</p>
 
+	<!-- ── Easter Egg Hunt ── -->
+	<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
+		<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1 flex items-center gap-2"><span class="text-amber-400">◆</span>Easter Egg Hunt</h2>
+		<p class="text-sm text-slate-400 mb-3">
+			FAAB eggs claimed across the league. Once every egg is found you can retire the
+			hunt — see <code class="text-amber-400/80">EASTER_EGG_REMOVAL.md</code>.
+		</p>
+		{#if data.eggProgress.claimed >= data.eggProgress.total}
+			<p class="text-sm font-semibold text-green-400">
+				All {data.eggProgress.total} eggs claimed — safe to retire the hunt. 🥚
+			</p>
+		{:else}
+			<p class="text-2xl font-sport font-black text-white leading-none">
+				{data.eggProgress.claimed}<span class="text-slate-500 text-lg"> / {data.eggProgress.total}</span>
+				<span class="text-xs font-semibold uppercase tracking-widest text-slate-400 ml-2">claimed</span>
+			</p>
+		{/if}
+	</section>
+
 	<!-- ── Draft Cache ── -->
 	<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
 		<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1 flex items-center gap-2"><span class="text-amber-400">◆</span>Draft Cache</h2>

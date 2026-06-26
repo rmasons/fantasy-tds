@@ -2,6 +2,22 @@ import { redirect, error } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getLeagueConfig, setLeagueConfig, deleteLeagueConfig } from '$lib/server/config';
 import { fetchRosters, fetchUsers, buildRosterInfoMap } from '$lib/sleeper';
+import { adminDb } from '$lib/firebase/admin';
+import { TOTAL_EGGS } from '$lib/eggs';
+
+// Count claimed FAAB eggs so an admin can see when the hunt is exhausted and
+// it's safe to retire (see EASTER_EGG_REMOVAL.md). Best-effort — a read failure
+// just shows 0 claimed rather than breaking the admin page.
+async function getEggProgress(leagueId: string): Promise<{ claimed: number; total: number }> {
+	try {
+		const doc = await adminDb().collection('faabEggs').doc(leagueId).get();
+		const claimed = doc.exists ? Object.keys(doc.data() ?? {}).length : 0;
+		return { claimed, total: TOTAL_EGGS };
+	} catch (e) {
+		console.error('[admin] failed to read egg progress for', leagueId, e);
+		return { claimed: 0, total: TOTAL_EGGS };
+	}
+}
 
 const VALID_NAV_ITEMS = new Set([
 	'standings', 'matchups', 'power-rankings', 'rosters', 'history',
@@ -11,10 +27,11 @@ const VALID_NAV_ITEMS = new Set([
 export const load: PageServerLoad = async ({ locals, params }) => {
 	if (!locals.user?.isAdmin) throw redirect(303, `/league/${params.leagueId}`);
 
-	const [cfg, rosters, users] = await Promise.all([
+	const [cfg, rosters, users, eggProgress] = await Promise.all([
 		getLeagueConfig(params.leagueId),
 		fetchRosters(params.leagueId).catch(() => []),
 		fetchUsers(params.leagueId).catch(() => []),
+		getEggProgress(params.leagueId),
 	]);
 
 	const infoMap = buildRosterInfoMap(rosters, users);
@@ -28,6 +45,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	return {
 		user: locals.user,
 		rosterList,
+		eggProgress,
 		faabBonuses: cfg.faabBonuses ?? {},
 		leagueConfig: {
 			contentfulSpaceId: cfg.contentfulSpaceId,
