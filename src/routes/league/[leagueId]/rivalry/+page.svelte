@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { ManagerOption } from '$lib/server/rivalry';
+	import type { DigestItem } from '$lib/server/rivalryDigest';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -32,6 +33,9 @@
 	let analyseStatus = $state('');
 	const loadingManagers = false;
 	let error = $state(data.loadFailed ? 'Failed to load managers.' : '');
+
+	const digest = $derived((data.digest ?? []) as DigestItem[]);
+	const digestWeek = $derived(data.digestWeek as number | null);
 
 	// Reset to the route league's server-rendered managers on navigation.
 	$effect(() => {
@@ -113,6 +117,82 @@
 
 <div>
 	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Rivalry</h1>
+
+	<!-- ── This week's digest ──────────────────────────────────────── -->
+	{#if digest.length > 0}
+		<div class="mb-8">
+			<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2">
+				<span class="text-amber-400">◆</span>
+				This Week's Grudge Matches
+				{#if digestWeek}
+					<span class="text-navy-500 normal-case font-sans font-normal tracking-normal text-[11px]">· Week {digestWeek}</span>
+				{/if}
+			</h2>
+			<div class="space-y-3">
+				{#each digest as item, i}
+					<div class="bg-navy-850 rounded-lg border border-navy-700 p-4">
+						<!-- Rank badge + headline row -->
+						<div class="flex items-start gap-3">
+							<span class="shrink-0 mt-0.5 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold
+							             {i === 0 ? 'bg-amber-500 text-navy-900' : 'bg-navy-800 text-navy-400'}">
+								{i + 1}
+							</span>
+							<div class="flex-1 min-w-0">
+								<!-- Manager names -->
+								<div class="flex items-center gap-2 mb-1.5 flex-wrap">
+									<div class="flex items-center gap-1.5">
+										{#if item.managerOne.avatar}
+											<img src={item.managerOne.avatar} alt="" class="w-5 h-5 rounded-full" />
+										{:else}
+											<div class="w-5 h-5 rounded-full bg-navy-800 flex items-center justify-center text-[9px]">🏈</div>
+										{/if}
+										<span class="text-sm font-semibold text-white">{item.managerOne.teamName}</span>
+									</div>
+									<span class="text-navy-500 text-xs">vs</span>
+									<div class="flex items-center gap-1.5">
+										{#if item.managerTwo.avatar}
+											<img src={item.managerTwo.avatar} alt="" class="w-5 h-5 rounded-full" />
+										{:else}
+											<div class="w-5 h-5 rounded-full bg-navy-800 flex items-center justify-center text-[9px]">🏈</div>
+										{/if}
+										<span class="text-sm font-semibold text-white">{item.managerTwo.teamName}</span>
+									</div>
+								</div>
+								<!-- Headline -->
+								<p class="text-amber-400 font-sport font-bold text-sm uppercase tracking-wide leading-snug">
+									{item.headline}
+								</p>
+								<!-- Subline -->
+								{#if item.subline}
+									<p class="text-slate-400 text-xs mt-0.5">{item.subline}</p>
+								{/if}
+								<!-- Signal pills -->
+								{#if item.signals.length > 0}
+									<div class="flex flex-wrap gap-1 mt-2">
+										{#each item.signals as signal}
+											<span class="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide font-bold
+											             {signal === 'tied_series' ? 'bg-amber-500/10 text-amber-400' :
+											              signal === 'revenge_game' ? 'bg-red-500/10 text-red-400' :
+											              signal === 'streak_on_the_line' ? 'bg-green-500/10 text-green-400' :
+											              signal === 'first_meeting' ? 'bg-sky-500/10 text-sky-400' :
+											              'bg-navy-800 text-navy-400'}">
+												{signal.replace(/_/g, ' ')}
+											</span>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
+
+	<!-- ── Rivalry analyzer ────────────────────────────────────────── -->
+	<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-4 flex items-center gap-2">
+		<span class="text-amber-400">◆</span>Analyze Any Rivalry
+	</h2>
 
 	{#if loadingManagers}
 		<div class="h-20 bg-navy-850 rounded-lg animate-pulse"></div>
