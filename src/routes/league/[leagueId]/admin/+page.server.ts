@@ -21,7 +21,7 @@ async function getEggProgress(leagueId: string): Promise<{ claimed: number; tota
 
 const VALID_NAV_ITEMS = new Set([
 	'standings', 'matchups', 'power-rankings', 'rosters', 'history',
-	'transactions', 'drafts', 'managers', 'rivalry', 'keepers', 'superlatives', 'blog',
+	'transactions', 'trades', 'drafts', 'managers', 'rivalry', 'keepers', 'superlatives', 'blog',
 ]);
 
 export const load: PageServerLoad = async ({ locals, params }) => {
