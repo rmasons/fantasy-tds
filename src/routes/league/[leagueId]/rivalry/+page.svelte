@@ -242,17 +242,16 @@
 			{/each}
 		</div>
 
-		<button
-			onclick={analyzeRivalry}
-			disabled={!userOneId || !userTwoId || userOneId === userTwoId || analysing}
-			class="px-5 py-2 bg-amber-500 hover:bg-amber-400 disabled:bg-navy-800 disabled:text-navy-500 disabled:cursor-not-allowed
-			       text-slate-900 font-sport font-bold uppercase tracking-wider text-sm rounded-lg transition-colors mb-8"
-		>
-			{analysing ? analyseStatus : 'Analyze Rivalry'}
-		</button>
+		<!-- Analysis runs automatically once two managers are selected. -->
+		{#if analysing}
+			<p class="flex items-center gap-2 text-sm text-navy-400 mb-8">
+				<span class="inline-block w-3 h-3 rounded-full border-2 border-amber-400 border-t-transparent animate-spin"></span>
+				{analyseStatus}
+			</p>
+		{/if}
 
 		{#if error}
-			<p class="text-red-400">{error}</p>
+			<p class="text-red-400 mb-8">{error}</p>
 		{/if}
 
 		{#if rivalry && managerOne && managerTwo}
