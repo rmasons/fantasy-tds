@@ -409,6 +409,37 @@ describe('computeTradeAnalytics — waiver ROI', () => {
 	});
 });
 
+// ── Tests: draft-pick trades excluded from lopsided ranking ────────────────────
+
+describe('computeTradeAnalytics — draft-pick trades', () => {
+	function pickForPlayer() {
+		// roster 1 sends a productive player, gets a pick back; roster 2 sends a pick.
+		const t = makeTrade({ id: 'pick-deal', week: 1, rosterIds: [1, 2], adds: { p1: 2 }, drops: { p1: 1 } });
+		t.draft_picks = [{ season: '2025', round: 1, roster_id: 2, previous_owner_id: 2, owner_id: 1 }];
+		return t;
+	}
+
+	it('flags trades that include draft picks', () => {
+		const result = computeTradeAnalytics([pickForPlayer()], [], rosterInfoMap, players);
+		expect(result.trades[0].involvesPicks).toBe(true);
+	});
+
+	it('excludes pick-involving trades from the most-lopsided ranking', () => {
+		// p1 scores big for roster 2 after the deal — a huge raw swing, but it's a
+		// pick trade so it must NOT be picked as the most lopsided.
+		const mw = buildMatchupWeeks([matchupEntry(2, 2, ['p1'], { p1: 40 })], 3);
+		const playerTrade = makeTrade({ id: 'player-deal', week: 1, rosterIds: [1, 3], adds: { p2: 1 }, drops: { p2: 3 } });
+		const result = computeTradeAnalytics([pickForPlayer(), playerTrade], mw, rosterInfoMap, players);
+		expect(result.bestTrade?.transactionId).toBe('player-deal');
+	});
+
+	it('leaves bestTrade null when every trade involves picks', () => {
+		const result = computeTradeAnalytics([pickForPlayer()], [], rosterInfoMap, players);
+		expect(result.bestTrade).toBeNull();
+		expect(result.totalTrades).toBe(1); // still counted
+	});
+});
+
 // ── Tests: pre-draft cutoff (draftStartMs) ─────────────────────────────────────
 
 describe('computeTradeAnalytics — pre-draft cutoff', () => {

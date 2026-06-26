@@ -40,6 +40,12 @@ export interface AnalyzedTrade {
 	pointSwings: Record<number, number>; // rosterId → net points gained
 	/** Numeric margin separating the biggest winner from runner-up, in points */
 	imbalanceScore: number;
+	/**
+	 * True when the trade includes draft picks. Picks have real value that can't
+	 * be measured in points, so these trades are excluded from the lopsided
+	 * ranking and their point swing isn't a "true" win/loss.
+	 */
+	involvesPicks: boolean;
 }
 
 export interface WaiverRoiRow {
@@ -257,6 +263,8 @@ export function computeTradeAnalytics(
 			});
 		}
 
+		const involvesPicks = (t.draft_picks?.length ?? 0) > 0;
+
 		// Imbalance = max swing - min swing (magnitude of the most lopsided outcome)
 		const swingValues = Object.values(pointSwings);
 		const maxSwing = swingValues.length ? Math.max(...swingValues) : 0;
@@ -270,14 +278,19 @@ export function computeTradeAnalytics(
 			parties,
 			pointSwings,
 			imbalanceScore,
+			involvesPicks,
 		};
 	});
 
 	// Sort trades by date descending (most recent first) for display
 	const tradesSorted = [...analyzedTrades].sort((a, b) => b.date - a.date);
 
-	// Best trade = most lopsided (winner's perspective); worst = loser's same deal
-	const byImbalance = [...analyzedTrades].sort((a, b) => b.imbalanceScore - a.imbalanceScore);
+	// Most lopsided = the biggest player-for-player imbalance. Pick-involving
+	// trades are excluded — a draft pick has value that points can't capture, so
+	// giving a player for a pick isn't a "true" point loss.
+	const byImbalance = analyzedTrades
+		.filter((t) => !t.involvesPicks)
+		.sort((a, b) => b.imbalanceScore - a.imbalanceScore);
 	const bestTrade = byImbalance[0] ?? null;
 	const worstTrade = byImbalance[0] ?? null; // same transaction, different party shown in UI
 
@@ -413,7 +426,9 @@ export function aggregateTradeAnalytics(
 		.sort((a, b) => b.pointsGained - a.pointsGained);
 
 	const tradesSorted = [...allTrades].sort((a, b) => b.date - a.date);
-	const byImbalance = [...allTrades].sort((a, b) => b.imbalanceScore - a.imbalanceScore);
+	const byImbalance = allTrades
+		.filter((t) => !t.involvesPicks)
+		.sort((a, b) => b.imbalanceScore - a.imbalanceScore);
 	const bestTrade = byImbalance[0] ?? null;
 
 	return {

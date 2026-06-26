@@ -374,11 +374,14 @@
 			<div class="space-y-3">
 				{#each trades as trade (trade.transactionId)}
 					{@const winner = tradeWinner(trade)}
-					{@const hasSwings = Object.values(trade.pointSwings).some(v => v !== 0)}
+					{@const hasSwings = !trade.involvesPicks && Object.values(trade.pointSwings).some(v => v !== 0)}
 					<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden">
 						<!-- Trade header -->
 						<div class="flex items-center gap-2 px-4 py-2.5 border-b border-navy-700/60 flex-wrap">
 							<span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-purple-900/60 text-purple-300">Trade</span>
+							{#if trade.involvesPicks}
+								<span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-navy-800 text-slate-400">Picks involved</span>
+							{/if}
 							<span class="text-xs text-slate-500">{#if trade.season}{trade.season} · {/if}Wk {trade.week} · {formatDate(trade.date)}</span>
 							{#if hasSwings && winner && Math.abs(winner[1]) > 0.1}
 								<span class="ml-auto text-[10px] text-slate-500">
@@ -475,14 +478,13 @@
 									{#each row.topPickups as pickup}
 										<div class="flex items-center gap-2 text-xs">
 											<span class="text-slate-300 flex-1 truncate">{pickup.playerName}</span>
-											<span class="font-mono text-amber-400 tabular-nums shrink-0">
+											<!-- Cost on the left of points; blank for free ($0) pickups so points stay aligned -->
+											<span class="font-mono text-slate-500 tabular-nums shrink-0 w-10 text-right">
+												{pickup.faabBid > 0 ? `$${pickup.faabBid}` : ''}
+											</span>
+											<span class="font-mono text-amber-400 tabular-nums shrink-0 w-16 text-right">
 												{fmtPts(pickup.pointsAfterPickup)} pts
 											</span>
-											{#if pickup.faabBid > 0}
-												<span class="font-mono text-slate-500 tabular-nums shrink-0">
-													${pickup.faabBid}
-												</span>
-											{/if}
 										</div>
 									{/each}
 								</div>
