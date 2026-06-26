@@ -15,12 +15,14 @@
 		{ href: 'rosters',         label: 'Rosters'         },
 		{ href: 'history',         label: 'Awards & Records' },
 		{ href: 'transactions',    label: 'Transactions'    },
+		{ href: 'trades',          label: 'Trade Analytics' },
 		{ href: 'drafts',          label: 'Drafts'          },
 		{ href: 'superlatives',    label: 'Superlatives'    },
 		{ href: 'managers',        label: 'Managers'        },
 		{ href: 'rivalry',         label: 'Rivalry'         },
 		{ href: 'blog',            label: 'Blog'            },
 		{ href: 'keepers',         label: 'Keepers'         },
+		{ href: 'faab',            label: 'FAAB Ledger'     },
 	];
 
 	onMount(async () => {

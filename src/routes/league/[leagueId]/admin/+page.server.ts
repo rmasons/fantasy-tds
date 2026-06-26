@@ -1,6 +1,7 @@
 import { redirect, error } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getLeagueConfig, setLeagueConfig, deleteLeagueConfig } from '$lib/server/config';
+import { getFaabLedger, addFaabTransaction, deleteFaabTransaction } from '$lib/server/faab';
 import { fetchRosters, fetchUsers, buildRosterInfoMap } from '$lib/sleeper';
 import { adminDb } from '$lib/firebase/admin';
 import { TOTAL_EGGS } from '$lib/eggs';
@@ -21,17 +22,18 @@ async function getEggProgress(leagueId: string): Promise<{ claimed: number; tota
 
 const VALID_NAV_ITEMS = new Set([
 	'standings', 'matchups', 'power-rankings', 'rosters', 'history',
-	'transactions', 'drafts', 'managers', 'rivalry', 'keepers', 'superlatives', 'blog',
+	'transactions', 'trades', 'drafts', 'managers', 'rivalry', 'keepers', 'superlatives', 'faab', 'blog',
 ]);
 
 export const load: PageServerLoad = async ({ locals, params }) => {
 	if (!locals.user?.isAdmin) throw redirect(303, `/league/${params.leagueId}`);
 
-	const [cfg, rosters, users, eggProgress] = await Promise.all([
+	const [cfg, rosters, users, eggProgress, faabLedger] = await Promise.all([
 		getLeagueConfig(params.leagueId),
 		fetchRosters(params.leagueId).catch(() => []),
 		fetchUsers(params.leagueId).catch(() => []),
 		getEggProgress(params.leagueId),
+		getFaabLedger(params.leagueId).catch(() => []),
 	]);
 
 	const infoMap = buildRosterInfoMap(rosters, users);
@@ -46,7 +48,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		user: locals.user,
 		rosterList,
 		eggProgress,
-		faabBonuses: cfg.faabBonuses ?? {},
+		faabLedger,
 		leagueConfig: {
 			contentfulSpaceId: cfg.contentfulSpaceId,
 			hasAccessToken: !!cfg.contentfulAccessToken,
@@ -82,17 +84,34 @@ export const actions: Actions = {
 		return { configSuccess: true };
 	},
 
-	saveFaabBonuses: async ({ request, params, locals }) => {
+	addFaab: async ({ request, params, locals }) => {
 		if (!locals.user?.isAdmin) throw error(403, 'Forbidden');
 		const data = await request.formData();
-		const bonuses: Record<string, number> = {};
-		for (const [key, val] of data.entries()) {
-			if (!key.startsWith('faab_')) continue;
-			const rosterId = key.slice(5);
-			const amount = parseInt(val as string, 10);
-			if (!isNaN(amount) && amount > 0) bonuses[rosterId] = amount;
+		const rosterId = (data.get('rosterId') as string)?.trim();
+		const amount = Number(data.get('amount'));
+		const reason = (data.get('reason') as string)?.trim();
+
+		if (!rosterId) return { faabError: 'Pick a manager.' };
+		if (!Number.isFinite(amount) || amount === 0) return { faabError: 'Enter a non-zero amount (+ or −).' };
+		if (!reason) return { faabError: 'A reason is required.' };
+
+		// Validate the roster belongs to this league — a crafted POST shouldn't be
+		// able to attach a ledger entry to a phantom team.
+		const rosters = await fetchRosters(params.leagueId).catch(() => []);
+		if (!rosters.some((r) => String(r.roster_id) === rosterId)) {
+			return { faabError: 'Unknown roster for this league.' };
 		}
-		await setLeagueConfig(params.leagueId, { faabBonuses: bonuses });
+
+		const createdBy = locals.user.sleeperUsername ?? locals.user.email ?? 'Commissioner';
+		await addFaabTransaction(params.leagueId, { rosterId, amount, reason, createdBy });
+		return { faabSuccess: true };
+	},
+
+	deleteFaab: async ({ request, params, locals }) => {
+		if (!locals.user?.isAdmin) throw error(403, 'Forbidden');
+		const id = (await request.formData()).get('id') as string;
+		if (!id) return { faabError: 'Missing transaction id.' };
+		await deleteFaabTransaction(params.leagueId, id);
 		return { faabSuccess: true };
 	},
 

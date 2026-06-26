@@ -134,7 +134,9 @@ export async function getKeeperData(leagueId: string): Promise<{
 	// A player drafted in (season - 1) is in their first year kept.
 	const planningYear = league.season as string;
 	const faabBudget: number = league.settings?.waiver_budget ?? 100;
-	const maxKeepers: number = league.settings?.num_keepers ?? 0;
+	// Sleeper exposes the keeper cap as `max_keepers`; fall back to the legacy
+	// `num_keepers` field if a league only has that set.
+	const maxKeepers: number = league.settings?.max_keepers ?? league.settings?.num_keepers ?? 0;
 
 	const sleeperUserIds: string[] = (usersRaw ?? []).map((u) => u.user_id).filter(Boolean);
 

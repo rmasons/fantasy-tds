@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { ManagerOption } from '$lib/server/rivalry';
+	import type { DigestItem } from '$lib/server/rivalryDigest';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -33,6 +34,9 @@
 	const loadingManagers = false;
 	let error = $state(data.loadFailed ? 'Failed to load managers.' : '');
 
+	const digest = $derived((data.digest ?? []) as DigestItem[]);
+	const digestWeek = $derived(data.digestWeek as number | null);
+
 	// Reset to the route league's server-rendered managers on navigation.
 	$effect(() => {
 		managers = data.managers;
@@ -42,21 +46,37 @@
 		error = data.loadFailed ? 'Failed to load managers.' : '';
 	});
 
+	// Auto-analyze as soon as two distinct managers are selected — no button click
+	// required. Depends only on the two ids, so it fires once per selection change
+	// (the guard inside analyzeRivalry no-ops on incomplete/identical picks).
+	$effect(() => {
+		if (userOneId && userTwoId && userOneId !== userTwoId) {
+			analyzeRivalry();
+		}
+	});
+
 	async function analyzeRivalry() {
 		if (!userOneId || !userTwoId || userOneId === userTwoId) return;
+		// Capture the selection before awaiting. The auto-analyze effect fires on
+		// every change, so a slow earlier request must not overwrite a newer one —
+		// discard the response if the selection changed while in flight.
+		const reqOne = userOneId;
+		const reqTwo = userTwoId;
 		analysing = true;
 		rivalry = null;
 		error = '';
 		analyseStatus = 'Analyzing matchup history…';
 
 		try {
-			const res = await fetch(`/api/rivalry/${data.leagueId}?one=${userOneId}&two=${userTwoId}`);
+			const res = await fetch(`/api/rivalry/${data.leagueId}?one=${reqOne}&two=${reqTwo}`);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			if (userOneId !== reqOne || userTwoId !== reqTwo) return; // stale — discard
 			rivalry = await res.json();
 		} catch (e: any) {
+			if (userOneId !== reqOne || userTwoId !== reqTwo) return;
 			error = e.message;
 		} finally {
-			analysing = false;
+			if (userOneId === reqOne && userTwoId === reqTwo) analysing = false;
 		}
 	}
 
@@ -114,6 +134,82 @@
 <div>
 	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-6">Rivalry</h1>
 
+	<!-- ── This week's digest ──────────────────────────────────────── -->
+	{#if digest.length > 0}
+		<div class="mb-8">
+			<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2">
+				<span class="text-amber-400">◆</span>
+				This Week's Grudge Matches
+				{#if digestWeek}
+					<span class="text-navy-500 normal-case font-sans font-normal tracking-normal text-[11px]">· Week {digestWeek}</span>
+				{/if}
+			</h2>
+			<div class="space-y-3">
+				{#each digest as item, i}
+					<div class="bg-navy-850 rounded-lg border border-navy-700 p-4">
+						<!-- Rank badge + headline row -->
+						<div class="flex items-start gap-3">
+							<span class="shrink-0 mt-0.5 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold
+							             {i === 0 ? 'bg-amber-500 text-navy-900' : 'bg-navy-800 text-navy-400'}">
+								{i + 1}
+							</span>
+							<div class="flex-1 min-w-0">
+								<!-- Manager names -->
+								<div class="flex items-center gap-2 mb-1.5 flex-wrap">
+									<div class="flex items-center gap-1.5">
+										{#if item.managerOne.avatar}
+											<img src={item.managerOne.avatar} alt="" class="w-5 h-5 rounded-full" />
+										{:else}
+											<div class="w-5 h-5 rounded-full bg-navy-800 flex items-center justify-center text-[9px]">🏈</div>
+										{/if}
+										<span class="text-sm font-semibold text-white">{item.managerOne.teamName}</span>
+									</div>
+									<span class="text-navy-500 text-xs">vs</span>
+									<div class="flex items-center gap-1.5">
+										{#if item.managerTwo.avatar}
+											<img src={item.managerTwo.avatar} alt="" class="w-5 h-5 rounded-full" />
+										{:else}
+											<div class="w-5 h-5 rounded-full bg-navy-800 flex items-center justify-center text-[9px]">🏈</div>
+										{/if}
+										<span class="text-sm font-semibold text-white">{item.managerTwo.teamName}</span>
+									</div>
+								</div>
+								<!-- Headline -->
+								<p class="text-amber-400 font-sport font-bold text-sm uppercase tracking-wide leading-snug">
+									{item.headline}
+								</p>
+								<!-- Subline -->
+								{#if item.subline}
+									<p class="text-slate-400 text-xs mt-0.5">{item.subline}</p>
+								{/if}
+								<!-- Signal pills -->
+								{#if item.signals.length > 0}
+									<div class="flex flex-wrap gap-1 mt-2">
+										{#each item.signals as signal}
+											<span class="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide font-bold
+											             {signal === 'tied_series' ? 'bg-amber-500/10 text-amber-400' :
+											              signal === 'revenge_game' ? 'bg-red-500/10 text-red-400' :
+											              signal === 'streak_on_the_line' ? 'bg-green-500/10 text-green-400' :
+											              signal === 'first_meeting' ? 'bg-sky-500/10 text-sky-400' :
+											              'bg-navy-800 text-navy-400'}">
+												{signal.replace(/_/g, ' ')}
+											</span>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
+
+	<!-- ── Rivalry analyzer ────────────────────────────────────────── -->
+	<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-4 flex items-center gap-2">
+		<span class="text-amber-400">◆</span>Analyze Any Rivalry
+	</h2>
+
 	{#if loadingManagers}
 		<div class="h-20 bg-navy-850 rounded-lg animate-pulse"></div>
 	{:else}
@@ -153,17 +249,16 @@
 			{/each}
 		</div>
 
-		<button
-			onclick={analyzeRivalry}
-			disabled={!userOneId || !userTwoId || userOneId === userTwoId || analysing}
-			class="px-5 py-2 bg-amber-500 hover:bg-amber-400 disabled:bg-navy-800 disabled:text-navy-500 disabled:cursor-not-allowed
-			       text-slate-900 font-sport font-bold uppercase tracking-wider text-sm rounded-lg transition-colors mb-8"
-		>
-			{analysing ? analyseStatus : 'Analyze Rivalry'}
-		</button>
+		<!-- Analysis runs automatically once two managers are selected. -->
+		{#if analysing}
+			<p class="flex items-center gap-2 text-sm text-navy-400 mb-8">
+				<span class="inline-block w-3 h-3 rounded-full border-2 border-amber-400 border-t-transparent animate-spin"></span>
+				{analyseStatus}
+			</p>
+		{/if}
 
 		{#if error}
-			<p class="text-red-400">{error}</p>
+			<p class="text-red-400 mb-8">{error}</p>
 		{/if}
 
 		{#if rivalry && managerOne && managerTwo}
