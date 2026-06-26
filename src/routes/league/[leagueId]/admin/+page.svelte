@@ -110,20 +110,15 @@
 		}
 	}
 
-	// ── FAAB bonuses ─────────────────────────────────────────────────────────────
-	let faabBonuses = $state<Record<string, number>>({ ...(data.faabBonuses ?? {}) });
+	// ── FAAB ledger ──────────────────────────────────────────────────────────────
+	const teamNameFor = (rosterId: string) =>
+		data.rosterList.find((r: { rosterId: string; teamName: string }) => r.rosterId === rosterId)?.teamName
+		?? `Roster ${rosterId}`;
 
-	function faabBonusFor(rosterId: string): number {
-		return faabBonuses[rosterId] ?? 0;
-	}
+	const fmtFaab = (amount: number) => (amount >= 0 ? '+$' : '-$') + Math.abs(amount);
 
-	function setFaabBonus(rosterId: string, raw: string) {
-		const val = parseInt(raw, 10);
-		const copy = { ...faabBonuses };
-		if (raw === '' || val <= 0 || isNaN(val)) delete copy[rosterId];
-		else copy[rosterId] = val;
-		faabBonuses = copy;
-	}
+	const fmtFaabDate = (ts: number) =>
+		ts ? new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
 	// ── Navigation config ────────────────────────────────────────────────────────
 	const ALL_NAV = [
@@ -350,50 +345,97 @@
 		</div>
 	</section>
 
-	<!-- ── FAAB Bonuses ── -->
+	<!-- ── FAAB Adjustments ── -->
 	<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
-		<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1 flex items-center gap-2"><span class="text-amber-400">◆</span>FAAB Bonuses</h2>
+		<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1 flex items-center gap-2"><span class="text-amber-400">◆</span>FAAB Adjustments</h2>
 		<p class="text-sm text-slate-400 mb-4">
-			Award extra FAAB outside Sleeper. Bonuses are added to each team's Sleeper balance on the Keepers page.
+			Grant or dock FAAB outside Sleeper. Each entry is recorded as a transaction the
+			league can see, and the running total is added to that team's balance on the Keepers page.
 		</p>
 
-		<form method="POST" action="?/saveFaabBonuses" use:enhance class="space-y-3">
-			{#each data.rosterList as roster}
-				<div class="flex items-center gap-3">
-					<span class="flex-1 text-sm text-slate-300 truncate">{roster.teamName}</span>
-					<div class="flex items-center gap-1.5">
-						<span class="text-navy-500 text-sm">$</span>
-						<input
-							type="number"
-							name="faab_{roster.rosterId}"
-							min="0"
-							step="1"
-							value={faabBonusFor(roster.rosterId) || ''}
-							oninput={(e) => setFaabBonus(roster.rosterId, (e.target as HTMLInputElement).value)}
-							placeholder="0"
-							class="w-20 bg-navy-800 border border-navy-700 rounded-lg px-2 py-1.5 text-sm text-white
-							       placeholder-navy-500 focus:outline-none focus:border-amber-500 text-right transition-colors"
-						/>
-					</div>
-				</div>
-			{/each}
-
-			{#if data.rosterList.length === 0}
-				<p class="text-sm text-navy-500">No rosters found.</p>
-			{/if}
-
-			<div class="flex items-center gap-4 pt-2">
-				<button
-					type="submit"
-					class="px-4 py-2 text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg transition-colors"
+		<!-- Add an adjustment -->
+		<form method="POST" action="?/addFaab" use:enhance class="flex flex-wrap items-end gap-3 mb-5">
+			<label class="flex flex-col gap-1">
+				<span class="text-[10px] uppercase tracking-widest text-navy-500 font-semibold">Manager</span>
+				<select
+					name="rosterId"
+					required
+					class="bg-navy-800 border border-navy-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500"
 				>
-					Save Bonuses
-				</button>
-				{#if form?.faabSuccess}
-					<span class="text-xs text-green-400">Saved.</span>
-				{/if}
-			</div>
+					<option value="">Select…</option>
+					{#each data.rosterList as roster}
+						<option value={roster.rosterId}>{roster.teamName}</option>
+					{/each}
+				</select>
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-[10px] uppercase tracking-widest text-navy-500 font-semibold">Amount (+/−)</span>
+				<input
+					type="number"
+					name="amount"
+					step="1"
+					required
+					placeholder="e.g. 5 or -3"
+					class="w-28 bg-navy-800 border border-navy-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500 text-right"
+				/>
+			</label>
+			<label class="flex flex-col gap-1 flex-1 min-w-[12rem]">
+				<span class="text-[10px] uppercase tracking-widest text-navy-500 font-semibold">Reason</span>
+				<input
+					type="text"
+					name="reason"
+					required
+					maxlength="120"
+					placeholder="e.g. trade kicker, late lineup penalty"
+					class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500"
+				/>
+			</label>
+			<button
+				type="submit"
+				class="px-4 py-2 text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg transition-colors"
+			>
+				Add
+			</button>
 		</form>
+
+		{#if form?.faabError}
+			<p class="text-sm text-red-400 mb-3">{form.faabError}</p>
+		{/if}
+
+		<!-- Ledger -->
+		{#if data.faabLedger.length === 0}
+			<p class="text-sm text-navy-500">No adjustments yet.</p>
+		{:else}
+			<div class="rounded-lg border border-navy-700 overflow-hidden">
+				<table class="w-full text-sm">
+					<thead>
+						<tr class="bg-navy-900 text-left">
+							<th class="px-3 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider">Manager</th>
+							<th class="px-3 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider text-right">Amount</th>
+							<th class="px-3 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider">Reason</th>
+							<th class="px-3 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider">Date</th>
+							<th class="px-3 py-2"></th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-navy-700/60">
+						{#each data.faabLedger as txn (txn.id)}
+							<tr class="hover:bg-navy-800">
+								<td class="px-3 py-2.5 text-slate-300 font-medium">{teamNameFor(txn.rosterId)}</td>
+								<td class="px-3 py-2.5 text-right font-mono font-bold {txn.amount >= 0 ? 'text-green-400' : 'text-red-400'}">{fmtFaab(txn.amount)}</td>
+								<td class="px-3 py-2.5 text-slate-400">{txn.reason}</td>
+								<td class="px-3 py-2.5 text-navy-500 whitespace-nowrap">{fmtFaabDate(txn.createdAt)}</td>
+								<td class="px-3 py-2.5 text-right">
+									<form method="POST" action="?/deleteFaab" use:enhance>
+										<input type="hidden" name="id" value={txn.id} />
+										<button type="submit" class="text-xs text-navy-500 hover:text-red-400 transition-colors" aria-label="Delete adjustment">✕</button>
+									</form>
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		{/if}
 	</section>
 
 	<!-- ── Blog (Contentful) + Navigation ── -->
