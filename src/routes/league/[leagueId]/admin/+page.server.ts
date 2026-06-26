@@ -95,6 +95,13 @@ export const actions: Actions = {
 		if (!Number.isFinite(amount) || amount === 0) return { faabError: 'Enter a non-zero amount (+ or −).' };
 		if (!reason) return { faabError: 'A reason is required.' };
 
+		// Validate the roster belongs to this league — a crafted POST shouldn't be
+		// able to attach a ledger entry to a phantom team.
+		const rosters = await fetchRosters(params.leagueId).catch(() => []);
+		if (!rosters.some((r) => String(r.roster_id) === rosterId)) {
+			return { faabError: 'Unknown roster for this league.' };
+		}
+
 		const createdBy = locals.user.sleeperUsername ?? locals.user.email ?? 'Commissioner';
 		await addFaabTransaction(params.leagueId, { rosterId, amount, reason, createdBy });
 		return { faabSuccess: true };
@@ -103,7 +110,8 @@ export const actions: Actions = {
 	deleteFaab: async ({ request, params, locals }) => {
 		if (!locals.user?.isAdmin) throw error(403, 'Forbidden');
 		const id = (await request.formData()).get('id') as string;
-		if (id) await deleteFaabTransaction(params.leagueId, id);
+		if (!id) return { faabError: 'Missing transaction id.' };
+		await deleteFaabTransaction(params.leagueId, id);
 		return { faabSuccess: true };
 	},
 

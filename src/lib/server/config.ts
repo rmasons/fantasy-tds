@@ -6,7 +6,7 @@ import { cachedFetch, deleteCache, cacheKey } from '$lib/server/cache';
 // Cache it (off the Firestore hot path) and evict on write. Short TTL bounds
 // cross-write staleness even if an eviction is missed.
 const LEAGUE_CONFIG_TTL_MS = 5 * 60 * 1000;
-const leagueConfigKey = (leagueId: string) => cacheKey('leagueConfigCache', leagueId);
+export const leagueConfigKey = (leagueId: string) => cacheKey('leagueConfigCache', leagueId);
 
 // config/app is read on the anonymous landing page (the redirect to the default
 // league), so an uncached/unhardened read 500s the site entry when Firestore is
@@ -31,6 +31,8 @@ export interface FaabTransaction {
 	createdAt: number;
 	/** display name of the admin who entered it */
 	createdBy: string;
+	/** True for entries synthesized from legacy faabBonuses on first write. */
+	isMigration?: boolean;
 }
 
 export interface LeagueConfig {

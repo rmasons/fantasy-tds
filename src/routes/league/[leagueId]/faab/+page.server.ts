@@ -15,11 +15,12 @@ export const load: PageServerLoad = async ({ params }) => {
 		return { teamName: info?.teamName ?? `Roster ${rosterId}`, avatar: info?.avatar ?? null };
 	};
 
-	// Hide synthesized opening-balance rows from the public ledger — they're a
-	// migration artifact, not a real transaction. Their value still shows in the
-	// per-team net totals below.
+	// Hide synthesized migration rows from the public ledger — they're a migration
+	// artifact, not a real transaction (matched by the isMigration flag, not the
+	// reason text, so a real entry can reuse any wording). Their value still shows
+	// in the per-team net totals below.
 	const ledger = ledgerRaw
-		.filter((t) => t.reason !== 'Opening balance')
+		.filter((t) => !t.isMigration)
 		.map((t) => ({ ...t, ...teamOf(t.rosterId) }));
 
 	const totals = Object.entries(netFromLedger(ledgerRaw))

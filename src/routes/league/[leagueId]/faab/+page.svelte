@@ -4,7 +4,6 @@
 	let { data } = $props<{ data: PageData }>();
 
 	const fmtFaab = (amount: number) => (amount >= 0 ? '+$' : '-$') + Math.abs(amount);
-	const fmtNet = (amount: number) => (amount >= 0 ? '+$' : '-$') + Math.abs(amount);
 	const fmtDate = (ts: number) =>
 		ts ? new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 </script>
@@ -30,7 +29,7 @@
 							<div class="w-7 h-7 rounded-full bg-navy-800 shrink-0 flex items-center justify-center text-sm">🏈</div>
 						{/if}
 						<span class="flex-1 text-sm text-slate-300 truncate">{t.teamName}</span>
-						<span class="font-mono font-bold text-sm {t.net >= 0 ? 'text-green-400' : 'text-red-400'}">{fmtNet(t.net)}</span>
+						<span class="font-mono font-bold text-sm {t.net >= 0 ? 'text-green-400' : 'text-red-400'}">{fmtFaab(t.net)}</span>
 					</div>
 				{/each}
 			</div>

@@ -1,4 +1,6 @@
-import { getLeagueConfig, setLeagueConfig, type FaabTransaction, type LeagueConfig } from '$lib/server/config';
+import { getLeagueConfig, leagueConfigKey, type FaabTransaction, type LeagueConfig } from '$lib/server/config';
+import { adminDb } from '$lib/firebase/admin';
+import { deleteCache } from '$lib/server/cache';
 
 // ── Pure helpers (unit-tested) ────────────────────────────────────────────────
 
@@ -30,6 +32,7 @@ export function resolveLedger(config: LeagueConfig): FaabTransaction[] {
 			reason: 'Opening balance',
 			createdAt: 0,
 			createdBy: 'Migration',
+			isMigration: true,
 		}));
 }
 
@@ -46,20 +49,29 @@ export async function getFaabLedger(leagueId: string): Promise<FaabTransaction[]
 	return sortLedger(resolveLedger(config));
 }
 
-/** Persist a ledger: write the transactions and the derived net map together. */
-async function writeLedger(leagueId: string, txns: FaabTransaction[]): Promise<void> {
-	await setLeagueConfig(leagueId, {
-		faabTransactions: txns,
-		faabBonuses: netFromLedger(txns),
+/**
+ * Atomically mutate the ledger inside a Firestore transaction so concurrent
+ * admin writes can't clobber each other (read-modify-write race). Writes the
+ * transactions and the derived net map together, then evicts the config cache.
+ */
+async function mutateLedger(
+	leagueId: string,
+	mutate: (ledger: FaabTransaction[]) => FaabTransaction[],
+): Promise<void> {
+	const ref = adminDb().collection('leagueConfig').doc(leagueId);
+	await adminDb().runTransaction(async (tx) => {
+		const snap = await tx.get(ref);
+		const config = (snap.exists ? snap.data() : {}) as LeagueConfig;
+		const next = mutate(resolveLedger(config));
+		tx.set(ref, { faabTransactions: next, faabBonuses: netFromLedger(next) }, { merge: true });
 	});
+	await deleteCache(leagueConfigKey(leagueId));
 }
 
 export async function addFaabTransaction(
 	leagueId: string,
 	entry: { rosterId: string; amount: number; reason: string; createdBy: string },
 ): Promise<FaabTransaction> {
-	const config = await getLeagueConfig(leagueId);
-	const ledger = resolveLedger(config); // migrates legacy bonuses on first write
 	const txn: FaabTransaction = {
 		id: crypto.randomUUID(),
 		rosterId: entry.rosterId,
@@ -68,12 +80,11 @@ export async function addFaabTransaction(
 		createdAt: Date.now(),
 		createdBy: entry.createdBy,
 	};
-	await writeLedger(leagueId, [...ledger, txn]);
+	// resolveLedger inside the transaction migrates legacy bonuses on first write.
+	await mutateLedger(leagueId, (ledger) => [...ledger, txn]);
 	return txn;
 }
 
 export async function deleteFaabTransaction(leagueId: string, txnId: string): Promise<void> {
-	const config = await getLeagueConfig(leagueId);
-	const ledger = resolveLedger(config);
-	await writeLedger(leagueId, ledger.filter((t) => t.id !== txnId));
+	await mutateLedger(leagueId, (ledger) => ledger.filter((t) => t.id !== txnId));
 }
