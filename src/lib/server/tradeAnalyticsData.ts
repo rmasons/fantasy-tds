@@ -8,7 +8,10 @@ import { computeTradeAnalytics, aggregateTradeAnalytics } from '$lib/server/trad
 import type { TradeAnalyticsResult } from '$lib/server/tradeAnalytics';
 import type { SlimPlayer } from '$lib/types';
 
-const SCHEMA_VERSION = 2;
+// v3: result shape changed from waiverRoi → waiverSteals/waiverBusts. Bump so
+// old-shape envelopes (incl. completed seasons that cache indefinitely) are not
+// served with empty steals/busts.
+const SCHEMA_VERSION = 3;
 const LIVE_TTL_MS = 15 * 60 * 1000;
 
 async function buildTradeAnalytics(leagueId: string): Promise<TradeAnalyticsResult> {
@@ -99,7 +102,7 @@ export async function getTradeAnalytics(leagueId: string): Promise<TradeAnalytic
 /**
  * All-time trade analytics across the full season chain. Orchestrates the
  * per-season cached results (so the heavy lifting is already memoized) and
- * aggregates them; waiver ROI is combined by owner since roster ids repeat.
+ * aggregates them; waiver steals/busts are pooled across seasons and re-ranked.
  */
 export async function getAllTimeTradeAnalytics(leagueId: string): Promise<TradeAnalyticsResult> {
 	const chain = await getSeasonChain(leagueId).catch(() => []);

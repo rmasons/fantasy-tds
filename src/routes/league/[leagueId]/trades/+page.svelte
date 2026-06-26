@@ -51,7 +51,7 @@
 		}
 	}
 
-	// All-time view: aggregate trades & waiver ROI across every season in the chain.
+	// All-time view: aggregate trades & waiver steals/busts across every season.
 	async function selectAllTime() {
 		if (viewLeagueId === 'all-time') return;
 		viewLeagueId = 'all-time';
@@ -375,7 +375,7 @@
 			</div>
 		{/if}
 
-	<!-- ── WAIVER ROI TAB ─────────────────────────────────────────────────── -->
+	<!-- ── STEALS & BUSTS TAB ─────────────────────────────────────────────── -->
 	{:else if activeTab === 'waiver'}
 		{#if steals.length === 0 && busts.length === 0}
 			<p class="text-navy-500">No waiver data available for this season.</p>
