@@ -11,7 +11,7 @@ import type { SlimPlayer } from '$lib/types';
 // v3: result shape changed from waiverRoi → waiverSteals/waiverBusts. Bump so
 // old-shape envelopes (incl. completed seasons that cache indefinitely) are not
 // served with empty steals/busts.
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const LIVE_TTL_MS = 15 * 60 * 1000;
 
 async function buildTradeAnalytics(leagueId: string): Promise<TradeAnalyticsResult> {

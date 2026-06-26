@@ -76,6 +76,12 @@ export interface TradeAnalyticsResult {
 	waiverSteals: WaiverPickupRow[];
 	/** Worst-value pickups: real FAAB spent for little production. */
 	waiverBusts: WaiverPickupRow[];
+	/**
+	 * Full, uncapped pickup list. The steals/busts above are capped slices; the
+	 * all-time aggregator must pool from this so a season's 13th-worst bust isn't
+	 * silently dropped from the all-time ranking.
+	 */
+	allPickups: WaiverPickupRow[];
 	totalTrades: number;
 	totalWaiverTransactions: number;
 }
@@ -349,6 +355,7 @@ export function computeTradeAnalytics(
 		worstTrade,
 		waiverSteals,
 		waiverBusts,
+		allPickups: pickups,
 		totalTrades: completedTrades.length,
 		totalWaiverTransactions: waiverTxs.length,
 	};
@@ -361,9 +368,10 @@ export function computeTradeAnalytics(
  *
  * - Trades are concatenated (each tagged with its season) and re-sorted newest-first.
  * - Best/worst trade is the single most lopsided deal across every season.
- * - Steals/busts: merging each season's top-N and re-ranking yields the exact
- *   all-time top-N (an all-time top-N pickup is always top-N within its own
- *   season), so we just pool the per-season lists and re-select.
+ * - Steals/busts: pooled from each season's FULL (uncapped) pickup list and
+ *   re-ranked. Pooling the capped per-season top-N would silently drop a
+ *   season's 13th-worst bust that's actually all-time top-N, so we use
+ *   result.allPickups (falling back to the capped lists for legacy/cached data).
  *
  * @param perSeason  results paired with their season label, in any order
  */
@@ -371,7 +379,7 @@ export function aggregateTradeAnalytics(
 	perSeason: Array<{ season: string; result: TradeAnalyticsResult }>,
 ): TradeAnalyticsResult {
 	const allTrades: AnalyzedTrade[] = [];
-	const allPickups: WaiverPickupRow[] = [];
+	const pooledPickups: WaiverPickupRow[] = [];
 	let totalTrades = 0;
 	let totalWaiverTransactions = 0;
 
@@ -380,17 +388,18 @@ export function aggregateTradeAnalytics(
 		totalTrades += result.totalTrades;
 		totalWaiverTransactions += result.totalWaiverTransactions;
 		for (const t of result.trades) allTrades.push({ ...t, season });
-		// A pickup can appear in both a season's steals and busts on tiny datasets;
-		// dedupe so it isn't double-counted in the pooled re-ranking.
-		for (const p of [...result.waiverSteals, ...result.waiverBusts]) {
+		// Prefer the full pickup list; older cached results only have the capped
+		// steals/busts, so fall back to those (deduped) for backward compatibility.
+		const source = result.allPickups ?? [...result.waiverSteals, ...result.waiverBusts];
+		for (const p of source) {
 			const k = `${season}_${p.playerId}_${p.rosterId}`;
 			if (seenPickup.has(k)) continue;
 			seenPickup.add(k);
-			allPickups.push({ ...p, season });
+			pooledPickups.push({ ...p, season });
 		}
 	}
 
-	const { steals: waiverSteals, busts: waiverBusts } = selectStealsAndBusts(allPickups);
+	const { steals: waiverSteals, busts: waiverBusts } = selectStealsAndBusts(pooledPickups);
 
 	const tradesSorted = [...allTrades].sort((a, b) => b.date - a.date);
 	const byImbalance = allTrades
@@ -404,6 +413,7 @@ export function aggregateTradeAnalytics(
 		worstTrade: bestTrade,
 		waiverSteals,
 		waiverBusts,
+		allPickups: pooledPickups,
 		totalTrades,
 		totalWaiverTransactions,
 	};
