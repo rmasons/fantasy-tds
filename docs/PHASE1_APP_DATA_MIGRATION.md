@@ -16,6 +16,7 @@ relief + retire several bespoke workarounds, on a small, contained surface.
 | `leagueConfig.faabTransactions[]` | `faab_transactions` (own table) | `faab.ts` |
 | `users/{uid}` | `users` | `user.ts` (+ layout, blog comments) |
 | `managerProfiles/{sleeperId}` | `manager_profiles` | `managerProfile.ts` |
+| `managerProfiles/.../leagues/*` | `manager_league_profiles` | `managerProfile.ts` |
 | `keeperSelections/{lg}/managers/{uid}` | `keeper_selections` | `keepers.ts` |
 | `keeperData/{lg}/players/{pid}` (overrides) | `keeper_overrides` | `keepers.ts` |
 | `superlativeHistory/*` | `superlatives` | `superlatives.ts` + API |
@@ -31,16 +32,28 @@ reads draft history from Firestore — a temporary cross-store read, fine.
 
 ## Stack
 
-- **Target:** Supabase or Neon Postgres (pick per the storage doc).
-- **Access:** **Drizzle ORM** — TS schema you own, generated SQL migrations, typed
-  queries; self-manageable with `drizzle-kit`. (Plain `postgres`/SQL is fine too.)
-- **Driver:** Neon → `@neondatabase/serverless` + `drizzle-orm/neon-http` (HTTP,
-  no pooled-connection exhaustion on Vercel). Supabase → `postgres` (porsager) via
-  the **transaction pooler** connection string.
-- **Env:** `DATABASE_URL` per environment (prod vs preview/staging — maps onto the
-  Vercel env-var plan).
-- **Migrations:** `drizzle/` folder committed; you run `drizzle-kit generate` +
-  `migrate` yourself.
+- **Target:** an **always-warm, portable** managed Postgres — leaning **Crunchy
+  Bridge (~$10/mo flat)**; Supabase Pro / Neon-paid are alternatives. See the host
+  shortlist in [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md#host-shortlist-for-the-1gb-target).
+- **Web stays serverless (Vercel).** The cold-start concern was the DB, not the web
+  tier — so this phase keeps the serverless web and only moves *data*.
+- **Access:** **Drizzle ORM** owns `app.*` (the web app is the only writer of these
+  tables) — TS schema you own, generated SQL migrations, typed queries, self-manageable
+  with `drizzle-kit`. (Plain `postgres`/SQL is fine too.)
+- **Driver / pooling:** serverless functions open many short-lived connections, so use
+  the host's **pooled connection string** (PgBouncer / transaction pooler) via
+  `postgres` (porsager) + `drizzle-orm/postgres-js`. This is the one serverless wrinkle
+  the always-warm DB doesn't remove — but every managed host hands you a pooled
+  endpoint for exactly this.
+- **Env:** `DATABASE_URL` per environment (prod vs preview/staging) as Vercel env vars.
+- **Migrations:** `drizzle/` folder committed; run `drizzle-kit generate` + `migrate`
+  yourself (wire into CI per environment before cutover).
+
+> **Schema ownership (looking ahead to Python ingestion):** Drizzle owns `app.*` only.
+> The future Sleeper-history schema `sleeper.*` is written by the **Python** ingestion
+> service and owns its own SQL migrations; the web app reads it read-only via
+> introspected types. See [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md#schema-ownership-python-changes-this).
+> This is why Drizzle is *not* the single migration source for the whole DB.
 
 ## Schema (DDL)
 
@@ -99,8 +112,14 @@ create table manager_profiles (
   preferred_contact  text,
   updated_at         timestamptz not null default now()
 );
--- include manager_league_profiles(league_id, sleeper_user_id, …) only if
--- upsertManagerLeagueProfile is actually in use — confirm before adding.
+-- confirmed in use (settings/profile, api/profile/*) — include it:
+create table manager_league_profiles (
+  sleeper_user_id text not null,
+  league_id       text not null,
+  joined_year     integer,
+  updated_at      timestamptz not null default now(),
+  primary key (sleeper_user_id, league_id)
+);
 
 create table keeper_selections (
   league_id     text not null,
@@ -119,10 +138,14 @@ create table keeper_overrides (
   primary key (league_id, player_id)
 );
 
+-- Firestore today: superlativeHistory/{lg} = { seasons: { "2024": { awardKey:
+-- {ownerId?, teamName?, stat, sub?} } } }. jsonb per (league, season) preserves the
+-- merge-by-season write semantics exactly; the previous_league_id read-fallback
+-- stays in the route. Normalize to (league, season, award_key) only if ever needed.
 create table superlatives (
   league_id  text not null,
   season     text not null,
-  data       jsonb not null,            -- computed award set (flexible; normalize later if needed)
+  data       jsonb not null,            -- the awards map for that season
   updated_at timestamptz not null default now(),
   primary key (league_id, season)
 );
@@ -175,6 +198,18 @@ create table faab_eggs (
      → `keeper_selections`.
 3. Print row counts per table; spot-check a league against Firestore.
 
+## Before cutover — operational pillars
+
+You're giving up Firestore's managed durability, so add these *first*:
+
+1. **DB backups + a tested restore.** Confirm the host's automated daily backups
+   (PITR ideally) and actually run one restore so you know it works. Highest priority.
+2. **Migrations in CI.** Run `drizzle-kit migrate` automatically per environment
+   (dev → test → main), in order, idempotently — otherwise the three environments drift.
+3. **Error + memory observability.** Sentry free tier or structured logs + alerts.
+4. **Isolated staging Postgres.** The `test` environment must point at a *separate*
+   staging DB, never prod, before any migration script runs against it.
+
 ## Cutover & rollback
 
 1. Create schema in the **staging** DB; run the migration against a Firestore export.
@@ -192,6 +227,6 @@ create table faab_eggs (
 
 ## Effort
 
-~8 tables, ~7 modules, 1 migration script — contained because storage already sits
+~10 tables, ~7 modules, 1 migration script — contained because storage already sits
 behind these modules. Net code **shrinks** (the FAAB net-sync, egg transaction, and
 keeper-cost cache plumbing all simplify).
