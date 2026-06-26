@@ -95,14 +95,53 @@ stuff, and this app's value is the historical/analytics layer Sleeper doesn't ha
   re-pulling the most recent week until it settles (~Wed), then set `is_final` and
   freeze it. A flag + date check, no infrastructure.
 
+## Near-real-time without a live poller: DB history + live current week
+
+We don't need an active live poller (live in-game scoring is out of scope). Instead,
+for each Sleeper data type, **read immutable history from the DB and the mutable
+"current" slice live from Sleeper (short read-through cache), then concatenate.** The
+live fetch is *passive* — it happens on page load and is cached, not on a tight cron —
+so freshness is bounded by the cache TTL with zero extra scheduling.
+
+The rule:
+
+- **Immutable past → DB** (ingested once, never re-read).
+- **Mutable current → live Sleeper, cached** (one cheap call; TTL by urgency).
+- **Concatenate** for the full picture; derived analytics consume the combined stream.
+
+| Data | Past (DB) | Current (live, cached) | Finalize → DB when |
+|---|---|---|---|
+| Transactions | weeks `< current` | current week, ~10 min | week rolls over (settle immediately) |
+| Matchups / scores | finalized weeks | current week, ~30–60 min | ~2 days after games (stat corrections) |
+| Standings / records / power rankings | from DB matchups | + current-week matchups | inherits matchups |
+| Rosters (current state) | final snapshot per past season | live, ~15 min (no week dimension on Sleeper) | season ends |
+| Drafts / picks | after the draft completes | live pre/mid-draft | draft `status = complete` |
+| League meta / users | — | live, ~hourly (rarely changes) | n/a — just refresh |
+| `nfl_state` | — | live, ~hourly | n/a |
+
+Notes:
+
+- **Transactions vs scores finalize differently:** a waiver/trade is never revised, so
+  a week's transactions are final at rollover; scores get revised for ~2 days, so a
+  matchup week is final ~Wed. Two different `is_final` triggers.
+- Single Sleeper call per current-slice per league, cached in Upstash — so cost is
+  ~one call per TTL per league regardless of traffic.
+- Derived features (trade analytics, superlatives, standings) get a current-season
+  view "for free" by combining DB past-weeks + the live current week — no special cases.
+- This makes the **daily cron's only job "finalize"**: ingest the newly-immutable
+  week(s) into the DB so they drop out of the live path. No sub-daily scheduling needed.
+
 ## App changes
 
 - The `getCached*` modules (`sleeperCache`, `standings`, `matchups`,
-  `transactions`, `tradeAnalyticsData`, …) collapse into SQL queries.
+  `transactions`, `tradeAnalyticsData`, …) become **"DB for finalized weeks +
+  one live Sleeper call for the current week"** (per the table above), then hand the
+  combined rows on. Past seasons are pure DB.
 - The pure engines (`tradeAnalytics`, `superlativesEngine`, etc.) keep working —
-  feed them DB rows instead of Sleeper fetches, so the well-tested logic is reused.
-- Drop the read-through Redis cache for these (the DB is the warm store); keep
-  Upstash for rate-limiting and any remaining hot caching.
+  feed them the concatenated rows instead of raw Sleeper fetches, so the well-tested
+  logic is reused unchanged.
+- Drop the read-through Redis cache for *finalized* data (the DB is the warm store);
+  keep a short Upstash cache on the **current-week live reads** and on rate-limiting.
 
 ## Phased rollout
 
