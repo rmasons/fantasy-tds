@@ -45,10 +45,9 @@ export const GET: RequestHandler = async ({ params, url }) => {
 						week = w;
 						break;
 					}
-					// Week exists but has no scores yet — could be a future week;
-					// keep searching backward.
+					// Matchup slots exist but scores are still 0 → this is the current
+					// (or upcoming) week with games not yet played. Use it and stop.
 					if (data && data.length > 0) {
-						// matchup slots exist but scores are 0 → this is the current or future week
 						week = w;
 						break;
 					}

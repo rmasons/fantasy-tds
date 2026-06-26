@@ -31,6 +31,7 @@
 		if (lid === data.leagueId) {
 			analytics = data.analytics;
 			error = data.loadFailed ? 'Failed to load trade analytics.' : '';
+			loading = false; // clear any spinner left over from an in-flight season fetch
 			return;
 		}
 

@@ -162,8 +162,10 @@ export function buildDigestItem(
 				signals.push('lopsided_series');
 				const domName = dominant === 'one' ? one.teamName : two.teamName;
 				const domWins = dominant === 'one' ? record.wins.one : record.wins.two;
+				const domLosses = totalMatchups - domWins - record.ties;
+				const domRecord = `${domWins}–${domLosses}${record.ties > 0 ? `–${record.ties}` : ''}`;
 				if (!headline) {
-					headline = `${domName} dominates ${totalMatchups > 0 ? domWins + '–' + (totalMatchups - domWins - record.ties) : ''} all-time`;
+					headline = `${domName} dominates ${domRecord} all-time`;
 					subline = `${(Math.max(winRateOne, winRateTwo) * 100).toFixed(0)}% win rate`;
 				}
 			} else if (totalMatchups >= 5) {
