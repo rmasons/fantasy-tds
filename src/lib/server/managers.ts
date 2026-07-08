@@ -1,7 +1,9 @@
 import { cachedFetch, cacheKey } from '$lib/server/cache';
 import { fetchRosters, fetchUsers, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
+import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 
-const SCHEMA_VERSION = 1;
+// v2: team names now respect manager display-name overrides (like every other view).
+const SCHEMA_VERSION = 2;
 const TTL_MS = 15 * 60 * 1000;
 
 export interface ManagerCard {
@@ -17,7 +19,12 @@ export interface ManagerCard {
 
 async function buildManagers(leagueId: string): Promise<ManagerCard[]> {
 	const [rosters, users] = await Promise.all([fetchRosters(leagueId), fetchUsers(leagueId)]);
-	const rosterInfo = buildRosterInfoMap(rosters, users);
+
+	const profiles = await getManagerProfilesBatch(rosters.map((r) => r.owner_id).filter(Boolean));
+	const overrides = new Map<string, string>();
+	for (const [uid, p] of profiles) if (p.displayName) overrides.set(uid, p.displayName);
+
+	const rosterInfo = buildRosterInfoMap(rosters, users, overrides);
 
 	return rosters
 		.filter((r) => r.owner_id)

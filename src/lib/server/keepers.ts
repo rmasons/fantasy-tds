@@ -1,5 +1,6 @@
 import { adminDb } from '$lib/firebase/admin';
 import { avatarUrl } from '$lib/sleeper';
+import { roundToBaseCost, calcKeeperCost } from '$lib/keeperCost';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 import { getLeagueConfig } from '$lib/server/config';
 import { getPlayers } from '$lib/server/players';
@@ -34,15 +35,6 @@ export interface KeeperRosterData {
 
 interface DraftPick { round: number; season: string }
 interface KeeperOverride { yearsKept?: number; baseOverride?: number | null }
-
-function roundToBaseCost(round: number): number {
-	return Math.max(5, 80 - 5 * round); // R1=$75, R2=$70 …
-}
-
-function calcKeeperCost(baseCost: number, yearsKept: number): number {
-	const effective = baseCost < 1 ? 5 : baseCost;
-	return Math.ceil(effective * (1 + (0.2 * (yearsKept + 1))));
-}
 
 async function sleeperGet<T>(path: string): Promise<T> {
 	const res = await fetch(`https://api.sleeper.app/v1${path}`, { signal: AbortSignal.timeout(5000) });
