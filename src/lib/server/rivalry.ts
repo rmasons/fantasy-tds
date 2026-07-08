@@ -4,7 +4,9 @@ import { getCachedMatchups } from '$lib/server/sleeperCache';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 import type { SleeperLeague, SleeperRoster } from '$lib/types';
 
-const SCHEMA_VERSION = 1;
+// v2: 0–0 (unplayed) matchups are no longer counted as ties — invalidate older
+// cached results that may include them.
+const SCHEMA_VERSION = 2;
 const TTL_MS = 15 * 60 * 1000;
 
 export interface ManagerOption {
@@ -77,8 +79,11 @@ async function buildRivalry(leagueId: string, oneId: string, twoId: string): Pro
 			const playoffStart = league.settings?.playoff_week_start ?? 15;
 			const weekNums = Array.from({ length: playoffStart - 1 }, (_, i) => i + 1);
 			const cid = curId;
+			// Only the route league mid-season needs live scores; once complete its
+			// weeks are as immutable as any past season's.
+			const live = isCurrentSeason && league.status !== 'complete';
 			const weekData = await Promise.all(
-				weekNums.map((w) => (isCurrentSeason ? fetchMatchups(cid, w) : getCachedMatchups(cid, w)))
+				weekNums.map((w) => (live ? fetchMatchups(cid, w) : getCachedMatchups(cid, w)))
 			);
 
 			for (let i = 0; i < weekData.length; i++) {
@@ -97,6 +102,11 @@ async function buildRivalry(leagueId: string, oneId: string, twoId: string): Pro
 						if (pair[0].roster_id !== rOne) pair.reverse();
 						const ptsOne = pair[0].points ?? 0;
 						const ptsTwo = pair[1].points ?? 0;
+
+						// 0–0 means scheduled-but-unplayed (Sleeper publishes future
+						// weeks with zero scores) — not a real tie. Skip it, matching
+						// how the records + superlatives engines treat 0–0 pairs.
+						if (ptsOne === 0 && ptsTwo === 0) continue;
 
 						result.points.one += ptsOne;
 						result.points.two += ptsTwo;

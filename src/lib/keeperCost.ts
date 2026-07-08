@@ -1,9 +1,9 @@
 /**
  * Pure keeper cost calculations — no DB, no network.
  *
- * These functions mirror the formulas in src/lib/server/keepers.ts exactly.
- * They are extracted here so the scenario builder (and tests) can price
- * hypothetical keeper sets purely on the client, with data already loaded.
+ * Single source of truth for the pricing formulas: the server keeper builder
+ * (src/lib/server/keepers.ts) imports them, and the scenario builder (and
+ * tests) can price hypothetical keeper sets purely on the client.
  */
 
 /** Draft round → base FAAB cost. R1=$75, R2=$70, … floor at $5. */
