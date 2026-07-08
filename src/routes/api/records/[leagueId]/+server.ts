@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { fetchLeagueCore, fetchNflState, fetchMatchups, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
+import { fetchLeagueCore, fetchNflState, buildRosterInfoMap, combineFpts } from '$lib/sleeper';
+import { getCachedMatchups } from '$lib/server/sleeperCache';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 import { validateLeagueId } from '$lib/server/leagueId';
 import { cachedFetch, cacheKey } from '$lib/server/cache';
@@ -61,7 +62,9 @@ async function buildRecords(leagueId: string): Promise<SeasonRecords> {
 
 	if (completedWeeks > 0) {
 		const weekNums = Array.from({ length: completedWeeks }, (_, i) => i + 1);
-		const weekData = await Promise.all(weekNums.map(w => fetchMatchups(leagueId, w)));
+		// Only completed weeks are read here, and those are immutable — serve them
+		// from the shared matchup cache instead of re-hitting Sleeper every rebuild.
+		const weekData = await Promise.all(weekNums.map(w => getCachedMatchups(leagueId, w)));
 
 		for (let wi = 0; wi < weekData.length; wi++) {
 			const week = wi + 1;
