@@ -34,6 +34,8 @@ export interface SleeperLeague {
 		waiver_budget?: number; // total FAAB budget per team
 		max_keepers?: number;   // Sleeper's keeper cap per team (preferred)
 		num_keepers?: number;   // legacy/alternate keeper-count field
+		leg?: number;            // current week the league is on
+		last_scored_leg?: number; // last week Sleeper has fully scored
 	};
 	avatar: string | null;
 }

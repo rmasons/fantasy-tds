@@ -20,5 +20,8 @@ export const load: LayoutServerLoad = async ({ locals, params }) => {
 		leagueAvatar: league?.avatar ? `https://sleepercdn.com/avatars/${league.avatar}` : null,
 		hasBlog: !!(leagueConfig.contentfulSpaceId && leagueConfig.contentfulAccessToken),
 		enabledNavItems: leagueConfig.enabledNavItems ?? null,
+		// Absent ruleset ⇒ classic. Drives the "Tiers" nav link and is otherwise
+		// inert — the existing fantasy-tds league never sets this field.
+		isPremier: leagueConfig.ruleset === 'premier',
 	};
 };
