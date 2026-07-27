@@ -1,6 +1,8 @@
 import { adminDb } from '$lib/firebase/admin';
 import { avatarUrl } from '$lib/sleeper';
 import { roundToBaseCost, calcKeeperCost } from '$lib/keeperCost';
+import { resolveKeeperHistory } from '$lib/keeperHistory';
+import type { DraftHistory } from '$lib/keeperHistory';
 import { getManagerProfilesBatch } from '$lib/server/managerProfile';
 import { getLeagueConfig } from '$lib/server/config';
 import { getPlayers } from '$lib/server/players';
@@ -16,6 +18,8 @@ export interface KeeperPlayerData {
 	ownerName: string;
 	draftRound: number | null;
 	draftSeason: string | null;
+	/** Season the player was acquired (drafted, or added off waivers/FA). */
+	acquiredSeason: string | null;
 	baseOverride: number | null;
 	baseCost: number;
 	yearsKept: number;
@@ -33,7 +37,6 @@ export interface KeeperRosterData {
 	faabRemaining: number;
 }
 
-interface DraftPick { round: number; season: string }
 interface KeeperOverride { yearsKept?: number; baseOverride?: number | null }
 
 async function sleeperGet<T>(path: string): Promise<T> {
@@ -42,8 +45,14 @@ async function sleeperGet<T>(path: string): Promise<T> {
 	return res.json();
 }
 
-async function walkDraftHistory(startLeagueId: string): Promise<Map<string, DraftPick>> {
-	const result = new Map<string, DraftPick>();
+/**
+ * Walk the league lineage newest → oldest and record every draft pick, keyed by
+ * season. Keeper picks are kept, not skipped: `is_keeper` is the only hard
+ * evidence that a player was held over, and resolveKeeperHistory needs it to
+ * count keeper years. See src/lib/keeperHistory.ts for the reasoning.
+ */
+async function walkDraftHistory(startLeagueId: string): Promise<DraftHistory> {
+	const result: DraftHistory = {};
 	let currentId: string | null = startLeagueId;
 
 	while (currentId && currentId !== '0') {
@@ -61,14 +70,24 @@ async function walkDraftHistory(startLeagueId: string): Promise<Map<string, Draf
 			try { picks = await sleeperGet<SleeperDraftPick[]>(`/draft/${draft.draft_id}/picks`); }
 			catch { continue; }
 
+			// Only mark the season as covered once a draft actually loaded, so a
+			// failed fetch leaves a hole rather than an empty season that would
+			// read as "nobody was kept that year".
+			const bySeason = (result[season] ??= {});
+
 			for (const pick of (picks ?? [])) {
-				// Skip keeper picks — they appear in the draft but are carries from prior years.
-				// We want the original non-keeper draft (the true base cost and draft year).
-				// Walking newest → oldest means first non-keeper occurrence = most recent fresh draft.
-				if (pick.is_keeper === true) continue;
-				if (pick.player_id && !result.has(pick.player_id)) {
-					result.set(pick.player_id, { round: pick.round, season });
-				}
+				if (!pick.player_id) continue;
+				const isKeeper = pick.is_keeper === true;
+				const existing = bySeason[pick.player_id];
+				// A season can host more than one draft (e.g. a rookie draft). Keep
+				// the first pick seen, but let a real draft pick displace a keeper
+				// entry — the ordinary pick is what anchors base cost.
+				if (existing && !(existing.isKeeper && !isKeeper)) continue;
+				bySeason[pick.player_id] = {
+					round: pick.round,
+					isKeeper,
+					rosterId: pick.roster_id ?? null,
+				};
 			}
 		}
 
@@ -79,27 +98,31 @@ async function walkDraftHistory(startLeagueId: string): Promise<Map<string, Draf
 }
 
 // Bump when walk logic changes — forces a rebuild of any existing stored history.
-const DRAFT_HISTORY_SCHEMA_VERSION = 2;
+const DRAFT_HISTORY_SCHEMA_VERSION = 3;
 
-async function getCachedDraftHistory(leagueId: string): Promise<Map<string, DraftPick>> {
+async function getCachedDraftHistory(leagueId: string): Promise<DraftHistory> {
 	const ref = adminDb().collection('keeperDraftHistory').doc(leagueId);
 	try {
 		const doc = await ref.get();
 		if (doc.exists) {
 			const stored = doc.data()!;
 			if (stored.schemaVersion === DRAFT_HISTORY_SCHEMA_VERSION) {
-				return new Map(Object.entries(stored.data as Record<string, DraftPick>));
+				return stored.data as DraftHistory;
 			}
 			// Schema mismatch — fall through to re-walk
 		}
 	} catch { /* miss */ }
 
 	const history = await walkDraftHistory(leagueId);
-	ref.set({
-		schemaVersion: DRAFT_HISTORY_SCHEMA_VERSION,
-		walkedAt: new Date().toISOString(),
-		data: Object.fromEntries(history),
-	}).catch(e => console.error('[keepers] Failed to write draft history:', e));
+	// Never cache an empty walk — that only happens when Sleeper was unreachable,
+	// and persisting it would freeze every player at "never kept".
+	if (Object.keys(history).length > 0) {
+		ref.set({
+			schemaVersion: DRAFT_HISTORY_SCHEMA_VERSION,
+			walkedAt: new Date().toISOString(),
+			data: history,
+		}).catch(e => console.error('[keepers] Failed to write draft history:', e));
+	}
 	return history;
 }
 
@@ -122,9 +145,11 @@ export async function getKeeperData(leagueId: string): Promise<{
 		sleeperGet<SleeperLeagueUser[]>(`/league/${leagueId}/users`),
 	]);
 
-	// league.season is the season currently being built — keepers are held for this year.
-	// A player drafted in (season - 1) is in their first year kept.
+	// league.season is the season currently being built — keepers are held for this
+	// year. Keeper years are counted back from (season - 1) using Sleeper's
+	// `is_keeper` flags, not guessed from the gap since a player's draft.
 	const planningYear = league.season as string;
+	const planningYearNum = parseInt(planningYear, 10);
 	const faabBudget: number = league.settings?.waiver_budget ?? 100;
 	// Sleeper exposes the keeper cap as `max_keepers`; fall back to the legacy
 	// `num_keepers` field if a league only has that set.
@@ -168,18 +193,14 @@ export async function getKeeperData(leagueId: string): Promise<{
 
 		for (const playerId of (roster.players ?? [])) {
 			const p = playersCache[playerId];
-			const draftInfo = draftHistory.get(playerId);
+			const history = resolveKeeperHistory(draftHistory, playerId, planningYearNum);
 			const ov = overrides.get(playerId);
 
 			const yearsKeptOverridden = ov?.yearsKept !== undefined;
-			const yearsKept = yearsKeptOverridden
-				? ov!.yearsKept!
-				: draftInfo
-					? parseInt(planningYear, 10) - parseInt(draftInfo.season, 10)
-					: 0;
+			const yearsKept = yearsKeptOverridden ? ov!.yearsKept! : history.yearsKept;
 
-			const draftRound = draftInfo?.round ?? null;
-			const draftSeason = draftInfo?.season ?? null;
+			const draftRound = history.draftRound;
+			const draftSeason = history.draftSeason;
 			const baseOverride = ov?.baseOverride ?? null;
 			const baseCost = baseOverride !== null
 				? baseOverride
@@ -199,6 +220,7 @@ export async function getKeeperData(leagueId: string): Promise<{
 				ownerName,
 				draftRound,
 				draftSeason,
+				acquiredSeason: history.acquiredSeason,
 				baseOverride,
 				baseCost,
 				yearsKept,

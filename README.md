@@ -14,6 +14,8 @@ Every major page lets you browse any past season. Standings, matchups, power ran
 ### Keepers cost calculator & planner
 Prices every rostered player automatically based on the round they were originally drafted, how many years they've been kept, and your league's cost formula (keeper cap read from Sleeper's `max_keepers`). Admins can override base cost or years kept per player. A **scenario planner** lets managers toggle hypothetical keepers and see live cost / cap / budget impact before the draft.
 
+Keeper years come from Sleeper's `is_keeper` draft flags, counted back season by season from the planning year — so a waiver pickup who was kept is priced as a keeper, and a player drafted years ago but since dropped and re-added starts over. Base cost is anchored to the draft that began the current keeper streak; players added off waivers/FA floor at $5. Run `node scripts/explain-keeper.mjs <leagueId> "Player Name"` to see the full trail for any rostered player.
+
 ### Trade & waiver analytics
 A `/trades` page surfacing season and all-time insight from full transaction history: the most lopsided **trades** (draft-pick trades excluded, since a pick isn't a measurable point loss), and waiver-wire **Biggest Steals & FAAB Busts** (best- and worst-value pickups by starter points scored after acquisition).
 
