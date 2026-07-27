@@ -531,6 +531,10 @@
 											<span class="text-xs text-slate-700 leading-none">
 												R{player.draftRound} · {player.draftSeason}
 											</span>
+										{:else if player.acquiredSeason}
+											<span class="text-xs text-slate-700 leading-none" title="Undrafted — added off waivers/FA">
+												FA · {player.acquiredSeason}
+											</span>
 										{:else}
 											<span></span>
 										{/if}
