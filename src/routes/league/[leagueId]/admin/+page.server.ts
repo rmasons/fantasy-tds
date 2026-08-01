@@ -2,7 +2,7 @@ import { redirect, error } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getLeagueConfig, setLeagueConfig, deleteLeagueConfig } from '$lib/server/config';
 import { getFaabLedger, addFaabTransaction, deleteFaabTransaction } from '$lib/server/faab';
-import { getKeeperSelectionsView } from '$lib/server/keepers';
+import { getPlayers } from '$lib/server/players';
 import { fetchRosters, fetchUsers, buildRosterInfoMap } from '$lib/sleeper';
 import { adminDb } from '$lib/firebase/admin';
 import { TOTAL_EGGS } from '$lib/eggs';
@@ -29,15 +29,15 @@ const VALID_NAV_ITEMS = new Set([
 export const load: PageServerLoad = async ({ locals, params }) => {
 	if (!locals.user?.isAdmin) throw redirect(303, `/league/${params.leagueId}`);
 
-	const [cfg, rosters, users, eggProgress, faabLedger, keeperSelectionViews] = await Promise.all([
+	const [cfg, rosters, users, eggProgress, faabLedger, players] = await Promise.all([
 		getLeagueConfig(params.leagueId),
 		fetchRosters(params.leagueId).catch(() => []),
 		fetchUsers(params.leagueId).catch(() => []),
 		getEggProgress(params.leagueId),
 		getFaabLedger(params.leagueId).catch(() => []),
-		getKeeperSelectionsView(params.leagueId).catch((e) => {
-			console.error('[admin] failed to load keeper selections for', params.leagueId, e);
-			return [];
+		getPlayers().catch((e) => {
+			console.error('[admin] failed to load players for', params.leagueId, e);
+			return {} as Awaited<ReturnType<typeof getPlayers>>;
 		}),
 	]);
 
@@ -49,28 +49,38 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		}))
 		.sort((a: any, b: any) => a.teamName.localeCompare(b.teamName));
 
-	// Join each roster with its submitted keeper selection (if any) so the panel
-	// shows every manager — including those who haven't picked yet.
-	const selByRoster = new Map(keeperSelectionViews.map((s) => [String(s.rosterId), s]));
-	const keeperSelections = rosterList.map((r: { rosterId: string; teamName: string }) => {
-		const sel = selByRoster.get(r.rosterId);
-		return {
-			rosterId: r.rosterId,
-			teamName: r.teamName,
-			submitted: !!sel,
-			submittedAt: sel?.submittedAt ?? null,
-			players: sel?.players ?? [],
-		};
-	});
-	const keeperSubmittedCount = keeperSelections.filter((k) => k.submitted).length;
+	// Read the keepers designated on each Sleeper roster (the same `keepers` array
+	// the draft planner uses), resolving each player id to a name/pos/team. Teams
+	// with an empty array simply haven't designated keepers yet.
+	const POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+	const posRank = (pos: string) => {
+		const i = POS_ORDER.indexOf(pos);
+		return i === -1 ? POS_ORDER.length : i;
+	};
+	const keeperTeams = rosters
+		.map((r: any) => {
+			const keeperPlayers = (r.keepers ?? [])
+				.map((pid: string) => {
+					const p = players[pid];
+					return { playerId: pid, name: p?.name ?? pid, pos: p?.pos ?? '?', team: p?.team ?? 'FA' };
+				})
+				.sort((a: any, b: any) => posRank(a.pos) - posRank(b.pos) || a.name.localeCompare(b.name));
+			return {
+				rosterId: String(r.roster_id),
+				teamName: infoMap.get(r.roster_id)?.teamName ?? `Roster ${r.roster_id}`,
+				players: keeperPlayers,
+			};
+		})
+		.sort((a: any, b: any) => a.teamName.localeCompare(b.teamName));
+	const keeperDesignatedCount = keeperTeams.filter((k: { players: unknown[] }) => k.players.length > 0).length;
 
 	return {
 		user: locals.user,
 		rosterList,
 		eggProgress,
 		faabLedger,
-		keeperSelections,
-		keeperSubmittedCount,
+		keeperTeams,
+		keeperDesignatedCount,
 		leagueConfig: {
 			contentfulSpaceId: cfg.contentfulSpaceId,
 			hasAccessToken: !!cfg.contentfulAccessToken,
