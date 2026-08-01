@@ -282,3 +282,34 @@ export function clearKeeperSelection(leagueId: string, ownerUserId: string) {
 		.doc(ownerUserId)
 		.delete();
 }
+
+export interface KeeperSelectionPlayer {
+	playerId: string;
+	name: string;
+	pos: string;
+	team: string;
+}
+
+export interface KeeperSelectionView extends KeeperSelection {
+	players: KeeperSelectionPlayer[];
+}
+
+/**
+ * Keeper selections with each stored playerId resolved to a name/pos/team, so a
+ * commissioner can read who kept whom without cross-referencing Sleeper IDs.
+ * Players missing from the active-player snapshot fall back to their raw id,
+ * matching getKeeperData's behaviour.
+ */
+export async function getKeeperSelectionsView(leagueId: string): Promise<KeeperSelectionView[]> {
+	const [selections, players] = await Promise.all([
+		getKeeperSelections(leagueId),
+		getPlayers(),
+	]);
+	return selections.map((s) => ({
+		...s,
+		players: s.playerIds.map((pid) => {
+			const p = players[pid];
+			return { playerId: pid, name: p?.name ?? pid, pos: p?.pos ?? '?', team: p?.team ?? 'FA' };
+		}),
+	}));
+}

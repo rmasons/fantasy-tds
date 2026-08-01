@@ -2,6 +2,7 @@ import { redirect, error } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getLeagueConfig, setLeagueConfig, deleteLeagueConfig } from '$lib/server/config';
 import { getFaabLedger, addFaabTransaction, deleteFaabTransaction } from '$lib/server/faab';
+import { getKeeperSelectionsView } from '$lib/server/keepers';
 import { fetchRosters, fetchUsers, buildRosterInfoMap } from '$lib/sleeper';
 import { adminDb } from '$lib/firebase/admin';
 import { TOTAL_EGGS } from '$lib/eggs';
@@ -28,12 +29,16 @@ const VALID_NAV_ITEMS = new Set([
 export const load: PageServerLoad = async ({ locals, params }) => {
 	if (!locals.user?.isAdmin) throw redirect(303, `/league/${params.leagueId}`);
 
-	const [cfg, rosters, users, eggProgress, faabLedger] = await Promise.all([
+	const [cfg, rosters, users, eggProgress, faabLedger, keeperSelectionViews] = await Promise.all([
 		getLeagueConfig(params.leagueId),
 		fetchRosters(params.leagueId).catch(() => []),
 		fetchUsers(params.leagueId).catch(() => []),
 		getEggProgress(params.leagueId),
 		getFaabLedger(params.leagueId).catch(() => []),
+		getKeeperSelectionsView(params.leagueId).catch((e) => {
+			console.error('[admin] failed to load keeper selections for', params.leagueId, e);
+			return [];
+		}),
 	]);
 
 	const infoMap = buildRosterInfoMap(rosters, users);
@@ -44,11 +49,28 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		}))
 		.sort((a: any, b: any) => a.teamName.localeCompare(b.teamName));
 
+	// Join each roster with its submitted keeper selection (if any) so the panel
+	// shows every manager — including those who haven't picked yet.
+	const selByRoster = new Map(keeperSelectionViews.map((s) => [String(s.rosterId), s]));
+	const keeperSelections = rosterList.map((r: { rosterId: string; teamName: string }) => {
+		const sel = selByRoster.get(r.rosterId);
+		return {
+			rosterId: r.rosterId,
+			teamName: r.teamName,
+			submitted: !!sel,
+			submittedAt: sel?.submittedAt ?? null,
+			players: sel?.players ?? [],
+		};
+	});
+	const keeperSubmittedCount = keeperSelections.filter((k) => k.submitted).length;
+
 	return {
 		user: locals.user,
 		rosterList,
 		eggProgress,
 		faabLedger,
+		keeperSelections,
+		keeperSubmittedCount,
 		leagueConfig: {
 			contentfulSpaceId: cfg.contentfulSpaceId,
 			hasAccessToken: !!cfg.contentfulAccessToken,

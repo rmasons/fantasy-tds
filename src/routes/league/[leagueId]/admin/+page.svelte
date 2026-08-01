@@ -120,6 +120,22 @@
 	const fmtFaabDate = (ts: number) =>
 		ts ? new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
+	// ── Keeper selections ─────────────────────────────────────────────────────────
+	const fmtSubmitted = (iso: string | null) =>
+		iso
+			? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+			: '—';
+
+	const posColor = (pos: string) =>
+		({
+			QB: 'text-red-400',
+			RB: 'text-green-400',
+			WR: 'text-blue-400',
+			TE: 'text-amber-400',
+			K: 'text-purple-400',
+			DEF: 'text-slate-400',
+		})[pos] ?? 'text-navy-400';
+
 	// ── Navigation config ────────────────────────────────────────────────────────
 	const ALL_NAV = [
 		{ href: 'standings',       label: 'Standings'       },
@@ -436,6 +452,52 @@
 				</table>
 			</div>
 		{/if}
+	</section>
+
+	<!-- ── Keeper Selections ── -->
+	<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
+		<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1 flex items-center gap-2"><span class="text-amber-400">◆</span>Keeper Selections</h2>
+		<p class="text-sm text-slate-400 mb-4">
+			Keepers each manager has submitted for this season on the Keepers page.
+			Managers who haven't locked in a selection yet are marked pending.
+		</p>
+
+		<p class="text-2xl font-sport font-black text-white leading-none mb-4">
+			{data.keeperSubmittedCount}<span class="text-slate-500 text-lg"> / {data.keeperSelections.length}</span>
+			<span class="text-xs font-semibold uppercase tracking-widest text-slate-400 ml-2">submitted</span>
+		</p>
+
+		<div class="space-y-2">
+			{#each data.keeperSelections as sel (sel.rosterId)}
+				<div class="rounded-lg border border-navy-700 px-4 py-3 {sel.submitted ? 'bg-navy-900' : 'bg-navy-900/40'}">
+					<div class="flex items-center justify-between gap-3 mb-1.5">
+						<span class="font-semibold text-white text-sm truncate min-w-0">{sel.teamName}</span>
+						{#if sel.submitted}
+							<span class="shrink-0 text-[10px] uppercase tracking-widest font-semibold text-navy-500">{fmtSubmitted(sel.submittedAt)}</span>
+						{:else}
+							<span class="shrink-0 text-[10px] uppercase tracking-widest font-semibold text-amber-500/80">Pending</span>
+						{/if}
+					</div>
+					{#if sel.submitted}
+						{#if sel.players.length === 0}
+							<p class="text-xs text-navy-500 italic">No keepers — submitted an empty selection.</p>
+						{:else}
+							<ul class="flex flex-wrap gap-x-4 gap-y-1">
+								{#each sel.players as player (player.playerId)}
+									<li class="flex items-center gap-1.5 text-sm">
+										<span class="text-[10px] font-semibold {posColor(player.pos)} w-6 shrink-0">{player.pos}</span>
+										<span class="text-slate-200">{player.name}</span>
+										<span class="text-navy-500 text-xs">{player.team}</span>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					{:else}
+						<p class="text-xs text-navy-500 italic">Hasn't submitted a keeper selection yet.</p>
+					{/if}
+				</div>
+			{/each}
+		</div>
 	</section>
 
 	<!-- ── Blog (Contentful) + Navigation ── -->
