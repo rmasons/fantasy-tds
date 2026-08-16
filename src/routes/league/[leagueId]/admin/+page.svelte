@@ -126,17 +126,20 @@
 	let seedingTiers = $state(false);
 
 	// Local editable copy of this season's tier assignments — seeded from
-	// data.leagueConfig.premier.tiersForSeason and re-synced whenever a save/seed
-	// action returns fresh data.
+	// data.leagueConfig.premier.tiersForSeason at init, and explicitly re-synced
+	// (via tierSnapshotFromData) after the "Seed Tiers from Sleeper" action
+	// invalidates and refreshes `data`, so a subsequent Save Tiers can't clobber
+	// freshly-seeded tiers with a stale pre-seed snapshot.
 	let tierSeason = $state(data.season || String(new Date().getFullYear()));
-	let tierByRoster = $state<Record<string, '1' | '2' | '3' | ''>>(
-		Object.fromEntries(
+	function tierSnapshotFromData(): Record<string, '1' | '2' | '3' | ''> {
+		return Object.fromEntries(
 			data.rosterList.map((r: { rosterId: string }) => [
 				r.rosterId,
 				String(data.leagueConfig.premier.tiersForSeason[r.rosterId] ?? ''),
 			]),
-		),
-	);
+		);
+	}
+	let tierByRoster = $state<Record<string, '1' | '2' | '3' | ''>>(tierSnapshotFromData());
 
 	const promotionKindLabel: Record<string, string> = {
 		collusion: 'Collusion (fixed −5)',
@@ -457,7 +460,14 @@
 				</div>
 			{/if}
 
-			<form method="POST" action="?/seedTiers" use:enhance={() => { seedingTiers = true; return async ({ update }) => { await update(); seedingTiers = false; }; }} class="mb-5">
+			<form method="POST" action="?/seedTiers" use:enhance={() => { seedingTiers = true; return async ({ update }) => {
+				await update();
+				// data was invalidated by the seed action; re-sync the local editable copy
+				// so a subsequent Save Tiers can't overwrite the seed with pre-seed values.
+				tierSeason = data.season || tierSeason;
+				tierByRoster = tierSnapshotFromData();
+				seedingTiers = false;
+			}; }} class="mb-5">
 				<button
 					type="submit"
 					disabled={seedingTiers}
