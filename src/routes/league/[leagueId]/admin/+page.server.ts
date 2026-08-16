@@ -15,6 +15,7 @@ import {
 	DEFAULT_TRADE_BUDGET_CAP,
 	DEFAULT_REGULAR_SEASON_END_WEEK,
 } from '$lib/server/promotionPoints';
+import { getPlayers } from '$lib/server/players';
 import { fetchRosters, fetchUsers, buildRosterInfoMap } from '$lib/sleeper';
 import { getCachedLeague } from '$lib/server/sleeperCache';
 const VALID_NAV_ITEMS = new Set([
@@ -25,13 +26,17 @@ const VALID_NAV_ITEMS = new Set([
 export const load: PageServerLoad = async ({ locals, params }) => {
 	if (!locals.user?.isAdmin) throw redirect(303, `/league/${params.leagueId}`);
 
-	const [cfg, rosters, users, faabLedger, league, promotionLedgerAll] = await Promise.all([
+	const [cfg, rosters, users, faabLedger, league, promotionLedgerAll, players] = await Promise.all([
 		getLeagueConfig(params.leagueId),
 		fetchRosters(params.leagueId).catch(() => []),
 		fetchUsers(params.leagueId).catch(() => []),
 		getFaabLedger(params.leagueId).catch(() => []),
 		getCachedLeague(params.leagueId).catch(() => null),
 		getPromotionLedger(params.leagueId).catch(() => []),
+		getPlayers().catch((e) => {
+			console.error('[admin] failed to load players for', params.leagueId, e);
+			return {} as Awaited<ReturnType<typeof getPlayers>>;
+		}),
 	]);
 
 	const infoMap = buildRosterInfoMap(rosters, users);
@@ -52,6 +57,31 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		? []
 		: promotionLedgerAll.filter((t: PromotionTransaction) => t.season === season);
 
+	// Read the keepers designated on each Sleeper roster (the same `keepers` array
+	// the draft planner uses), resolving each player id to a name/pos/team. Teams
+	// with an empty array simply haven't designated keepers yet.
+	const POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+	const posRank = (pos: string) => {
+		const i = POS_ORDER.indexOf(pos);
+		return i === -1 ? POS_ORDER.length : i;
+	};
+	const keeperTeams = rosters
+		.map((r: any) => {
+			const keeperPlayers = (r.keepers ?? [])
+				.map((pid: string) => {
+					const p = players[pid];
+					return { playerId: pid, name: p?.name ?? pid, pos: p?.pos ?? '?', team: p?.team ?? 'FA' };
+				})
+				.sort((a: any, b: any) => posRank(a.pos) - posRank(b.pos) || a.name.localeCompare(b.name));
+			return {
+				rosterId: String(r.roster_id),
+				teamName: infoMap.get(r.roster_id)?.teamName ?? `Roster ${r.roster_id}`,
+				players: keeperPlayers,
+			};
+		})
+		.sort((a: any, b: any) => a.teamName.localeCompare(b.teamName));
+	const keeperDesignatedCount = keeperTeams.filter((k: { players: unknown[] }) => k.players.length > 0).length;
+
 	return {
 		user: locals.user,
 		rosterList,
@@ -59,6 +89,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		season,
 		seasonUnavailable,
 		promotionLedger,
+		keeperTeams,
+		keeperDesignatedCount,
 		leagueConfig: {
 			contentfulSpaceId: cfg.contentfulSpaceId,
 			hasAccessToken: !!cfg.contentfulAccessToken,

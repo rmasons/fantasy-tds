@@ -9,7 +9,8 @@
  *
  * Each entry's baseCost is derived from round_drafted (or free_agent_cost for FA
  * acquisitions) using the same formula as the app: max(5, 80 - 5 * round).
- * yearsKept is planningYear - year_acquired.
+ * yearsKept is the number of seasons already kept (planningYear - year_acquired - 1),
+ * matching calcKeeperCost: 0 = first keeper year = 1.2× base.
  *
  * Writes are idempotent — re-running will overwrite with the same values.
  */
@@ -85,7 +86,10 @@ for (const [playerId, info] of entries) {
 		? (info.free_agent_cost ?? 5)
 		: roundToBaseCost(info.round_drafted);
 
-	const yearsKept = planningYear - info.year_acquired;
+	// yearsKept counts seasons already kept, not seasons rostered: a player
+	// acquired in the season before the planning year has been kept zero times,
+	// so keeping them now is their first keeper year (1.2× base).
+	const yearsKept = Math.max(0, planningYear - info.year_acquired - 1);
 
 	batch.set(col.doc(playerId), { baseOverride: baseCost, yearsKept }, { merge: true });
 

@@ -147,6 +147,17 @@
 	let promotionKind = $state<'collusion' | 'neglect' | 'other'>('collusion');
 	const fmtPP = (amount: number) => (amount >= 0 ? '+' : '−') + Math.abs(amount) + ' PP';
 
+	// ── Keeper selections ─────────────────────────────────────────────────────────
+	const posColor = (pos: string) =>
+		({
+			QB: 'text-red-400',
+			RB: 'text-green-400',
+			WR: 'text-blue-400',
+			TE: 'text-amber-400',
+			K: 'text-purple-400',
+			DEF: 'text-slate-400',
+		})[pos] ?? 'text-navy-400';
+
 	// ── Navigation config ────────────────────────────────────────────────────────
 	const ALL_NAV = [
 		{ href: 'standings',       label: 'Standings'       },
@@ -734,6 +745,45 @@
 				</table>
 			</div>
 		{/if}
+	</section>
+
+	<!-- ── Keeper Selections ── -->
+	<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
+		<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1 flex items-center gap-2"><span class="text-amber-400">◆</span>Keeper Selections</h2>
+		<p class="text-sm text-slate-400 mb-4">
+			Keepers designated on each team's Sleeper roster for this season. Teams with
+			no keepers designated yet are shown as empty — this reflects Sleeper directly,
+			the same source the draft planner uses.
+		</p>
+
+		<p class="text-2xl font-sport font-black text-white leading-none mb-4">
+			{data.keeperDesignatedCount}<span class="text-slate-500 text-lg"> / {data.keeperTeams.length}</span>
+			<span class="text-xs font-semibold uppercase tracking-widest text-slate-400 ml-2">teams with keepers</span>
+		</p>
+
+		<div class="space-y-2">
+			{#each data.keeperTeams as team (team.rosterId)}
+				<div class="rounded-lg border border-navy-700 px-4 py-3 {team.players.length > 0 ? 'bg-navy-900' : 'bg-navy-900/40'}">
+					<div class="flex items-center justify-between gap-3 mb-1.5">
+						<span class="font-semibold text-white text-sm truncate min-w-0">{team.teamName}</span>
+						<span class="shrink-0 text-[10px] uppercase tracking-widest font-semibold text-navy-500">{team.players.length} keeper{team.players.length === 1 ? '' : 's'}</span>
+					</div>
+					{#if team.players.length === 0}
+						<p class="text-xs text-navy-500 italic">No keepers designated on Sleeper yet.</p>
+					{:else}
+						<ul class="flex flex-wrap gap-x-4 gap-y-1">
+							{#each team.players as player (player.playerId)}
+								<li class="flex items-center gap-1.5 text-sm">
+									<span class="text-[10px] font-semibold {posColor(player.pos)} w-6 shrink-0">{player.pos}</span>
+									<span class="text-slate-200">{player.name}</span>
+									<span class="text-navy-500 text-xs">{player.team}</span>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</div>
+			{/each}
+		</div>
 	</section>
 
 	<!-- ── Blog (Contentful) + Navigation ── -->

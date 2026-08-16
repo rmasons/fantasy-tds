@@ -62,6 +62,7 @@ export interface SleeperRoster {
 	players: string[] | null;   // all rostered player IDs
 	starters: string[] | null;  // starting-lineup player IDs (in slot order)
 	reserve: string[] | null;   // IR slot player IDs
+	keepers?: string[] | null;  // player IDs designated as keepers on Sleeper (may be empty/absent before deadline)
 	settings: {
 		wins: number;
 		losses: number;
