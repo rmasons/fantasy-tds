@@ -120,6 +120,36 @@
 	const fmtFaabDate = (ts: number) =>
 		ts ? new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
+	// ── Premier Keepers ──────────────────────────────────────────────────────────
+	let rulesetIsPremier = $state(data.leagueConfig.ruleset === 'premier');
+
+	let seedingTiers = $state(false);
+
+	// Local editable copy of this season's tier assignments — seeded from
+	// data.leagueConfig.premier.tiersForSeason at init, and explicitly re-synced
+	// (via tierSnapshotFromData) after the "Seed Tiers from Sleeper" action
+	// invalidates and refreshes `data`, so a subsequent Save Tiers can't clobber
+	// freshly-seeded tiers with a stale pre-seed snapshot.
+	let tierSeason = $state(data.season || String(new Date().getFullYear()));
+	function tierSnapshotFromData(): Record<string, '1' | '2' | '3' | ''> {
+		return Object.fromEntries(
+			data.rosterList.map((r: { rosterId: string }) => [
+				r.rosterId,
+				String(data.leagueConfig.premier.tiersForSeason[r.rosterId] ?? ''),
+			]),
+		);
+	}
+	let tierByRoster = $state<Record<string, '1' | '2' | '3' | ''>>(tierSnapshotFromData());
+
+	const promotionKindLabel: Record<string, string> = {
+		collusion: 'Collusion (fixed −5)',
+		neglect: 'Roster neglect (escalating)',
+		other: 'Other (manual amount)',
+	};
+
+	let promotionKind = $state<'collusion' | 'neglect' | 'other'>('collusion');
+	const fmtPP = (amount: number) => (amount >= 0 ? '+' : '−') + Math.abs(amount) + ' PP';
+
 	// ── Keeper selections ─────────────────────────────────────────────────────────
 	const posColor = (pos: string) =>
 		({
@@ -145,6 +175,7 @@
 		{ href: 'keepers',         label: 'Keepers'         },
 		{ href: 'superlatives',    label: 'Superlatives'    },
 		{ href: 'blog',            label: 'Blog'            },
+		{ href: 'tiers',           label: 'Tiers'           },
 	];
 
 	interface NavItem { href: string; label: string; enabled: boolean; }
@@ -190,25 +221,6 @@
 <div class="max-w-2xl">
 	<h1 class="font-sport font-black text-5xl uppercase tracking-tight text-white leading-none mb-1">League Admin</h1>
 	<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mb-8">Tools for commissioners. Changes affect all league members.</p>
-
-	<!-- ── Easter Egg Hunt ── -->
-	<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
-		<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1 flex items-center gap-2"><span class="text-amber-400">◆</span>Easter Egg Hunt</h2>
-		<p class="text-sm text-slate-400 mb-3">
-			FAAB eggs claimed across the league. Once every egg is found you can retire the
-			hunt — see <code class="text-amber-400/80">EASTER_EGG_REMOVAL.md</code>.
-		</p>
-		{#if data.eggProgress.claimed >= data.eggProgress.total}
-			<p class="text-sm font-semibold text-green-400">
-				All {data.eggProgress.total} eggs claimed — safe to retire the hunt. 🥚
-			</p>
-		{:else}
-			<p class="text-2xl font-sport font-black text-white leading-none">
-				{data.eggProgress.claimed}<span class="text-slate-500 text-lg"> / {data.eggProgress.total}</span>
-				<span class="text-xs font-semibold uppercase tracking-widest text-slate-400 ml-2">claimed</span>
-			</p>
-		{/if}
-	</section>
 
 	<!-- ── Draft Cache ── -->
 	<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
@@ -355,6 +367,302 @@
 			</div>
 		</div>
 	</section>
+
+	<!-- ── Premier Keepers Ruleset ── -->
+	<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
+		<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1 flex items-center gap-2"><span class="text-amber-400">◆</span>Premier Keepers Ruleset</h2>
+		<p class="text-sm text-slate-400 mb-4">
+			Switches this league between the classic ruleset and Premier Keepers (tiers,
+			promotion points, per-tier budgets). Leave off for a normal fantasy-tds league.
+		</p>
+
+		<form method="POST" action="?/savePremierConfig" use:enhance class="space-y-5">
+			<label class="flex items-center gap-3">
+				<input
+					type="checkbox"
+					bind:checked={rulesetIsPremier}
+					class="w-4 h-4 rounded cursor-pointer accent-amber-500"
+				/>
+				<input type="hidden" name="ruleset" value={rulesetIsPremier ? 'premier' : 'classic'} />
+				<span class="text-sm text-white font-semibold">Enable Premier Keepers ruleset</span>
+			</label>
+
+			{#if rulesetIsPremier}
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+					{#each [['auctionBudget', 'Auction Budget', data.leagueConfig.premier.auctionBudget], ['faabBudget', 'FAAB Budget', data.leagueConfig.premier.faabBudget], ['tradeBudgetCap', 'Trade Budget Cap', data.leagueConfig.premier.tradeBudgetCap]] as [name, label, defaults]}
+						<div>
+							<p class="text-xs font-semibold text-navy-500 uppercase tracking-wider mb-2">{label}</p>
+							<div class="space-y-1.5">
+								{#each [1, 2, 3] as tier}
+									<div class="flex items-center gap-2">
+										<span class="text-[10px] text-navy-500 w-14 shrink-0">Tier {tier}</span>
+										<input
+											type="number"
+											name="{name}{tier}"
+											value={(defaults as Record<number, number>)[tier]}
+											min="0"
+											class="w-full bg-navy-800 border border-navy-700 rounded-lg px-2.5 py-1.5 text-sm text-white
+											       focus:outline-none focus:border-amber-500 font-mono transition-colors"
+										/>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				</div>
+
+				<div>
+					<label for="regularSeasonEndWeek" class="block text-xs font-semibold text-navy-500 uppercase tracking-wider mb-1">
+						Regular Season / PP Cutoff Week
+					</label>
+					<input
+						id="regularSeasonEndWeek"
+						type="number"
+						name="regularSeasonEndWeek"
+						value={data.leagueConfig.premier.regularSeasonEndWeek}
+						min="1"
+						max="18"
+						class="w-24 bg-navy-800 border border-navy-700 rounded-lg px-3 py-1.5 text-sm text-white
+						       focus:outline-none focus:border-amber-500 font-mono transition-colors"
+					/>
+				</div>
+			{/if}
+
+			<button
+				type="submit"
+				class="px-4 py-2 text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg transition-colors"
+			>
+				Save Ruleset
+			</button>
+			{#if form?.premierSuccess}
+				<span class="text-xs text-green-400 ml-3">Saved.</span>
+			{/if}
+		</form>
+	</section>
+
+	{#if rulesetIsPremier}
+		<!-- ── Tier Assignments ── -->
+		<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
+			<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1 flex items-center gap-2"><span class="text-amber-400">◆</span>Tier Assignments</h2>
+			<p class="text-sm text-slate-400 mb-4">
+				Per-season tier snapshot (Tier I / II / III), keyed by season since Sleeper's own
+				division field mutates on promotion. Seed the current live season straight from
+				Sleeper's roster divisions, or hand-enter a season (e.g. 2024, 2023) below.
+			</p>
+
+			{#if data.seasonUnavailable}
+				<div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4">
+					<p class="text-amber-300 text-sm font-medium">Couldn't reach Sleeper to determine this league's season.</p>
+					<p class="text-amber-300/70 text-sm mt-1">
+						Existing tier assignments and Promotion Points entries are <strong>not</strong> shown below and have
+						<strong>not</strong> been lost. Reload before making changes.
+					</p>
+				</div>
+			{/if}
+
+			<form method="POST" action="?/seedTiers" use:enhance={() => { seedingTiers = true; return async ({ update }) => {
+				await update();
+				// data was invalidated by the seed action; re-sync the local editable copy
+				// so a subsequent Save Tiers can't overwrite the seed with pre-seed values.
+				tierSeason = data.season || tierSeason;
+				tierByRoster = tierSnapshotFromData();
+				seedingTiers = false;
+			}; }} class="mb-5">
+				<button
+					type="submit"
+					disabled={seedingTiers}
+					class="px-4 py-2 text-sm font-bold bg-navy-700 hover:bg-navy-600 disabled:opacity-40 text-white rounded-lg transition-colors"
+				>
+					{seedingTiers ? 'Seeding…' : `Seed ${data.season || 'current season'} from Sleeper`}
+				</button>
+				<span class="text-xs text-navy-500 ml-2">Only seeds THIS league's own season — never a prior year.</span>
+			</form>
+
+			{#if form?.tiersError}
+				<p class="text-sm text-red-400 mb-3">{form.tiersError}</p>
+			{/if}
+			{#if form?.tiersSuccess}
+				<p class="text-sm text-green-400 mb-3">Saved {form.seededCount} roster{form.seededCount === 1 ? '' : 's'} for {form.seededSeason}.</p>
+				{#if form.unassignedRosters?.length}
+					<p class="text-sm text-amber-400 mb-3">
+						{form.unassignedRosters.length} roster{form.unassignedRosters.length === 1 ? ' was' : 's were'} left unassigned and will score no Promotion Points.
+					</p>
+				{/if}
+			{/if}
+
+			<form method="POST" action="?/saveTiers" use:enhance class="space-y-3">
+				<label class="flex items-center gap-2">
+					<span class="text-[10px] uppercase tracking-widest text-navy-500 font-semibold">Season</span>
+					<input
+						type="text"
+						name="season"
+						bind:value={tierSeason}
+						maxlength="4"
+						placeholder="YYYY"
+						class="w-24 bg-navy-800 border border-navy-700 rounded-lg px-3 py-1.5 text-sm text-white
+						       placeholder-navy-500 focus:outline-none focus:border-amber-500 font-mono transition-colors"
+					/>
+				</label>
+
+				<div class="rounded-lg border border-navy-700 overflow-hidden">
+					<table class="w-full text-sm">
+						<thead>
+							<tr class="bg-navy-900 text-left">
+								<th class="px-3 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider">Manager</th>
+								<th class="px-3 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider">Tier</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-navy-700/60">
+							{#each data.rosterList as roster}
+								<tr class="hover:bg-navy-800">
+									<td class="px-3 py-2.5 text-slate-300 font-medium">{roster.teamName}</td>
+									<td class="px-3 py-2.5">
+										<select
+											name="tier_{roster.rosterId}"
+											bind:value={tierByRoster[roster.rosterId]}
+											class="bg-navy-800 border border-navy-700 rounded-lg px-2.5 py-1 text-sm text-white focus:outline-none focus:border-amber-500"
+										>
+											<option value="">—</option>
+											<option value="1">Tier I</option>
+											<option value="2">Tier II</option>
+											<option value="3">Tier III</option>
+										</select>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+
+				<button
+					type="submit"
+					class="px-4 py-2 text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg transition-colors"
+				>
+					Save Tiers
+				</button>
+			</form>
+		</section>
+
+		<!-- ── Promotion Points Ledger ── -->
+		<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">
+			<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-1 flex items-center gap-2"><span class="text-amber-400">◆</span>Promotion Points Ledger</h2>
+			<p class="text-sm text-slate-400 mb-4">
+				Manual PP adjustments — collusion and roster neglect (§III). Neglect's penalty
+				escalates automatically: the app counts this roster's prior neglect entries for the
+				season and picks −1 / −3 / −5 / −10 for you.
+			</p>
+
+			<form method="POST" action="?/addPromotion" use:enhance class="flex flex-wrap items-end gap-3 mb-5">
+				<label class="flex flex-col gap-1">
+					<span class="text-[10px] uppercase tracking-widest text-navy-500 font-semibold">Manager</span>
+					<select
+						name="rosterId"
+						required
+						class="bg-navy-800 border border-navy-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500"
+					>
+						<option value="">Select…</option>
+						{#each data.rosterList as roster}
+							<option value={roster.rosterId}>{roster.teamName}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="flex flex-col gap-1">
+					<span class="text-[10px] uppercase tracking-widest text-navy-500 font-semibold">Season</span>
+					<input
+						type="text"
+						name="season"
+						value={data.season}
+						maxlength="4"
+						required
+						placeholder="YYYY"
+						class="w-20 bg-navy-800 border border-navy-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500 font-mono"
+					/>
+				</label>
+				<label class="flex flex-col gap-1">
+					<span class="text-[10px] uppercase tracking-widest text-navy-500 font-semibold">Reason type</span>
+					<select
+						name="kind"
+						bind:value={promotionKind}
+						class="bg-navy-800 border border-navy-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500"
+					>
+						{#each Object.entries(promotionKindLabel) as [value, label]}
+							<option {value}>{label}</option>
+						{/each}
+					</select>
+				</label>
+				{#if promotionKind === 'other'}
+					<label class="flex flex-col gap-1">
+						<span class="text-[10px] uppercase tracking-widest text-navy-500 font-semibold">Amount (+/−)</span>
+						<input
+							type="number"
+							name="amount"
+							step="1"
+							required
+							placeholder="e.g. 5 or -3"
+							class="w-28 bg-navy-800 border border-navy-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500 text-right"
+						/>
+					</label>
+				{/if}
+				<label class="flex flex-col gap-1 flex-1 min-w-[12rem]">
+					<span class="text-[10px] uppercase tracking-widest text-navy-500 font-semibold">Reason</span>
+					<input
+						type="text"
+						name="reason"
+						required
+						maxlength="120"
+						placeholder="e.g. no lineup set for 3 weeks"
+						class="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-navy-500 focus:outline-none focus:border-amber-500"
+					/>
+				</label>
+				<button
+					type="submit"
+					class="px-4 py-2 text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg transition-colors"
+				>
+					Add
+				</button>
+			</form>
+
+			{#if form?.promotionError}
+				<p class="text-sm text-red-400 mb-3">{form.promotionError}</p>
+			{/if}
+
+			{#if data.promotionLedger.length === 0}
+				<p class="text-sm text-navy-500">No adjustments yet for {data.season}.</p>
+			{:else}
+				<div class="rounded-lg border border-navy-700 overflow-hidden">
+					<table class="w-full text-sm">
+						<thead>
+							<tr class="bg-navy-900 text-left">
+								<th class="px-3 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider">Manager</th>
+								<th class="px-3 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider text-right">PP</th>
+								<th class="px-3 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider">Kind</th>
+								<th class="px-3 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider">Reason</th>
+								<th class="px-3 py-2 text-[10px] font-semibold text-navy-500 uppercase tracking-wider">Date</th>
+								<th class="px-3 py-2"></th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-navy-700/60">
+							{#each data.promotionLedger as txn (txn.id)}
+								<tr class="hover:bg-navy-800">
+									<td class="px-3 py-2.5 text-slate-300 font-medium">{teamNameFor(txn.rosterId)}</td>
+									<td class="px-3 py-2.5 text-right font-mono font-bold {txn.amount >= 0 ? 'text-green-400' : 'text-red-400'}">{fmtPP(txn.amount)}</td>
+									<td class="px-3 py-2.5 text-slate-400 capitalize">{txn.kind}</td>
+									<td class="px-3 py-2.5 text-slate-400">{txn.reason}</td>
+									<td class="px-3 py-2.5 text-navy-500 whitespace-nowrap">{fmtFaabDate(txn.createdAt)}</td>
+									<td class="px-3 py-2.5 text-right">
+										<form method="POST" action="?/deletePromotion" use:enhance>
+											<input type="hidden" name="id" value={txn.id} />
+											<button type="submit" class="text-xs text-navy-500 hover:text-red-400 transition-colors" aria-label="Delete adjustment">✕</button>
+										</form>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{/if}
+		</section>
+	{/if}
 
 	<!-- ── FAAB Adjustments ── -->
 	<section class="bg-navy-850 rounded-lg border border-navy-700 p-6 mb-6">

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
-	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -234,9 +233,6 @@
 			<p class="text-navy-500 text-sm">{error}</p>
 		</div>
 	{:else if post}
-		{#if data.isLatestPost}
-			<FaabEasterEgg eggId="13" leagueId={data.leagueId} loggedIn={!!data.user} large={true} />
-		{/if}
 		<article class="mt-4 max-w-2xl">
 			<div class="flex items-center gap-2 mb-3">
 				<span class="text-xs px-2 py-0.5 rounded font-semibold bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/25">{post.type}</span>

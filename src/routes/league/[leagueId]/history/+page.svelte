@@ -2,7 +2,6 @@
 	import type { PageData } from './$types';
 	import type { SeasonRecords, RecordGame, RecordScore, ManagerProfile } from '$lib/types';
 	import type { Podium, ManagerEntry } from '$lib/server/historyPodiums';
-	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -615,7 +614,7 @@
 
 			<div class="mt-10">
 				<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2">
-					<span class="text-amber-400">◆</span>All-Time Champions{#if selectedSeason === '2024'}<FaabEasterEgg eggId="9" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}
+					<span class="text-amber-400">◆</span>All-Time Champions
 				</h2>
 				<div class="bg-navy-850 rounded-lg border border-navy-700 overflow-hidden">
 					<table class="w-full text-sm">
@@ -1023,7 +1022,7 @@
 
 				<section class="bg-navy-850 border border-navy-700 rounded-lg overflow-hidden flex flex-col h-[460px]">
 					<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 px-4 py-2.5 bg-navy-900 border-b border-navy-700 shrink-0 flex items-center gap-2">
-						<span class="text-amber-400">◆</span> All-Time Lowest Scoring Matchups<FaabEasterEgg eggId="2" leagueId={data.leagueId} loggedIn={!!data.user} />
+						<span class="text-amber-400">◆</span> All-Time Lowest Scoring Matchups
 					</h2>
 					<div class="flex-1 flex flex-col min-h-0">
 						{#if atLowCombined.length === 0 && atLoading}

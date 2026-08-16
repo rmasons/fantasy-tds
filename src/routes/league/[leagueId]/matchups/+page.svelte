@@ -2,7 +2,6 @@
 	import type { PageData } from './$types';
 	import type { RosterInfo, RawMatchup } from '$lib/sleeper';
 	import type { MatchupsMeta, SeasonBracket, BracketMatch } from '$lib/server/matchups';
-	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -201,7 +200,7 @@
 				class="px-5 py-2.5 font-sport font-bold uppercase text-sm tracking-wider -mb-px transition-colors
 				       {view === 'bracket' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-navy-500 hover:text-slate-300'}"
 			>
-				{bracketLoading ? 'Loading…' : 'Bracket'}{#if viewLeagueId === data.leagueId}<FaabEasterEgg eggId="4" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}
+				{bracketLoading ? 'Loading…' : 'Bracket'}
 			</button>
 		</div>
 

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { HomeData } from '$lib/server/homeData';
-	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -183,7 +182,7 @@
 	{:else if weekMatchups.length > 0}
 		<div class="mb-6">
 			<h2 class="font-sport font-bold text-xs uppercase tracking-widest text-slate-300 mb-3 flex items-center gap-2">
-				<span class="text-amber-400">◆</span>Week {nflState?.week} Matchups<FaabEasterEgg eggId="12" leagueId={data.leagueId} loggedIn={!!data.user} />
+				<span class="text-amber-400">◆</span>Week {nflState?.week} Matchups
 			</h2>
 			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 				{#each weekMatchups as matchup}

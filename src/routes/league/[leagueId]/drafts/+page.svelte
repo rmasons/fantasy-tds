@@ -2,7 +2,6 @@
 	import type { PageData } from './$types';
 	import type { SlimPlayer } from '$lib/types';
 	import { onMount } from 'svelte';
-	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -325,7 +324,7 @@
 					<table class="text-xs border-collapse w-max">
 						<thead>
 							<tr class="bg-navy-900">
-								<th class="px-2 py-2 text-navy-500 text-left font-semibold w-12 border-b border-navy-700 uppercase tracking-wider text-[10px]">Rd{#if viewLeagueId === data.leagueId}<FaabEasterEgg eggId="6" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</th>
+								<th class="px-2 py-2 text-navy-500 text-left font-semibold w-12 border-b border-navy-700 uppercase tracking-wider text-[10px]">Rd</th>
 								{#each slots as [, rid]}
 									<th class="px-2 py-2 text-navy-500 font-semibold border-b border-navy-700 min-w-[120px] max-w-[150px] uppercase tracking-wider text-[10px]">
 										<span class="truncate block">{draft.rosterNames.get(rid) ?? `T${rid}`}</span>

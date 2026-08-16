@@ -35,6 +35,70 @@ export interface FaabTransaction {
 	isMigration?: boolean;
 }
 
+/**
+ * A single manual Promotion Points adjustment — collusion or roster neglect.
+ * Mirrors FaabTransaction exactly so the ledger UI, audit trail, and admin
+ * form are near-copies of the FAAB ones (see src/lib/server/faab.ts).
+ */
+export interface PromotionTransaction {
+	id: string;
+	/** roster_id (as string) the adjustment applies to */
+	rosterId: string;
+	/** season this adjustment counts against (neglect escalation is counted per-season) */
+	season: string;
+	/** signed amount: collusion is always -5, neglect is derived, 'other' is admin-entered */
+	amount: number;
+	/** why the adjustment was made (shown in the ledger) */
+	reason: string;
+	/** 'neglect' entries drive the escalation count; 'collusion' and 'other' don't */
+	kind: 'collusion' | 'neglect' | 'other';
+	/** epoch ms */
+	createdAt: number;
+	/** display name of the admin who entered it */
+	createdBy: string;
+}
+
+/**
+ * Per-tier dollar caps. Sleeper supports one league-wide auction/FAAB budget,
+ * so these are honor-system for the auction (app displays + validates only)
+ * and enforced for FAAB by posting opening ledger adjustments against the
+ * Tier I Sleeper value (see docs/PREMIER_KEEPERS.md "Per-tier budgets").
+ */
+export interface TierBudget {
+	1: number;
+	2: number;
+	3: number;
+}
+
+export interface PremierConfig {
+	/**
+	 * Per-season tier snapshot: season → rosterId (as string) → tier.
+	 * Sleeper's roster.settings.division is the CURRENT tier and mutates on
+	 * promotion, so it can't be trusted for history — this is the source of
+	 * truth for "what tier was this roster in when this game was played."
+	 * Seeded from Sleeper for the live season only; hand-entered for prior ones.
+	 */
+	tiersBySeason: Record<string, Record<string, 1 | 2 | 3>>;
+
+	auctionBudget: TierBudget; // 300 / 200 / 100
+	faabBudget: TierBudget; // 300 / 200 / 100
+	tradeBudgetCap: TierBudget; // 200 / 100 / 100 (§I)
+
+	/** Regular season / PP-accrual cutoff. 14 per the 2025 constitution. */
+	regularSeasonEndWeek: number;
+
+	/** Manual PP adjustments — roster neglect, collusion. Source of truth. */
+	promotionTransactions: PromotionTransaction[];
+	/**
+	 * Per-roster net of the above, summed across ALL seasons (mirrors the
+	 * faabBonuses/faabTransactions pair exactly — see resolveLedger's docs
+	 * for why this is a flat, non-season-scoped denormalization). Per-season
+	 * PP math in src/lib/server/promotionPoints.ts filters the ledger by
+	 * season directly rather than reading this map.
+	 */
+	promotionAdjustments: Record<string, number>;
+}
+
 export interface LeagueConfig {
 	contentfulSpaceId?: string;
 	contentfulAccessToken?: string;
@@ -49,6 +113,10 @@ export interface LeagueConfig {
 	faabBonuses?: Record<string, number>;
 	/** Full ledger of commissioner FAAB adjustments (source of truth). */
 	faabTransactions?: FaabTransaction[];
+	/** Which ruleset this league runs. Absent ⇒ 'classic' (fantasy-tds is unaffected). */
+	ruleset?: 'classic' | 'premier';
+	/** Premier Keepers config block. Only meaningful when ruleset === 'premier'. */
+	premier?: PremierConfig;
 }
 
 function toFirestoreWrite(obj: Record<string, unknown>): Record<string, unknown> {
