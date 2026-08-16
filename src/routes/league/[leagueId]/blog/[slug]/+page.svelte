@@ -38,7 +38,13 @@
 	function renderNode(node: any): string {
 		if (!node) return '';
 		if (node.nodeType === 'text') {
-			let text = (node.value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+			let text = (node.value ?? '')
+				.replace(/&/g, '&amp;')
+				.replace(/</g, '&lt;')
+				.replace(/>/g, '&gt;')
+				// Preserve soft line breaks (Shift+Enter in Contentful) — HTML would
+				// otherwise collapse the "\n" to a single space.
+				.replace(/\n/g, '<br />');
 			for (const mark of node.marks ?? []) {
 				if (mark.type === 'bold') text = `<strong>${text}</strong>`;
 				else if (mark.type === 'italic') text = `<em>${text}</em>`;
@@ -50,7 +56,9 @@
 		const children = (node.content ?? []).map(renderNode).join('');
 		switch (node.nodeType) {
 			case 'document': return children;
-			case 'paragraph': return `<p class="mb-4 leading-relaxed">${children}</p>`;
+			// An empty paragraph is a deliberate blank line — give it height so the
+			// gap survives (an empty <p> collapses to zero and the spacing is lost).
+			case 'paragraph': return `<p class="mb-4 leading-relaxed">${children || '<br />'}</p>`;
 			case 'heading-1': return `<h1 class="text-3xl font-extrabold mt-8 mb-4">${children}</h1>`;
 			case 'heading-2': return `<h2 class="text-2xl font-bold mt-7 mb-3">${children}</h2>`;
 			case 'heading-3': return `<h3 class="text-xl font-bold mt-6 mb-3">${children}</h3>`;
