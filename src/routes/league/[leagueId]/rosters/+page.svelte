@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
-	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -166,7 +165,7 @@
 							<!-- Bench -->
 							{#if team.bench.length}
 								<div>
-									<p class="font-sport font-bold text-[10px] uppercase tracking-widest text-slate-300 mb-2 flex items-center gap-1.5"><span class="text-amber-400">◆</span>Bench{#if i === teams.length - 1 && viewLeagueId === data.leagueId}<FaabEasterEgg eggId="7" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</p>
+									<p class="font-sport font-bold text-[10px] uppercase tracking-widest text-slate-300 mb-2 flex items-center gap-1.5"><span class="text-amber-400">◆</span>Bench</p>
 									<div class="space-y-1">
 										{#each team.bench as p}
 											{@const logo = teamLogoUrl(p.team)}

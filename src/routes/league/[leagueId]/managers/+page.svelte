@@ -2,7 +2,6 @@
 	import type { PageData } from './$types';
 	import type { ManagerProfile } from '$lib/types';
 	import type { ManagerCard } from '$lib/server/managers';
-	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -83,6 +82,6 @@
 				</a>
 			{/each}
 		</div>
-		<p class="mt-3 text-right text-[10px] text-navy-800 select-none">sorted by all-time record<FaabEasterEgg eggId="10" leagueId={data.leagueId} loggedIn={!!data.user} /></p>
+		<p class="mt-3 text-right text-[10px] text-navy-800 select-none">sorted by all-time record</p>
 	{/if}
 </div>
