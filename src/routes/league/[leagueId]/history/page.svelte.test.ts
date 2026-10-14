@@ -64,4 +64,23 @@ describe('Awards & Records page', () => {
 		// Only the in-progress season is requested; there are no podiums to enrich.
 		expect(fetches.calls).toEqual(['/api/records/L1']);
 	});
+
+	// Regression: the failure notice used to sit inside the {#if typeof tab ===
+	// 'number'} branch. A failed load empties podiums, so no season tabs render and
+	// that branch is unreachable — the user silently lost every past season with no
+	// hint anything had gone wrong.
+	it('surfaces a failed server load on the default tab', () => {
+		const { html } = mountPage(Page, { data: pageData({ podiums: [], seasonLidMap: {}, loadFailed: true }) });
+		expect(html).toContain('Failed to load league history.');
+		expect(html).toContain('Champions and past seasons are unavailable');
+		// And not alongside "No completed seasons found." — that lives in the
+		// numeric-tab branch, which a failed load leaves no tab to select.
+		expect(html).not.toContain('No completed seasons found.');
+	});
+
+	it('shows no failure notice on a healthy load', () => {
+		const { html } = mountPage(Page, { data: pageData() });
+		expect(html).not.toContain('Failed to load league history.');
+		expect(html).not.toContain('Champions and past seasons are unavailable');
+	});
 });
