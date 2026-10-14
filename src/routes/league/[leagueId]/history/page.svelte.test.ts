@@ -73,6 +73,9 @@ describe('Awards & Records page', () => {
 		const { html } = mountPage(Page, { data: pageData({ podiums: [], seasonLidMap: {}, loadFailed: true }) });
 		expect(html).toContain('Failed to load league history.');
 		expect(html).toContain('Champions and past seasons are unavailable');
+		// And not alongside "No completed seasons found." — that lives in the
+		// numeric-tab branch, which a failed load leaves no tab to select.
+		expect(html).not.toContain('No completed seasons found.');
 	});
 
 	it('shows no failure notice on a healthy load', () => {
