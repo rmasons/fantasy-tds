@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { PageData } from './$types';
 	import type { SeasonRecords, RecordGame, RecordScore, ManagerProfile } from '$lib/types';
 	import type { Podium, ManagerEntry } from '$lib/server/historyPodiums';
@@ -107,10 +108,14 @@
 		}
 
 		// Eagerly load records for the default tab (first historical year).
+		// untrack: loadYearRecords reads and writes yearRecordsCache, which this
+		// effect also resets above. Without it the read registers as a dependency
+		// and the write re-triggers the effect forever (effect_update_depth_exceeded).
 		if (data.podiums.length > 0) {
 			const defaultSeason = data.podiums[0].season;
-			if (data.seasonLidMap[defaultSeason]) {
-				loadYearRecords(defaultSeason, data.seasonLidMap[defaultSeason]);
+			const defaultLid = data.seasonLidMap[defaultSeason];
+			if (defaultLid) {
+				untrack(() => loadYearRecords(defaultSeason, defaultLid));
 			}
 		}
 
