@@ -296,6 +296,15 @@
 		<p class="text-navy-500 text-[10px] uppercase tracking-[0.2em] font-semibold mt-1">Champions &amp; League Statistics</p>
 	</div>
 
+	<!-- Page-level: a failed podium load leaves no season tabs to click, so this
+	     cannot live inside a per-tab branch or it is never seen. -->
+	{#if awardsError}
+		<div class="mb-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
+			<p class="text-sm font-semibold text-red-400">{awardsError}</p>
+			<p class="mt-0.5 text-xs text-navy-400">Champions and past seasons are unavailable. Season and all-time records below are unaffected. Reload to try again.</p>
+		</div>
+	{/if}
+
 	<div class="flex mb-6 border-b border-navy-700 flex-wrap">
 		<button
 			onclick={() => switchTab('season')}
@@ -337,8 +346,6 @@
 				{/each}
 				<p class="text-navy-500 text-sm">{awardsStatus}</p>
 			</div>
-		{:else if awardsError}
-			<p class="text-red-400">Failed to load awards: {awardsError}</p>
 		{:else if podiums.length === 0}
 			<p class="text-navy-500">No completed seasons found.</p>
 		{:else if podium}
