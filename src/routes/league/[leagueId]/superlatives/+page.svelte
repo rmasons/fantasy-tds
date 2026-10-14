@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -87,7 +86,7 @@
 							<span class="text-2xl leading-none shrink-0 mt-0.5">{s.emoji}</span>
 							<div>
 								<p class="font-sport font-black uppercase tracking-wide text-amber-400 text-xl leading-tight">{s.title}</p>
-								<p class="text-[10px] text-navy-500 uppercase tracking-widest mt-0.5 leading-snug">{s.desc}{#if si === superlatives.length - 1}<FaabEasterEgg eggId="8" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</p>
+								<p class="text-[10px] text-navy-500 uppercase tracking-widest mt-0.5 leading-snug">{s.desc}</p>
 							</div>
 						</div>
 					</div>

@@ -34,6 +34,8 @@ export interface SleeperLeague {
 		waiver_budget?: number; // total FAAB budget per team
 		max_keepers?: number;   // Sleeper's keeper cap per team (preferred)
 		num_keepers?: number;   // legacy/alternate keeper-count field
+		leg?: number;            // current week the league is on
+		last_scored_leg?: number; // last week Sleeper has fully scored
 	};
 	avatar: string | null;
 }
@@ -60,6 +62,7 @@ export interface SleeperRoster {
 	players: string[] | null;   // all rostered player IDs
 	starters: string[] | null;  // starting-lineup player IDs (in slot order)
 	reserve: string[] | null;   // IR slot player IDs
+	keepers?: string[] | null;  // player IDs designated as keepers on Sleeper (may be empty/absent before deadline)
 	settings: {
 		wins: number;
 		losses: number;

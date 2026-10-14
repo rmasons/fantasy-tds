@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { StandingRow } from '$lib/types';
-	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -131,7 +130,7 @@
 							<th class="px-4 py-3 text-center">T</th>
 						{/if}
 						<th class="px-4 py-3 text-right">PF</th>
-						<th class="px-4 py-3 text-right">PA{#if viewLeagueId === data.leagueId}<FaabEasterEgg eggId="1" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</th>
+						<th class="px-4 py-3 text-right">PA</th>
 						<th class="px-4 py-3 text-center">Streak</th>
 					</tr>
 				</thead>

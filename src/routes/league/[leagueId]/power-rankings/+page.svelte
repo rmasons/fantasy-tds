@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { PowerRankingsData } from '$lib/server/powerRankings';
-	import FaabEasterEgg from '$lib/components/FaabEasterEgg.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -447,7 +446,7 @@
 						<th class="px-4 py-3 text-left">Team</th>
 						<th class="px-4 py-3 text-center">Record</th>
 						<th class="px-4 py-3 text-right">Total PF</th>
-						<th class="px-4 py-3 text-right">Score{#if viewLeagueId === data.leagueId}<FaabEasterEgg eggId="5" leagueId={data.leagueId} loggedIn={!!data.user} />{/if}</th>
+						<th class="px-4 py-3 text-right">Score</th>
 						<th class="px-4 py-3 text-right">Playoff %</th>
 					</tr>
 				</thead>

@@ -23,6 +23,7 @@
 		{ href: 'blog',            label: 'Blog'            },
 		{ href: 'keepers',         label: 'Keepers'         },
 		{ href: 'faab',            label: 'FAAB Ledger'     },
+		{ href: 'tiers',           label: 'Tiers'           },
 	];
 
 	onMount(async () => {
@@ -32,14 +33,20 @@
 	});
 
 	const hasBlog = $derived(!!(page.data as any).hasBlog);
+	const isPremier = $derived(!!(page.data as any).isPremier);
 	const enabledNavItems = $derived((page.data as any).enabledNavItems as string[] | null);
+
+	// Same shape as the blog gate: 'tiers' only shows for the premier ruleset,
+	// 'blog' only shows when Contentful is configured — both independent of
+	// whether the admin has customized the nav order.
+	const navVisible = (href: string) => (href !== 'blog' || hasBlog) && (href !== 'tiers' || isPremier);
 
 	const visibleLinks = $derived(
 		enabledNavItems && enabledNavItems.length > 0
 			? enabledNavItems
 				.map((href: string) => navLinks.find(l => l.href === href))
-				.filter((l): l is { href: string; label: string } => !!l && (l.href !== 'blog' || hasBlog))
-			: navLinks.filter(l => l.href !== 'blog' || hasBlog)
+				.filter((l): l is { href: string; label: string } => !!l && navVisible(l.href))
+			: navLinks.filter(l => navVisible(l.href))
 	);
 
 	const bottomTabDefs = [
