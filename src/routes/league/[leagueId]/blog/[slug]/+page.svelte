@@ -88,9 +88,13 @@
 				const alt = (f?.title ?? f?.description ?? '').replace(/"/g, '&quot;');
 				const contentType: string = f?.file?.contentType ?? '';
 				const safeUrl = url.replace(/"/g, '%22');
-				const media = contentType.startsWith('video/')
-					? `<video src="${safeUrl}" controls autoplay muted loop playsinline style="max-width:100%;border-radius:0.5rem;display:block"></video>`
-					: `<img src="${safeUrl}" alt="${alt}" style="max-width:100%;border-radius:0.5rem;display:block" />`;
+				const media = contentType.startsWith('audio/')
+					? `<audio src="${safeUrl}" controls preload="metadata" aria-label="${alt || 'Audio broadcast'}" style="display:block;width:100%;max-width:100%"></audio>`
+					: contentType.startsWith('video/')
+						? `<video src="${safeUrl}" controls autoplay muted loop playsinline style="max-width:100%;border-radius:0.5rem;display:block"></video>`
+						: contentType.startsWith('image/')
+							? `<img src="${safeUrl}" alt="${alt}" style="max-width:100%;border-radius:0.5rem;display:block" />`
+							: '';
 				return node.nodeType === 'embedded-asset-inline'
 					? media
 					: `<figure style="margin:1.5rem 0;text-align:center">${media}</figure>`;
